@@ -1,0 +1,30 @@
+{
+  "name": "voxa",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Voxa — self-hosted платформа голосового и текстового общения для закрытого круга друзей",
+  "packageManager": "pnpm@10.34.4",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm --filter @voxa/shared build && pnpm -r typecheck",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "licenses:check": "node scripts/check-licenses.mjs",
+    "dev:infra": "docker compose -f docker-compose.dev.yml up -d",
+    "dev:server": "pnpm --filter @voxa/shared build && pnpm --filter @voxa/server start:dev",
+    "dev:web": "pnpm --filter @voxa/web dev"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.20.0",
+    "eslint": "^9.20.0",
+    "eslint-config-prettier": "^10.0.1",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "prettier": "^3.5.0",
+    "typescript": "^5.8.0",
+    "typescript-eslint": "^8.24.0"
+  }
+}

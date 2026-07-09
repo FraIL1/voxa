@@ -1,0 +1,18 @@
+# Зависимости и сборка
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Секреты и локальная конфигурация
+.env
+.env.*
+!.env.example
+
+# Логи и служебные файлы
+*.log
+coverage/
+.DS_Store
+Thumbs.db
+
+# Tauri (этап 4)
+apps/desktop/src-tauri/target/
