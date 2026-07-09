@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Версия pnpm берётся из поля packageManager в package.json
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Установка зависимостей
+        run: pnpm install --frozen-lockfile
+
+      - name: Линтер
+        run: pnpm lint
+
+      - name: Форматирование
+        run: pnpm format:check
+
+      - name: Сборка
+        run: pnpm -r build
+
+      - name: Проверка типов
+        run: pnpm -r typecheck
+
+      - name: Лицензии зависимостей
+        run: pnpm licenses:check
