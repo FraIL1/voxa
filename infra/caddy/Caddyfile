@@ -1,0 +1,29 @@
+# Caddyfile Voxa (прод). DOMAIN приходит из .env через docker-compose.
+# Для DOMAIN=localhost Caddy сам выпустит self-signed сертификат —
+# так можно проверить весь прод-стек локально без домена.
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+		# HSTS включим на реальном домене (этап 5): выставленный на localhost,
+		# он заставит браузер навсегда упреждающе переводить ВСЕ порты localhost
+		# на https и сломает локальную разработку (vite на http://localhost:5173).
+	}
+
+	handle /api/* {
+		reverse_proxy server:3000
+	}
+
+	handle /socket.io/* {
+		reverse_proxy server:3000
+	}
+
+	# Статика веб-клиента появится на этапе 2; пока — заглушка
+	handle {
+		respond "Voxa server is up. API: /api/healthz" 200
+	}
+}
