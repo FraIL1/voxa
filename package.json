@@ -16,7 +16,19 @@
     "licenses:check": "node scripts/check-licenses.mjs",
     "dev:infra": "docker compose -f docker-compose.dev.yml up -d",
     "dev:server": "pnpm --filter @voxa/shared build && pnpm --filter @voxa/server start:dev",
-    "dev:web": "pnpm --filter @voxa/web dev"
+    "dev:web": "pnpm --filter @voxa/web dev",
+    "db:generate": "pnpm --filter @voxa/server exec prisma generate",
+    "db:migrate": "pnpm --filter @voxa/server exec prisma migrate dev",
+    "test:e2e": "pnpm --filter @voxa/server test:e2e"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "argon2",
+      "esbuild",
+      "prisma"
+    ]
   },
   "devDependencies": {
     "@eslint/js": "^9.20.0",

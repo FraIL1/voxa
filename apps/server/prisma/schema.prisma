@@ -1,0 +1,178 @@
+generator client {
+  provider = "prisma-client-js"
+  // native — локальная разработка; musl — рантайм в node:22-alpine
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(uuid(7))
+  username      String
+  usernameLower String   @unique @map("username_lower")
+  passwordHash  String   @map("password_hash")
+  avatarUrl     String?  @map("avatar_url")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  roles          UserRole[]
+  sessions       RefreshSession[]
+  messages       Message[]
+  invitesCreated Invite[]         @relation("InviteCreator")
+
+  @@map("users")
+}
+
+model Invite {
+  id           String    @id @default(uuid(7))
+  code         String    @unique
+  createdById  String?   @map("created_by_id")
+  createdBy    User?     @relation("InviteCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  /// Роль, которая выдаётся при регистрации по этому инвайту (bootstrap Владельца)
+  grantsRoleId String?   @map("grants_role_id")
+  grantsRole   Role?     @relation(fields: [grantsRoleId], references: [id], onDelete: SetNull)
+  maxUses      Int?      @map("max_uses")
+  uses         Int       @default(0)
+  expiresAt    DateTime? @map("expires_at")
+  revokedAt    DateTime? @map("revoked_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@map("invites")
+}
+
+model RefreshSession {
+  id        String    @id @default(uuid(7))
+  userId    String    @map("user_id")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// HMAC-SHA256 от refresh-токена (сам токен нигде не хранится)
+  tokenHash String    @unique @map("token_hash")
+  /// Семейство ротации: при повторном использовании старого токена
+  /// отзывается вся цепочка (детекция кражи)
+  family    String
+  userAgent String?   @map("user_agent")
+  ip        String?
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([family])
+  @@map("refresh_sessions")
+}
+
+model LoginAttempt {
+  id        BigInt   @id @default(autoincrement())
+  username  String
+  ip        String
+  success   Boolean
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([username, createdAt])
+  @@map("login_attempts")
+}
+
+model Role {
+  id          String   @id @default(uuid(7))
+  name        String   @unique
+  color       String?
+  /// Битмаска прав (см. Permissions в @voxa/shared)
+  permissions Int
+  /// Больше — старше в иерархии
+  position    Int
+  /// Выдаётся автоматически при регистрации («Участник»)
+  isDefault   Boolean  @default(false) @map("is_default")
+  /// «Владелец»: все права, роль нельзя удалить
+  isOwnerRole Boolean  @default(false) @map("is_owner_role")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  members       UserRole[]
+  channelAccess ChannelRoleAccess[]
+  invites       Invite[]
+
+  @@map("roles")
+}
+
+model UserRole {
+  userId String @map("user_id")
+  roleId String @map("role_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model Category {
+  id        String    @id @default(uuid(7))
+  name      String
+  position  Int
+  createdAt DateTime  @default(now()) @map("created_at")
+  channels  Channel[]
+
+  @@map("categories")
+}
+
+enum ChannelType {
+  TEXT
+  VOICE
+}
+
+model Channel {
+  id         String      @id @default(uuid(7))
+  name       String
+  type       ChannelType
+  topic      String?
+  categoryId String?     @map("category_id")
+  category   Category?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  position   Int
+  isPrivate  Boolean     @default(false) @map("is_private")
+  createdAt  DateTime    @default(now()) @map("created_at")
+  updatedAt  DateTime    @updatedAt @map("updated_at")
+
+  allowedRoles ChannelRoleAccess[]
+  messages     Message[]
+
+  @@map("channels")
+}
+
+model ChannelRoleAccess {
+  channelId String  @map("channel_id")
+  roleId    String  @map("role_id")
+  channel   Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  role      Role    @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([channelId, roleId])
+  @@map("channel_role_access")
+}
+
+model Message {
+  id        String    @id @default(uuid(7))
+  channelId String    @map("channel_id")
+  channel   Channel   @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  authorId  String?   @map("author_id")
+  author    User?     @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  /// Markdown-исходник; санитизация — при рендере на клиенте
+  content   String
+  replyToId String?   @map("reply_to_id")
+  replyTo   Message?  @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies   Message[] @relation("MessageReplies")
+  editedAt  DateTime? @map("edited_at")
+  /// Мягкое удаление: ответы на удалённое сообщение показывают заглушку
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([channelId, createdAt])
+  @@map("messages")
+}
+
+/// Служебные флаги приложения (выполнен ли стартовый сид и т.п.)
+model AppMeta {
+  key   String @id
+  value String
+
+  @@map("app_meta")
+}
