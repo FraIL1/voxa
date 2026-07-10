@@ -56,12 +56,27 @@ export interface CommunityStructureDto {
   uncategorized: ChannelDto[];
 }
 
+export interface ReactionDto {
+  emoji: string;
+  userId: string;
+}
+
+/** Короткое превью сообщения, на которое отвечают */
+export interface ReplyPreviewDto {
+  id: string;
+  authorUsername: string | null;
+  /** Первые ~140 символов оригинала; null — оригинал удалён */
+  excerpt: string | null;
+}
+
 export interface MessageDto {
   id: string;
   channelId: string;
   author: UserPublicDto | null;
   content: string;
   replyToId: string | null;
+  replyTo: ReplyPreviewDto | null;
+  reactions: ReactionDto[];
   editedAt: string | null;
   createdAt: string;
 }

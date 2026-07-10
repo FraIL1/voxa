@@ -96,3 +96,21 @@ export const messagesQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });
 export type MessagesQueryInput = z.infer<typeof messagesQuerySchema>;
+
+export const editMessageSchema = z.object({
+  content: z
+    .string()
+    .min(1, 'Сообщение не может быть пустым')
+    .max(4000, 'Сообщение слишком длинное (максимум 4000 символов)')
+    .refine((s) => s.trim().length > 0, 'Сообщение не может быть пустым'),
+});
+export type EditMessageInput = z.infer<typeof editMessageSchema>;
+
+/** Эмодзи реакции: непустая строка без пробелов (может быть несколько кодпоинтов) */
+export const reactionEmojiSchema = z.string().min(1).max(32).regex(/^\S+$/u, 'Недопустимый эмодзи');
+
+/** Полезная нагрузка клиентского события typing */
+export const typingSchema = z.object({
+  channelId: z.string().uuid(),
+});
+export type TypingInput = z.infer<typeof typingSchema>;

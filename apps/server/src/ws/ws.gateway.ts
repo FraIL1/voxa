@@ -1,12 +1,21 @@
 import { Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import {
+  MessageBody,
+  ConnectedSocket,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
-import { WsEvents, type WsEventName, type WsServerEvents } from '@voxa/shared';
+import {
+  typingSchema,
+  WsClientEvents,
+  WsEvents,
+  type WsEventName,
+  type WsServerEvents,
+} from '@voxa/shared';
 import type { Server, Socket } from 'socket.io';
 
 import type { AccessTokenPayload } from '../common/guards/jwt-auth.guard';
@@ -23,7 +32,12 @@ export function userRoom(userId: string): string {
 interface SocketData {
   userId?: string;
   username?: string;
+  /** Последняя отправка typing по каналам: channelId → timestamp (троттлинг) */
+  typingAt?: Map<string, number>;
 }
+
+/** Чаще, чем раз в это время, typing от сокета по каналу не ретранслируется */
+const TYPING_THROTTLE_MS = 2000;
 
 /**
  * Единственный WebSocket-шлюз приложения. Аутентификация — JWT в
@@ -73,6 +87,36 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (data.userId) {
       this.logger.debug(`Отключился ${data.username ?? data.userId}`);
     }
+  }
+
+  /**
+   * «X печатает…»: ретрансляция остальным подписчикам канала.
+   * Сокет должен состоять в комнате канала (видимость уже проверена при
+   * подключении); серверный троттлинг защищает от флуда.
+   */
+  @SubscribeMessage(WsClientEvents.Typing)
+  handleTyping(@ConnectedSocket() socket: Socket, @MessageBody() body: unknown): void {
+    const data = socket.data as SocketData;
+    if (!data.userId || !data.username) return;
+
+    const parsed = typingSchema.safeParse(body);
+    if (!parsed.success) return;
+    const { channelId } = parsed.data;
+
+    if (!socket.rooms.has(channelRoom(channelId))) return;
+
+    const now = Date.now();
+    data.typingAt ??= new Map();
+    const last = data.typingAt.get(channelId) ?? 0;
+    if (now - last < TYPING_THROTTLE_MS) return;
+    data.typingAt.set(channelId, now);
+
+    const payload: WsServerEvents[typeof WsEvents.Typing] = {
+      channelId,
+      userId: data.userId,
+      username: data.username,
+    };
+    socket.to(channelRoom(channelId)).emit(WsEvents.Typing, payload);
   }
 
   emitToAll<E extends WsEventName>(event: E, payload: WsServerEvents[E]): void {

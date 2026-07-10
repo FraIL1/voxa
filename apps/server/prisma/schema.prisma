@@ -21,6 +21,7 @@ model User {
   roles          UserRole[]
   sessions       RefreshSession[]
   messages       Message[]
+  reactions      Reaction[]
   invitesCreated Invite[]         @relation("InviteCreator")
 
   @@map("users")
@@ -165,8 +166,25 @@ model Message {
   deletedAt DateTime? @map("deleted_at")
   createdAt DateTime  @default(now()) @map("created_at")
 
+  reactions Reaction[]
+
   @@index([channelId, createdAt])
   @@map("messages")
+}
+
+model Reaction {
+  id        String   @id @default(uuid(7))
+  messageId String   @map("message_id")
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Эмодзи как есть (может быть несколько кодпоинтов)
+  emoji     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+  @@map("reactions")
 }
 
 /// Служебные флаги приложения (выполнен ли стартовый сид и т.п.)

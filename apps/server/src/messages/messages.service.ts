@@ -1,22 +1,54 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import type { Message, Reaction, User } from '@prisma/client';
+import {
+  hasPermission,
+  Permissions,
   WsEvents,
+  type EditMessageInput,
   type MessageDto,
   type MessagesPageDto,
   type MessagesQueryInput,
   type SendMessageInput,
 } from '@voxa/shared';
-import type { Message, User } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { WsGateway } from '../ws/ws.gateway';
 
-type MessageWithAuthor = Message & {
+const EXCERPT_LENGTH = 140;
+/** Максимум различных эмодзи на одном сообщении */
+const MAX_DISTINCT_REACTIONS = 20;
+
+type MessageWithRelations = Message & {
   author: Pick<User, 'id' | 'username' | 'avatarUrl'> | null;
+  reactions: Pick<Reaction, 'emoji' | 'userId'>[];
+  replyTo:
+    | (Pick<Message, 'id' | 'content' | 'deletedAt'> & {
+        author: Pick<User, 'username'> | null;
+      })
+    | null;
 };
 
 const AUTHOR_SELECT = { select: { id: true, username: true, avatarUrl: true } } as const;
+
+const MESSAGE_INCLUDE = {
+  author: AUTHOR_SELECT,
+  reactions: { select: { emoji: true, userId: true }, orderBy: { createdAt: 'asc' } },
+  replyTo: {
+    select: {
+      id: true,
+      content: true,
+      deletedAt: true,
+      author: { select: { username: true } },
+    },
+  },
+} as const;
 
 @Injectable()
 export class MessagesService {
@@ -26,7 +58,7 @@ export class MessagesService {
     private readonly ws: WsGateway,
   ) {}
 
-  private toDto(message: MessageWithAuthor): MessageDto {
+  private toDto(message: MessageWithRelations): MessageDto {
     return {
       id: message.id,
       channelId: message.channelId,
@@ -39,6 +71,16 @@ export class MessagesService {
         : null,
       content: message.content,
       replyToId: message.replyToId,
+      replyTo: message.replyTo
+        ? {
+            id: message.replyTo.id,
+            authorUsername: message.replyTo.author?.username ?? null,
+            excerpt: message.replyTo.deletedAt
+              ? null
+              : message.replyTo.content.slice(0, EXCERPT_LENGTH),
+          }
+        : null,
+      reactions: message.reactions.map((r) => ({ emoji: r.emoji, userId: r.userId })),
       editedAt: message.editedAt?.toISOString() ?? null,
       createdAt: message.createdAt.toISOString(),
     };
@@ -53,6 +95,19 @@ export class MessagesService {
     if (channel.type !== 'TEXT') {
       throw new BadRequestException('Сообщения можно отправлять только в текстовые каналы');
     }
+  }
+
+  /** Живое сообщение в этом канале — иначе 404 */
+  private async findAliveOrThrow(
+    channelId: string,
+    messageId: string,
+  ): Promise<MessageWithRelations> {
+    const message = await this.prisma.message.findFirst({
+      where: { id: messageId, channelId, deletedAt: null },
+      include: MESSAGE_INCLUDE,
+    });
+    if (!message) throw new NotFoundException('Сообщение не найдено');
+    return message;
   }
 
   async send(userId: string, channelId: string, input: SendMessageInput): Promise<MessageDto> {
@@ -75,12 +130,123 @@ export class MessagesService {
         content: input.content,
         replyToId: input.replyToId ?? null,
       },
-      include: { author: AUTHOR_SELECT },
+      include: MESSAGE_INCLUDE,
     });
 
     const dto = this.toDto(message);
     this.ws.emitToChannel(channelId, WsEvents.MessageNew, dto);
     return dto;
+  }
+
+  /** Редактировать может только автор (модераторы — нет, как в Discord) */
+  async edit(
+    userId: string,
+    channelId: string,
+    messageId: string,
+    input: EditMessageInput,
+  ): Promise<MessageDto> {
+    await this.assertTextChannelAccess(userId, channelId);
+    const message = await this.findAliveOrThrow(channelId, messageId);
+
+    if (message.authorId !== userId) {
+      throw new ForbiddenException('Редактировать можно только свои сообщения');
+    }
+
+    const updated = await this.prisma.message.update({
+      where: { id: messageId },
+      data: { content: input.content, editedAt: new Date() },
+      include: MESSAGE_INCLUDE,
+    });
+
+    const dto = this.toDto(updated);
+    this.ws.emitToChannel(channelId, WsEvents.MessageEdited, dto);
+    return dto;
+  }
+
+  /** Удаляет автор или обладатель права DELETE_MESSAGES (мягкое удаление) */
+  async remove(userId: string, channelId: string, messageId: string): Promise<void> {
+    await this.assertTextChannelAccess(userId, channelId);
+    const message = await this.findAliveOrThrow(channelId, messageId);
+
+    if (message.authorId !== userId) {
+      const mask = await this.users.permissionMaskOf(userId);
+      if (!hasPermission(mask, Permissions.DELETE_MESSAGES)) {
+        throw new ForbiddenException('Недостаточно прав для удаления чужого сообщения');
+      }
+    }
+
+    await this.prisma.message.update({
+      where: { id: messageId },
+      data: { deletedAt: new Date() },
+    });
+
+    this.ws.emitToChannel(channelId, WsEvents.MessageDeleted, { id: messageId, channelId });
+  }
+
+  async addReaction(
+    userId: string,
+    channelId: string,
+    messageId: string,
+    emoji: string,
+  ): Promise<void> {
+    await this.assertTextChannelAccess(userId, channelId);
+    await this.findAliveOrThrow(channelId, messageId);
+
+    // Идемпотентность: реакция уже стоит — не ошибка и не событие
+    const existing = await this.prisma.reaction.findUnique({
+      where: { messageId_userId_emoji: { messageId, userId, emoji } },
+      select: { id: true },
+    });
+    if (existing) return;
+
+    const distinct = await this.prisma.reaction.findMany({
+      where: { messageId },
+      select: { emoji: true },
+      distinct: ['emoji'],
+    });
+    const isNewEmoji = !distinct.some((r) => r.emoji === emoji);
+    if (isNewEmoji && distinct.length >= MAX_DISTINCT_REACTIONS) {
+      throw new BadRequestException('На сообщении слишком много разных реакций');
+    }
+
+    try {
+      await this.prisma.reaction.create({ data: { messageId, userId, emoji } });
+    } catch (error) {
+      // Гонка параллельных запросов: другой запрос успел создать ту же реакцию
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        return;
+      }
+      throw error;
+    }
+
+    this.ws.emitToChannel(channelId, WsEvents.ReactionAdded, {
+      channelId,
+      messageId,
+      emoji,
+      userId,
+    });
+  }
+
+  async removeReaction(
+    userId: string,
+    channelId: string,
+    messageId: string,
+    emoji: string,
+  ): Promise<void> {
+    await this.assertTextChannelAccess(userId, channelId);
+    await this.findAliveOrThrow(channelId, messageId);
+
+    const { count } = await this.prisma.reaction.deleteMany({
+      where: { messageId, userId, emoji },
+    });
+    if (count === 0) return; // нечего убирать — не событие
+
+    this.ws.emitToChannel(channelId, WsEvents.ReactionRemoved, {
+      channelId,
+      messageId,
+      emoji,
+      userId,
+    });
   }
 
   /** История канала: от новых к старым, курсор — id сообщения (uuid v7 монотонен) */
@@ -96,7 +262,7 @@ export class MessagesService {
       orderBy: { id: 'desc' },
       take: query.limit + 1,
       ...(query.before ? { cursor: { id: query.before }, skip: 1 } : {}),
-      include: { author: AUTHOR_SELECT },
+      include: MESSAGE_INCLUDE,
     });
 
     const hasMore = messages.length > query.limit;
