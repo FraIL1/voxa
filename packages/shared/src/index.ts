@@ -7,3 +7,8 @@ export interface HealthzResponse {
   uptimeSeconds: number;
   timestamp: string;
 }
+
+export * from './permissions';
+export * from './schemas';
+export * from './dto';
+export * from './ws';

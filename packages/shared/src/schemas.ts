@@ -1,0 +1,98 @@
+import { z } from 'zod';
+
+/** Имя пользователя: 3–24 символа, буквы/цифры/_ . - (раздел 5.1 PRD) */
+export const usernameSchema = z
+  .string()
+  .trim()
+  .min(3, 'Имя должно быть не короче 3 символов')
+  .max(24, 'Имя должно быть не длиннее 24 символов')
+  .regex(/^[\p{L}\p{N}_.-]+$/u, 'Допустимы только буквы, цифры и символы _ . -');
+
+/** Пароль: минимум 10 символов (раздел 5.1 PRD) */
+export const passwordSchema = z
+  .string()
+  .min(10, 'Пароль должен быть не короче 10 символов')
+  .max(128, 'Пароль должен быть не длиннее 128 символов');
+
+export const registerSchema = z.object({
+  inviteCode: z.string().trim().min(4).max(64),
+  username: usernameSchema,
+  password: passwordSchema,
+});
+export type RegisterInput = z.infer<typeof registerSchema>;
+
+export const loginSchema = z.object({
+  username: z.string().trim().min(1).max(24),
+  password: z.string().min(1).max(128),
+});
+export type LoginInput = z.infer<typeof loginSchema>;
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1).max(128),
+  newPassword: passwordSchema,
+});
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+
+export const createInviteSchema = z.object({
+  /** null/не задано — без лимита использований */
+  maxUses: z.number().int().min(1).max(1000).nullish(),
+  /** null/не задано — бессрочный */
+  expiresInHours: z
+    .number()
+    .int()
+    .min(1)
+    .max(24 * 30)
+    .nullish(),
+});
+export type CreateInviteInput = z.infer<typeof createInviteSchema>;
+
+export const createCategorySchema = z.object({
+  name: z.string().trim().min(1).max(32),
+});
+export type CreateCategoryInput = z.infer<typeof createCategorySchema>;
+
+export const updateCategorySchema = z.object({
+  name: z.string().trim().min(1).max(32).optional(),
+  position: z.number().int().min(0).optional(),
+});
+export type UpdateCategoryInput = z.infer<typeof updateCategorySchema>;
+
+export const channelTypeSchema = z.enum(['TEXT', 'VOICE']);
+
+export const createChannelSchema = z.object({
+  name: z.string().trim().min(1).max(32),
+  type: channelTypeSchema,
+  topic: z.string().trim().max(1024).optional(),
+  categoryId: z.string().uuid().nullish(),
+  isPrivate: z.boolean().optional(),
+  /** Роли, которым виден приватный канал */
+  allowedRoleIds: z.array(z.string().uuid()).max(50).optional(),
+});
+export type CreateChannelInput = z.infer<typeof createChannelSchema>;
+
+export const updateChannelSchema = z.object({
+  name: z.string().trim().min(1).max(32).optional(),
+  topic: z.string().trim().max(1024).nullable().optional(),
+  categoryId: z.string().uuid().nullable().optional(),
+  position: z.number().int().min(0).optional(),
+  isPrivate: z.boolean().optional(),
+  allowedRoleIds: z.array(z.string().uuid()).max(50).optional(),
+});
+export type UpdateChannelInput = z.infer<typeof updateChannelSchema>;
+
+export const sendMessageSchema = z.object({
+  content: z
+    .string()
+    .min(1, 'Сообщение не может быть пустым')
+    .max(4000, 'Сообщение слишком длинное (максимум 4000 символов)')
+    .refine((s) => s.trim().length > 0, 'Сообщение не может быть пустым'),
+  replyToId: z.string().uuid().optional(),
+});
+export type SendMessageInput = z.infer<typeof sendMessageSchema>;
+
+export const messagesQuerySchema = z.object({
+  /** id сообщения, ДО которого грузить историю (курсор) */
+  before: z.string().uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+});
+export type MessagesQueryInput = z.infer<typeof messagesQuerySchema>;
