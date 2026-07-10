@@ -4,11 +4,14 @@ import { PrismaClient } from '@prisma/client';
 import {
   API_PREFIX,
   Permissions,
+  WsClientEvents,
   WsEvents,
   type AuthResponseDto,
   type CommunityStructureDto,
+  type MeDto,
   type MessageDto,
   type MessagesPageDto,
+  type TypingPayload,
 } from '@voxa/shared';
 import cookieParser from 'cookie-parser';
 import type { AddressInfo } from 'node:net';
@@ -257,5 +260,151 @@ describe('Voxa: критический поток (e2e)', () => {
       .set('Authorization', `Bearer ${ownerAccess}`)
       .send({ content: 'ответ не туда', replyToId: existingId })
       .expect(400);
+  });
+
+  it('правка своего сообщения рассылается (message.edit), чужого — запрещена', async () => {
+    const sent = await request(httpServer)
+      .post(`/api/channels/${generalChannelId}/messages`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ content: 'до правки' })
+      .expect(201);
+
+    const edited = new Promise<MessageDto>((resolve) => {
+      socket?.once(WsEvents.MessageEdited, resolve);
+    });
+
+    await request(httpServer)
+      .patch(`/api/channels/${generalChannelId}/messages/${sent.body.id}`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ content: 'после правки' })
+      .expect(200);
+
+    const wsMessage = await edited;
+    expect(wsMessage.id).toBe(sent.body.id);
+    expect(wsMessage.content).toBe('после правки');
+    expect(wsMessage.editedAt).toBeTruthy();
+
+    // Участник не может править чужое сообщение
+    await request(httpServer)
+      .patch(`/api/channels/${generalChannelId}/messages/${sent.body.id}`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ content: 'взлом' })
+      .expect(403);
+  });
+
+  it('реакции: идемпотентная постановка, снятие и события WS', async () => {
+    const me = await request(httpServer)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(200);
+    const memberId = (me.body as MeDto).id;
+
+    const target = await request(httpServer)
+      .post(`/api/channels/${generalChannelId}/messages`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ content: 'поставьте мне реакцию' })
+      .expect(201);
+    const emoji = encodeURIComponent('🔥');
+
+    const addEvents: unknown[] = [];
+    const onAdd = (p: unknown): void => {
+      addEvents.push(p);
+    };
+    socket?.on(WsEvents.ReactionAdded, onAdd);
+
+    await request(httpServer)
+      .put(`/api/channels/${generalChannelId}/messages/${target.body.id}/reactions/${emoji}`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(204);
+    // Повторная постановка идемпотентна и не порождает второе событие
+    await request(httpServer)
+      .put(`/api/channels/${generalChannelId}/messages/${target.body.id}/reactions/${emoji}`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(204);
+
+    await new Promise((r) => setTimeout(r, 300));
+    socket?.off(WsEvents.ReactionAdded, onAdd);
+    expect(addEvents).toHaveLength(1);
+
+    const history = await request(httpServer)
+      .get(`/api/channels/${generalChannelId}/messages`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    const withReaction = (history.body as MessagesPageDto).items.find(
+      (m) => m.id === target.body.id,
+    );
+    expect(withReaction?.reactions).toEqual([{ emoji: '🔥', userId: memberId }]);
+
+    const removed = new Promise((resolve) => {
+      socket?.once(WsEvents.ReactionRemoved, resolve);
+    });
+    await request(httpServer)
+      .delete(`/api/channels/${generalChannelId}/messages/${target.body.id}/reactions/${emoji}`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(204);
+    await removed;
+  });
+
+  it('ответ с превью; чужое удаляет только модератор (message.delete)', async () => {
+    const original = await request(httpServer)
+      .post(`/api/channels/${generalChannelId}/messages`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ content: 'оригинал для ответа' })
+      .expect(201);
+
+    const reply = await request(httpServer)
+      .post(`/api/channels/${generalChannelId}/messages`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ content: 'ответ с превью', replyToId: original.body.id })
+      .expect(201);
+    expect((reply.body as MessageDto).replyTo).toEqual({
+      id: original.body.id,
+      authorUsername: MEMBER.username,
+      excerpt: 'оригинал для ответа',
+    });
+
+    // Участник не может удалить чужое сообщение
+    await request(httpServer)
+      .delete(`/api/channels/${generalChannelId}/messages/${reply.body.id}`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(403);
+
+    // Владелец (ADMINISTRATOR ⊃ DELETE_MESSAGES) удаляет сообщение участника
+    const deleted = new Promise<{ id: string }>((resolve) => {
+      socket?.once(WsEvents.MessageDeleted, resolve);
+    });
+    await request(httpServer)
+      .delete(`/api/channels/${generalChannelId}/messages/${original.body.id}`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(204);
+    expect((await deleted).id).toBe(original.body.id);
+
+    // Удалённого нет в истории, а превью ответа на него обнулено
+    const history = await request(httpServer)
+      .get(`/api/channels/${generalChannelId}/messages`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    const items = (history.body as MessagesPageDto).items;
+    expect(items.some((m) => m.id === original.body.id)).toBe(false);
+    const replyRow = items.find((m) => m.id === reply.body.id);
+    expect(replyRow?.replyTo?.excerpt).toBeNull();
+  });
+
+  it('событие typing ретранслируется другим участникам канала', async () => {
+    const memberSocket = io(baseUrl, { auth: { token: memberAccess }, transports: ['websocket'] });
+    await new Promise((resolve, reject) => {
+      memberSocket.once(WsEvents.Ready, resolve);
+      memberSocket.once('auth_error', () => reject(new Error('WS-авторизация не прошла')));
+    });
+
+    const typing = new Promise<TypingPayload>((resolve) => {
+      socket?.once(WsEvents.Typing, resolve);
+    });
+    memberSocket.emit(WsClientEvents.Typing, { channelId: generalChannelId });
+
+    const payload = await typing;
+    expect(payload.channelId).toBe(generalChannelId);
+    expect(payload.username).toBe(MEMBER.username);
+    memberSocket.disconnect();
   });
 });
