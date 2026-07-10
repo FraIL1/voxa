@@ -15,11 +15,14 @@ RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
 
 COPY packages/shared packages/shared
 COPY apps/server apps/server
-RUN pnpm --filter @voxa/shared build && pnpm --filter @voxa/server build
+RUN pnpm --filter @voxa/server exec prisma generate \
+    && pnpm --filter @voxa/shared build \
+    && pnpm --filter @voxa/server build
 
-# Убираем dev-зависимости: переустановка только прод-пакетов
+# Убираем dev-зависимости и генерируем Prisma-клиент заново уже в прод-дереве
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
-    pnpm install --prod --frozen-lockfile
+    pnpm install --prod --frozen-lockfile \
+    && pnpm --filter @voxa/server exec prisma generate
 
 # ---------- Рантайм ----------
 FROM node:22-alpine AS runtime
@@ -28,4 +31,6 @@ WORKDIR /app
 COPY --from=build /app /app
 USER node
 EXPOSE 3000
-CMD ["node", "apps/server/dist/main.js"]
+WORKDIR /app/apps/server
+# Миграции применяются автоматически при каждом старте (раздел 10 PRD)
+CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy && node dist/main.js"]

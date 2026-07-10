@@ -8,6 +8,27 @@ on:
 jobs:
   checks:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: voxa
+          POSTGRES_USER: voxa
+          POSTGRES_PASSWORD: voxa
+        ports: ['5433:5432']
+        options: >-
+          --health-cmd "pg_isready -U voxa -d voxa"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
@@ -21,6 +42,9 @@ jobs:
 
       - name: Установка зависимостей
         run: pnpm install --frozen-lockfile
+
+      - name: Генерация Prisma-клиента
+        run: pnpm db:generate
 
       - name: Линтер
         run: pnpm lint
@@ -36,3 +60,11 @@ jobs:
 
       - name: Лицензии зависимостей
         run: pnpm licenses:check
+
+      - name: E2e-тесты
+        run: pnpm test:e2e
+        env:
+          DATABASE_URL: postgresql://voxa:voxa@localhost:5433/voxa?schema=e2e
+          REDIS_URL: redis://localhost:6379
+          JWT_ACCESS_SECRET: ci-access-secret-0123456789
+          JWT_REFRESH_SECRET: ci-refresh-secret-0123456789
