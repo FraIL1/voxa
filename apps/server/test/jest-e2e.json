@@ -1,0 +1,13 @@
+{
+  "preset": "ts-jest",
+  "testEnvironment": "node",
+  "rootDir": "..",
+  "roots": ["<rootDir>/test"],
+  "testRegex": "\\.e2e-spec\\.ts$",
+  "setupFiles": ["<rootDir>/test/set-env.ts"],
+  "globalSetup": "<rootDir>/test/global-setup.ts",
+  "moduleNameMapper": {
+    "^@voxa/shared$": "<rootDir>/../../packages/shared/src/index.ts"
+  },
+  "testTimeout": 30000
+}
