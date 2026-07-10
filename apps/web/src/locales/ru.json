@@ -1,0 +1,39 @@
+{
+  "app": {
+    "name": "Voxa",
+    "loading": "Загрузка…",
+    "communityName": "Voxa"
+  },
+  "auth": {
+    "loginTitle": "С возвращением!",
+    "registerTitle": "Регистрация по приглашению",
+    "username": "Имя пользователя",
+    "password": "Пароль",
+    "passwordHint": "Минимум 10 символов",
+    "inviteCode": "Код приглашения",
+    "loginButton": "Войти",
+    "registerButton": "Создать аккаунт",
+    "working": "Секунду…",
+    "noAccount": "Есть код приглашения?",
+    "registerLink": "Зарегистрироваться",
+    "haveAccount": "Уже есть аккаунт?",
+    "loginLink": "Войти",
+    "logout": "Выйти",
+    "genericError": "Что-то пошло не так, попробуйте ещё раз"
+  },
+  "channels": {
+    "uncategorized": "Без категории",
+    "voiceComingSoon": "Голосовые каналы появятся на этапе 3",
+    "selectChannel": "Выберите канал слева, чтобы начать общение"
+  },
+  "chat": {
+    "placeholder": "Написать в #{{channel}}",
+    "send": "Отправить",
+    "loadMore": "Показать более ранние сообщения",
+    "empty": "Здесь пока пусто. Напишите первое сообщение!",
+    "unknownUser": "Удалённый аккаунт"
+  },
+  "members": {
+    "comingSoon": "Список участников появится чуть позже"
+  }
+}

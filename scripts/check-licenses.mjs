@@ -18,6 +18,8 @@ const ALLOWED = new Set([
   'CC-BY-4.0',
   'Unlicense',
   'Python-2.0',
+  // Шрифты (Inter через @fontsource): PRD раздел 11 явно разрешает SIL OFL
+  'OFL-1.1',
 ]);
 
 /** Поддерживает выражения SPDX вида "(MIT OR Apache-2.0)" и "A AND B". */
