@@ -311,6 +311,7 @@ a {
 }
 
 .message {
+  position: relative;
   display: flex;
   gap: 12px;
   padding: 6px 8px;
@@ -323,6 +324,138 @@ a {
 
 .message.pending {
   opacity: 0.55;
+}
+
+/* Тулбар действий: появляется при наведении на сообщение */
+.message-toolbar {
+  position: absolute;
+  top: -14px;
+  right: 12px;
+  display: none;
+  gap: 2px;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2px;
+}
+
+.message:hover .message-toolbar {
+  display: flex;
+}
+
+.icon-button.danger:hover {
+  color: var(--danger);
+}
+
+/* Превью сообщения, на которое отвечают */
+.reply-preview {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+  min-width: 0;
+}
+
+.reply-preview .reply-author {
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.reply-preview .reply-excerpt {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Реакции */
+.reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.reaction {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 14px;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.reaction:hover {
+  border-color: var(--text-faint);
+}
+
+.reaction.mine {
+  border-color: var(--accent);
+  background: rgba(255, 122, 69, 0.12);
+}
+
+.reaction-count {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Мини-пикер эмодзи */
+.picker-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+}
+
+.emoji-picker {
+  position: absolute;
+  top: 18px;
+  right: 12px;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 2px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.emoji-picker button {
+  background: transparent;
+  font-size: 18px;
+  padding: 6px;
+  border-radius: 6px;
+}
+
+.emoji-picker button:hover {
+  background: var(--panel-raised);
+}
+
+/* Инлайн-редактирование */
+.edit-box textarea {
+  width: 100%;
+  resize: none;
+  min-height: 38px;
+}
+
+.edit-hint {
+  font-size: 11px;
+  color: var(--text-faint);
+  margin-top: 2px;
+}
+
+/* Упоминания */
+.mention {
+  color: var(--accent);
+  background: rgba(255, 122, 69, 0.12);
+  border-radius: 4px;
+  padding: 0 3px;
+  font-weight: 500;
 }
 
 .avatar {
@@ -394,8 +527,35 @@ a {
   color: var(--text-muted);
 }
 
+/* «X печатает…» — фиксированная высота, чтобы лента не прыгала */
+.typing-indicator {
+  height: 20px;
+  padding: 0 24px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 .composer {
-  padding: 0 16px 20px;
+  padding: 0 16px 16px;
+}
+
+.composer-reply {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+  padding: 6px 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.composer-reply + .composer-inner {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
 }
 
 .composer-inner {

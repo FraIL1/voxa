@@ -4,9 +4,11 @@ import type { MessageDto, MessagesPageDto } from '@voxa/shared';
 import { api } from '../api/client';
 import {
   addMessage,
+  applyReaction,
   confirmMessage,
   messagesKey,
   removeMessage,
+  updateMessage,
   type ChatMessage,
 } from '../api/messages-cache';
 import { useAuthStore } from '../stores/auth';
@@ -29,20 +31,22 @@ export function useSendMessage(channelId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (content: string) =>
+    mutationFn: ({ content, replyToId }: { content: string; replyToId?: string }) =>
       api<MessageDto>(`/channels/${channelId}/messages`, {
         method: 'POST',
-        body: { content },
+        body: { content, ...(replyToId ? { replyToId } : {}) },
       }),
 
-    onMutate: (content) => {
+    onMutate: ({ content, replyToId }) => {
       const user = useAuthStore.getState().user;
       const temp: ChatMessage = {
         id: `temp-${crypto.randomUUID()}`,
         channelId,
         author: user ? { id: user.id, username: user.username, avatarUrl: user.avatarUrl } : null,
         content,
-        replyToId: null,
+        replyToId: replyToId ?? null,
+        replyTo: null,
+        reactions: [],
         editedAt: null,
         createdAt: new Date().toISOString(),
         pending: true,
@@ -51,12 +55,72 @@ export function useSendMessage(channelId: string) {
       return { tempId: temp.id };
     },
 
-    onSuccess: (real, _content, context) => {
+    onSuccess: (real, _vars, context) => {
       confirmMessage(queryClient, channelId, context.tempId, real);
     },
 
-    onError: (_error, _content, context) => {
+    onError: (_error, _vars, context) => {
       if (context) removeMessage(queryClient, channelId, context.tempId);
+    },
+  });
+}
+
+export function useEditMessage(channelId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ messageId, content }: { messageId: string; content: string }) =>
+      api<MessageDto>(`/channels/${channelId}/messages/${messageId}`, {
+        method: 'PATCH',
+        body: { content },
+      }),
+    onSuccess: (updated) => {
+      updateMessage(queryClient, updated);
+    },
+  });
+}
+
+export function useDeleteMessage(channelId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (messageId: string) =>
+      api<void>(`/channels/${channelId}/messages/${messageId}`, { method: 'DELETE' }),
+    onSuccess: (_data, messageId) => {
+      removeMessage(queryClient, channelId, messageId);
+    },
+  });
+}
+
+/** Клик по реакции: снимает свою или ставит новую — оптимистично, с откатом */
+export function useToggleReaction(channelId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ messageId, emoji, mine }: { messageId: string; emoji: string; mine: boolean }) =>
+      api<void>(
+        `/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`,
+        { method: mine ? 'DELETE' : 'PUT' },
+      ),
+
+    onMutate: ({ messageId, emoji, mine }) => {
+      const userId = useAuthStore.getState().user?.id;
+      if (!userId) return;
+      applyReaction(queryClient, channelId, messageId, emoji, userId, mine ? 'remove' : 'add');
+      return { userId };
+    },
+
+    onError: (_error, { messageId, emoji, mine }, context) => {
+      if (!context) return;
+      // откат оптимистичного изменения
+      applyReaction(
+        queryClient,
+        channelId,
+        messageId,
+        emoji,
+        context.userId,
+        mine ? 'add' : 'remove',
+      );
     },
   });
 }

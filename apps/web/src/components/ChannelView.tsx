@@ -5,6 +5,7 @@ import { Navigate, useParams } from 'react-router';
 import { allChannelsOf, useStructure } from '../hooks/useStructure';
 import Composer from './Composer';
 import MessageList from './MessageList';
+import TypingIndicator from './TypingIndicator';
 
 export default function ChannelView() {
   const { t } = useTranslation();
@@ -25,6 +26,7 @@ export default function ChannelView() {
         {channel.topic && <span className="topic">— {channel.topic}</span>}
       </header>
       <MessageList channelId={channel.id} />
+      <TypingIndicator channelId={channel.id} />
       <Composer channelId={channel.id} channelName={channel.name} />
     </div>
   );

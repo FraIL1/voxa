@@ -10,6 +10,17 @@ export function messagesKey(channelId: string): [string, string] {
   return ['messages', channelId];
 }
 
+function mapPages(
+  data: MessagesData | undefined,
+  fn: (items: ChatMessage[]) => ChatMessage[],
+): MessagesData | undefined {
+  if (!data) return data;
+  return {
+    ...data,
+    pages: data.pages.map((page) => ({ ...page, items: fn(page.items) })),
+  };
+}
+
 /** Новое сообщение — в начало первой (самой свежей) страницы, с дедупликацией */
 export function addMessage(queryClient: QueryClient, message: ChatMessage): void {
   queryClient.setQueryData<MessagesData>(messagesKey(message.channelId), (data) => {
@@ -37,29 +48,52 @@ export function confirmMessage(
   real: MessageDto,
 ): void {
   queryClient.setQueryData<MessagesData>(messagesKey(channelId), (data) => {
-    if (!data) return data;
-    const alreadyHasReal = data.pages.some((p) => p.items.some((m) => m.id === real.id));
-    return {
-      ...data,
-      pages: data.pages.map((page) => ({
-        ...page,
-        items: page.items
-          .filter((m) => !(m.id === tempId && alreadyHasReal))
-          .map((m) => (m.id === tempId ? real : m)),
-      })),
-    };
+    const alreadyHasReal = data?.pages.some((p) => p.items.some((m) => m.id === real.id)) ?? false;
+    return mapPages(data, (items) =>
+      items
+        .filter((m) => !(m.id === tempId && alreadyHasReal))
+        .map((m) => (m.id === tempId ? real : m)),
+    );
   });
 }
 
+/** Замена сообщения по id (правка своя или пришедшая по WebSocket) */
+export function updateMessage(queryClient: QueryClient, message: MessageDto): void {
+  queryClient.setQueryData<MessagesData>(messagesKey(message.channelId), (data) =>
+    mapPages(data, (items) => items.map((m) => (m.id === message.id ? { ...m, ...message } : m))),
+  );
+}
+
 export function removeMessage(queryClient: QueryClient, channelId: string, id: string): void {
-  queryClient.setQueryData<MessagesData>(messagesKey(channelId), (data) => {
-    if (!data) return data;
-    return {
-      ...data,
-      pages: data.pages.map((page) => ({
-        ...page,
-        items: page.items.filter((m) => m.id !== id),
-      })),
-    };
-  });
+  queryClient.setQueryData<MessagesData>(messagesKey(channelId), (data) =>
+    mapPages(data, (items) => items.filter((m) => m.id !== id)),
+  );
+}
+
+/** Добавление/снятие реакции (и оптимистично, и из WebSocket-события) */
+export function applyReaction(
+  queryClient: QueryClient,
+  channelId: string,
+  messageId: string,
+  emoji: string,
+  userId: string,
+  kind: 'add' | 'remove',
+): void {
+  queryClient.setQueryData<MessagesData>(messagesKey(channelId), (data) =>
+    mapPages(data, (items) =>
+      items.map((m) => {
+        if (m.id !== messageId) return m;
+        const exists = m.reactions.some((r) => r.emoji === emoji && r.userId === userId);
+        if (kind === 'add') {
+          if (exists) return m;
+          return { ...m, reactions: [...m.reactions, { emoji, userId }] };
+        }
+        if (!exists) return m;
+        return {
+          ...m,
+          reactions: m.reactions.filter((r) => !(r.emoji === emoji && r.userId === userId)),
+        };
+      }),
+    ),
+  );
 }

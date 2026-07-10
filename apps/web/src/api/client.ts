@@ -33,7 +33,7 @@ export function refreshSession(): Promise<boolean> {
 }
 
 interface ApiOptions {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
   /** Служебное: запрет повторного refresh-ретрая */
   _noRetry?: boolean;
