@@ -2,6 +2,7 @@ import { useLayoutEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useMessages } from '../hooks/useMessages';
+import { useAutoAck } from '../hooks/useReadStates';
 import Message from './Message';
 
 export default function MessageList({ channelId }: { channelId: string }) {
@@ -18,6 +19,16 @@ export default function MessageList({ channelId }: { channelId: string }) {
     const flat = data?.pages.flatMap((p) => p.items) ?? [];
     return [...flat].reverse();
   }, [data]);
+
+  // Самое свежее подтверждённое сообщение — курсор авто-ack
+  const latestRealId = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const id = messages[i]?.id;
+      if (id && !id.startsWith('temp-')) return id;
+    }
+    return undefined;
+  }, [messages]);
+  useAutoAck(channelId, latestRealId);
 
   useLayoutEffect(() => {
     const el = listRef.current;

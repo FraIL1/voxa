@@ -3,6 +3,7 @@ import { Navigate, Outlet } from 'react-router';
 
 import { useRealtime } from '../hooks/useRealtime';
 import { useAuthStore } from '../stores/auth';
+import MemberList from './MemberList';
 import Sidebar from './Sidebar';
 
 export default function AppShell() {
@@ -20,7 +21,7 @@ export default function AppShell() {
       <main className="main-column">
         <Outlet />
       </main>
-      <aside className="members">{t('members.comingSoon')}</aside>
+      <MemberList />
     </div>
   );
 }

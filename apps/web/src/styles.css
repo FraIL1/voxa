@@ -218,6 +218,31 @@ a {
   flex-shrink: 0;
 }
 
+.channel-link .channel-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Непрочитанный канал: яркое имя */
+.channel-link.unread {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Счётчик упоминаний */
+.mention-badge {
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  border-radius: 999px;
+  padding: 3px 6px;
+  flex-shrink: 0;
+}
+
 .user-card {
   border-top: 1px solid var(--border);
   padding: 10px 12px;
@@ -599,9 +624,66 @@ a {
 .members {
   background: var(--panel);
   border-left: 1px solid var(--border);
-  padding: 14px;
+  padding: 10px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.member-group-name {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   color: var(--text-faint);
+  padding: 12px 6px 4px;
+}
+
+.member {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: var(--radius);
+}
+
+.member:hover {
+  background: var(--panel-raised);
+}
+
+.member.offline {
+  opacity: 0.45;
+}
+
+.member-avatar {
+  position: relative;
+  width: 28px;
+  height: 28px;
   font-size: 13px;
+}
+
+.member-name {
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-dot {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--panel);
+}
+
+.status-dot.online {
+  background: #43b581;
+}
+
+.status-dot.offline {
+  background: var(--text-faint);
 }
 
 /* Служебное */

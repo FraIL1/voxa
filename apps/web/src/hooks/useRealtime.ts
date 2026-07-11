@@ -1,15 +1,20 @@
 import { useQueryClient } from '@tanstack/react-query';
 import {
   WsEvents,
+  type MemberDto,
   type MessageDto,
+  type PresenceUpdatePayload,
   type ReactionEventPayload,
+  type ReadStateUpdatedPayload,
   type TypingPayload,
 } from '@voxa/shared';
 import { useEffect } from 'react';
 
 import { refreshSession } from '../api/client';
 import { addMessage, applyReaction, removeMessage, updateMessage } from '../api/messages-cache';
+import { bumpUnread, setReadState } from '../api/read-states-cache';
 import { connectSocket, disconnectSocket } from '../api/socket';
+import { MEMBERS_KEY } from './useMembers';
 import { useAuthStore } from '../stores/auth';
 import { useChatStore } from '../stores/chat';
 
@@ -33,6 +38,15 @@ export function useRealtime(): void {
       if (message.author) {
         useChatStore.getState().clearTypingUser(message.channelId, message.author.id);
       }
+      // Чужое сообщение — плюс к непрочитанным; авто-ack открытого канала снимет
+      const myId = useAuthStore.getState().user?.id;
+      if (myId && message.author?.id !== myId) {
+        bumpUnread(
+          queryClient,
+          message.channelId,
+          message.mentionedUserIds?.includes(myId) ?? false,
+        );
+      }
     });
 
     socket.on(WsEvents.MessageEdited, (message: MessageDto) => {
@@ -53,6 +67,21 @@ export function useRealtime(): void {
 
     socket.on(WsEvents.Typing, (p: TypingPayload) => {
       chat.markTyping(p.channelId, p.userId, p.username);
+    });
+
+    socket.on(WsEvents.PresenceUpdate, (p: PresenceUpdatePayload) => {
+      queryClient.setQueryData<MemberDto[]>(MEMBERS_KEY, (members) =>
+        members?.map((m) => (m.id === p.userId ? { ...m, status: p.status } : m)),
+      );
+    });
+
+    // Ack из другой вкладки/устройства этого же пользователя
+    socket.on(WsEvents.ReadStateUpdated, (p: ReadStateUpdatedPayload) => {
+      setReadState(queryClient, p.channelId, {
+        lastReadMessageId: p.lastReadMessageId,
+        unreadCount: 0,
+        mentionCount: 0,
+      });
     });
 
     const invalidateStructure = (): void => {

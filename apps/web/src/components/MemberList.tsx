@@ -1,0 +1,63 @@
+import type { MemberDto } from '@voxa/shared';
+import { useTranslation } from 'react-i18next';
+
+import { useMembers } from '../hooks/useMembers';
+
+interface Group {
+  label: string;
+  /** Позиция роли для сортировки; офлайн-группа всегда внизу */
+  position: number;
+  members: MemberDto[];
+}
+
+function groupMembers(members: MemberDto[], offlineLabel: string): Group[] {
+  const groups = new Map<string, Group>();
+  for (const member of members) {
+    const online = member.status === 'online';
+    const topRole = member.roles[0];
+    const label = online ? (topRole?.name ?? '—') : offlineLabel;
+    const position = online ? (topRole?.position ?? 0) : -1;
+    const group = groups.get(label) ?? { label, position, members: [] };
+    group.members.push(member);
+    groups.set(label, group);
+  }
+  return [...groups.values()].sort((a, b) => b.position - a.position);
+}
+
+export default function MemberList() {
+  const { t } = useTranslation();
+  const { data: members } = useMembers();
+
+  if (!members) {
+    return <aside className="members" />;
+  }
+
+  const groups = groupMembers(members, t('members.offline'));
+
+  return (
+    <aside className="members">
+      {groups.map((group) => (
+        <div key={group.label} className="member-group">
+          <div className="member-group-name">
+            {group.label} — {group.members.length}
+          </div>
+          {group.members.map((member) => {
+            const color =
+              member.status === 'online' ? (member.roles[0]?.color ?? undefined) : undefined;
+            return (
+              <div key={member.id} className={`member ${member.status}`}>
+                <div className="avatar member-avatar" aria-hidden>
+                  {member.username.slice(0, 1).toUpperCase()}
+                  <span className={`status-dot ${member.status}`} />
+                </div>
+                <span className="member-name" style={color ? { color } : undefined}>
+                  {member.username}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </aside>
+  );
+}
