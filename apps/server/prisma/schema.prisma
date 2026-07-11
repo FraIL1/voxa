@@ -22,7 +22,8 @@ model User {
   sessions       RefreshSession[]
   messages       Message[]
   reactions      Reaction[]
-  invitesCreated Invite[]         @relation("InviteCreator")
+  readStates     ChannelReadState[]
+  invitesCreated Invite[]           @relation("InviteCreator")
 
   @@map("users")
 }
@@ -136,6 +137,7 @@ model Channel {
 
   allowedRoles ChannelRoleAccess[]
   messages     Message[]
+  readStates   ChannelReadState[]
 
   @@map("channels")
 }
@@ -185,6 +187,21 @@ model Reaction {
   @@unique([messageId, userId, emoji])
   @@index([messageId])
   @@map("reactions")
+}
+
+/// Прочитанность канала пользователем: маркер и счётчик упоминаний
+model ChannelReadState {
+  userId            String   @map("user_id")
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channelId         String   @map("channel_id")
+  channel           Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  /// id последнего прочитанного сообщения (uuid v7 — монотонен)
+  lastReadMessageId String?  @map("last_read_message_id")
+  mentionCount      Int      @default(0) @map("mention_count")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@id([userId, channelId])
+  @@map("channel_read_states")
 }
 
 /// Служебные флаги приложения (выполнен ли стартовый сид и т.п.)

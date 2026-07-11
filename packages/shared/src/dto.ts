@@ -79,6 +79,32 @@ export interface MessageDto {
   reactions: ReactionDto[];
   editedAt: string | null;
   createdAt: string;
+  /** Кого упоминает сообщение; присутствует только в WS-событии message.new */
+  mentionedUserIds?: string[];
+}
+
+export type PresenceStatus = 'online' | 'offline';
+
+/** Роль в списке участников (без маски прав) */
+export interface MemberRoleDto {
+  id: string;
+  name: string;
+  color: string | null;
+  position: number;
+}
+
+export interface MemberDto extends UserPublicDto {
+  status: PresenceStatus;
+  /** По убыванию старшинства */
+  roles: MemberRoleDto[];
+}
+
+/** Состояние прочитанности канала для текущего пользователя */
+export interface ReadStateDto {
+  channelId: string;
+  lastReadMessageId: string | null;
+  unreadCount: number;
+  mentionCount: number;
 }
 
 export interface MessagesPageDto {

@@ -13,7 +13,9 @@ import { validateEnv, type Env } from './config/env';
 import { HealthController } from './health/health.controller';
 import { InvitesModule } from './invites/invites.module';
 import { MessagesModule } from './messages/messages.module';
+import { PresenceModule } from './presence/presence.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { ReadStatesModule } from './read-states/read-states.module';
 import { REDIS, RedisModule } from './redis/redis.module';
 import { SeedModule } from './seed/seed.module';
 import { UsersModule } from './users/users.module';
@@ -34,10 +36,12 @@ import { WsModule } from './ws/ws.module';
       }),
     }),
     UsersModule,
+    PresenceModule,
     AuthModule,
     InvitesModule,
     ChannelsModule,
     MessagesModule,
+    ReadStatesModule,
     WsModule,
     SeedModule,
   ],

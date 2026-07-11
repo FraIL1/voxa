@@ -114,3 +114,13 @@ export const typingSchema = z.object({
   channelId: z.string().uuid(),
 });
 export type TypingInput = z.infer<typeof typingSchema>;
+
+/** Отметка «прочитано до этого сообщения включительно» */
+export const ackSchema = z.object({
+  messageId: z.string().uuid(),
+});
+export type AckInput = z.infer<typeof ackSchema>;
+
+/** Регулярка упоминаний: @имя (как в usernameSchema) или @everyone */
+export const MENTION_PATTERN = /@([\p{L}\p{N}_.-]{2,24})/gu;
+export const EVERYONE_MENTION = '@everyone';

@@ -19,6 +19,7 @@ import {
 import type { Server, Socket } from 'socket.io';
 
 import type { AccessTokenPayload } from '../common/guards/jwt-auth.guard';
+import { PresenceService } from '../presence/presence.service';
 import { UsersService } from '../users/users.service';
 
 export function channelRoom(channelId: string): string {
@@ -54,6 +55,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private readonly jwtService: JwtService,
     private readonly usersService: UsersService,
+    private readonly presence: PresenceService,
   ) {}
 
   async handleConnection(socket: Socket): Promise<void> {
@@ -76,16 +78,26 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         channelIds,
       };
       socket.emit(WsEvents.Ready, ready);
+
+      // Первый сокет пользователя — все видят его онлайн
+      const becameOnline = await this.presence.connected(payload.sub, socket.id);
+      if (becameOnline) {
+        this.emitToAll(WsEvents.PresenceUpdate, { userId: payload.sub, status: 'online' });
+      }
     } catch {
       socket.emit('auth_error', 'Авторизация не пройдена, переподключитесь с новым токеном');
       socket.disconnect(true);
     }
   }
 
-  handleDisconnect(socket: Socket): void {
+  async handleDisconnect(socket: Socket): Promise<void> {
     const data = socket.data as SocketData;
-    if (data.userId) {
-      this.logger.debug(`Отключился ${data.username ?? data.userId}`);
+    if (!data.userId) return;
+
+    // Последний сокет закрыт — пользователь ушёл в офлайн
+    const wentOffline = await this.presence.disconnected(data.userId, socket.id);
+    if (wentOffline) {
+      this.emitToAll(WsEvents.PresenceUpdate, { userId: data.userId, status: 'offline' });
     }
   }
 

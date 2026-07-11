@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client';
 import type { Message, Reaction, User } from '@prisma/client';
 import {
   hasPermission,
+  MENTION_PATTERN,
   Permissions,
   WsEvents,
   type EditMessageInput,
@@ -18,6 +19,7 @@ import {
 } from '@voxa/shared';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { ReadStatesService } from '../read-states/read-states.service';
 import { UsersService } from '../users/users.service';
 import { WsGateway } from '../ws/ws.gateway';
 
@@ -56,7 +58,49 @@ export class MessagesService {
     private readonly prisma: PrismaService,
     private readonly users: UsersService,
     private readonly ws: WsGateway,
+    private readonly readStates: ReadStatesService,
   ) {}
+
+  /**
+   * Адресаты упоминаний: @имя (существующие пользователи, которым виден
+   * канал) и @everyone (все видящие канал; требует права MENTION_EVERYONE).
+   * Автор из списка исключается.
+   */
+  private async resolveMentions(
+    content: string,
+    authorId: string,
+    channelId: string,
+  ): Promise<string[]> {
+    const hasEveryone = /@everyone(?![\p{L}\p{N}_.-])/u.test(content);
+    const names = new Set<string>();
+    for (const match of content.matchAll(MENTION_PATTERN)) {
+      const name = (match[1] as string).toLowerCase();
+      if (name !== 'everyone') names.add(name);
+    }
+    if (!hasEveryone && names.size === 0) return [];
+
+    const visible = new Set(await this.users.visibleUserIdsOfChannel(channelId));
+    const targets = new Set<string>();
+
+    if (hasEveryone) {
+      const mask = await this.users.permissionMaskOf(authorId);
+      if (hasPermission(mask, Permissions.MENTION_EVERYONE)) {
+        for (const id of visible) targets.add(id);
+      }
+    }
+    if (names.size > 0) {
+      const mentioned = await this.prisma.user.findMany({
+        where: { usernameLower: { in: [...names] } },
+        select: { id: true },
+      });
+      for (const { id } of mentioned) {
+        if (visible.has(id)) targets.add(id);
+      }
+    }
+
+    targets.delete(authorId);
+    return [...targets];
+  }
 
   private toDto(message: MessageWithRelations): MessageDto {
     return {
@@ -134,7 +178,15 @@ export class MessagesService {
     });
 
     const dto = this.toDto(message);
-    this.ws.emitToChannel(channelId, WsEvents.MessageNew, dto);
+
+    const mentionedUserIds = await this.resolveMentions(input.content, userId, channelId);
+    if (mentionedUserIds.length > 0) {
+      await this.readStates.incrementMentions(channelId, mentionedUserIds);
+    }
+
+    // mentionedUserIds — только в WS-событии: клиент по нему решает,
+    // увеличивать ли свой счётчик упоминаний
+    this.ws.emitToChannel(channelId, WsEvents.MessageNew, { ...dto, mentionedUserIds });
     return dto;
   }
 

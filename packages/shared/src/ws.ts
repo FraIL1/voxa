@@ -1,4 +1,4 @@
-import type { CategoryDto, ChannelDto, MessageDto } from './dto';
+import type { CategoryDto, ChannelDto, MessageDto, PresenceStatus } from './dto';
 
 /** События WebSocket (раздел 8.5 PRD). Сервер → клиент. */
 export const WsEvents = {
@@ -10,6 +10,9 @@ export const WsEvents = {
   ReactionAdded: 'reaction.add',
   ReactionRemoved: 'reaction.remove',
   Typing: 'typing',
+  PresenceUpdate: 'presence.update',
+  /** Адресное событие: синхронизация прочитанности между вкладками/устройствами */
+  ReadStateUpdated: 'readstate.update',
   ChannelCreated: 'channel.created',
   ChannelUpdated: 'channel.updated',
   ChannelDeleted: 'channel.deleted',
@@ -44,6 +47,16 @@ export interface TypingPayload {
   username: string;
 }
 
+export interface PresenceUpdatePayload {
+  userId: string;
+  status: PresenceStatus;
+}
+
+export interface ReadStateUpdatedPayload {
+  channelId: string;
+  lastReadMessageId: string | null;
+}
+
 export interface WsServerEvents {
   [WsEvents.Ready]: WsReadyPayload;
   [WsEvents.MessageNew]: MessageDto;
@@ -52,6 +65,8 @@ export interface WsServerEvents {
   [WsEvents.ReactionAdded]: ReactionEventPayload;
   [WsEvents.ReactionRemoved]: ReactionEventPayload;
   [WsEvents.Typing]: TypingPayload;
+  [WsEvents.PresenceUpdate]: PresenceUpdatePayload;
+  [WsEvents.ReadStateUpdated]: ReadStateUpdatedPayload;
   [WsEvents.ChannelCreated]: ChannelDto;
   [WsEvents.ChannelUpdated]: ChannelDto;
   [WsEvents.ChannelDeleted]: { id: string };

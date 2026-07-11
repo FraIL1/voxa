@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { combineMasks, hasPermission, Permissions } from '@voxa/shared';
-import type { MeDto, RoleDto } from '@voxa/shared';
+import type { MeDto, MemberDto, RoleDto } from '@voxa/shared';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -60,6 +60,55 @@ export class UsersService {
     const roleIds = await this.roleIdsOf(userId);
     const allowed = new Set(channel.allowedRoles.map((ar) => ar.roleId));
     return roleIds.some((id) => allowed.has(id));
+  }
+
+  /** Все участники сообщества со статусом присутствия и ролями (по старшинству) */
+  async listMembers(onlineUserIds: ReadonlySet<string>): Promise<MemberDto[]> {
+    const users = await this.prisma.user.findMany({
+      include: {
+        roles: {
+          include: { role: { select: { id: true, name: true, color: true, position: true } } },
+        },
+      },
+      orderBy: { usernameLower: 'asc' },
+    });
+
+    return users.map((user) => ({
+      id: user.id,
+      username: user.username,
+      avatarUrl: user.avatarUrl,
+      status: onlineUserIds.has(user.id) ? ('online' as const) : ('offline' as const),
+      roles: user.roles
+        .map((ur) => ur.role)
+        .sort((a, b) => b.position - a.position)
+        .map((r) => ({ id: r.id, name: r.name, color: r.color, position: r.position })),
+    }));
+  }
+
+  /** Кому виден канал (для адресатов упоминаний): все или роли приватного канала + админы */
+  async visibleUserIdsOfChannel(channelId: string): Promise<string[]> {
+    const channel = await this.prisma.channel.findUnique({
+      where: { id: channelId },
+      include: { allowedRoles: { select: { roleId: true } } },
+    });
+    if (!channel) return [];
+
+    if (!channel.isPrivate) {
+      const all = await this.prisma.user.findMany({ select: { id: true } });
+      return all.map((u) => u.id);
+    }
+
+    const roles = await this.prisma.role.findMany({ select: { id: true, permissions: true } });
+    const adminRoleIds = roles
+      .filter((r) => hasPermission(r.permissions, Permissions.ADMINISTRATOR))
+      .map((r) => r.id);
+    const allowedRoleIds = [...channel.allowedRoles.map((ar) => ar.roleId), ...adminRoleIds];
+
+    const memberships = await this.prisma.userRole.findMany({
+      where: { roleId: { in: allowedRoleIds } },
+      select: { userId: true },
+    });
+    return [...new Set(memberships.map((m) => m.userId))];
   }
 
   async getMe(userId: string): Promise<MeDto> {
