@@ -562,6 +562,193 @@ a {
 
 .composer {
   padding: 0 16px 16px;
+  border-radius: var(--radius);
+}
+
+.composer.drag-over .composer-inner {
+  border-color: var(--accent);
+  border-style: dashed;
+}
+
+/* Чипы загружаемых файлов */
+.composer-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 0;
+}
+
+.file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 6px 4px 12px;
+  font-size: 13px;
+  max-width: 280px;
+}
+
+.file-chip.error {
+  border-color: var(--danger);
+}
+
+.file-chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-chip-error {
+  color: var(--danger);
+  flex-shrink: 0;
+}
+
+.attach-button {
+  align-self: flex-end;
+  padding: 8px;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Вложения в сообщении */
+.attachments {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.attachment-image {
+  background: none;
+  padding: 0;
+  border-radius: var(--radius);
+  overflow: hidden;
+  max-width: min(400px, 100%);
+  line-height: 0;
+}
+
+.attachment-image img {
+  max-width: 100%;
+  max-height: 320px;
+  display: block;
+}
+
+.attachment-media {
+  max-width: min(480px, 100%);
+  border-radius: var(--radius);
+}
+
+.attachment-audio {
+  max-width: min(400px, 100%);
+}
+
+.attachment-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  color: var(--text);
+  text-decoration: none;
+  max-width: min(400px, 100%);
+}
+
+.attachment-file:hover {
+  border-color: var(--text-faint);
+}
+
+.attachment-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-size {
+  color: var(--text-faint);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+/* Полноэкранный просмотр картинки */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.85);
+  display: grid;
+  place-items: center;
+  cursor: zoom-out;
+  padding: 24px;
+}
+
+.lightbox img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: var(--radius);
+}
+
+/* Карточка предпросмотра ссылки */
+.link-preview {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin-top: 6px;
+  max-width: min(480px, 100%);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.link-preview-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.lp-site {
+  font-size: 11px;
+  color: var(--text-faint);
+  margin-bottom: 2px;
+}
+
+.lp-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--accent);
+}
+
+.lp-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.lp-image {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 6px;
+  flex-shrink: 0;
 }
 
 .composer-reply {

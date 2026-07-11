@@ -4,6 +4,26 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        // Крупные зависимости — отдельными чанками (кэш браузера + без warning)
+        manualChunks: {
+          vendor: [
+            'react',
+            'react-dom',
+            'react-router',
+            '@tanstack/react-query',
+            'zustand',
+            'socket.io-client',
+            'i18next',
+            'react-i18next',
+          ],
+          markdown: ['react-markdown', 'remark-gfm'],
+        },
+      },
+    },
+  },
   resolve: {
     alias: {
       // Vite собирает shared из исходников: CJS-dist пакета Rollup

@@ -10,6 +10,7 @@ import { useDeleteMessage, useEditMessage, useToggleReaction } from '../hooks/us
 import { rehypeMentions } from '../lib/rehype-mentions';
 import { useAuthStore } from '../stores/auth';
 import { useChatStore } from '../stores/chat';
+import Attachments from './Attachments';
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥', '🎉', '👀', '💯', '🤔', '👎', '🫡'];
 
@@ -146,6 +147,30 @@ export default function Message({ message }: { message: ChatMessage }) {
               {message.content}
             </Markdown>
           </div>
+        )}
+
+        <Attachments attachments={message.attachments} />
+
+        {message.linkPreview && (
+          <a
+            className="link-preview"
+            href={message.linkPreview.url}
+            target="_blank"
+            rel="noreferrer noopener"
+          >
+            <div className="link-preview-text">
+              {message.linkPreview.siteName && (
+                <div className="lp-site">{message.linkPreview.siteName}</div>
+              )}
+              <div className="lp-title">{message.linkPreview.title}</div>
+              {message.linkPreview.description && (
+                <div className="lp-desc">{message.linkPreview.description}</div>
+              )}
+            </div>
+            {message.linkPreview.imageUrl && (
+              <img className="lp-image" src={message.linkPreview.imageUrl} alt="" loading="lazy" />
+            )}
+          </a>
         )}
 
         {reactions.length > 0 && (

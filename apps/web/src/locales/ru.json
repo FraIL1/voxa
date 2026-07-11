@@ -45,7 +45,14 @@
     "addReaction": "Добавить реакцию",
     "typingOne": "{{name}} печатает…",
     "typingTwo": "{{a}} и {{b}} печатают…",
-    "typingMany": "Несколько человек печатают…"
+    "typingMany": "Несколько человек печатают…",
+    "attach": "Прикрепить файл",
+    "uploadError": "не загрузился",
+    "removeFile": "Убрать файл"
+  },
+  "units": {
+    "kb": "КБ",
+    "mb": "МБ"
   },
   "members": {
     "offline": "Не в сети"

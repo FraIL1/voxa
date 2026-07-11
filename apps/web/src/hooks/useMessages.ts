@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { MessageDto, MessagesPageDto } from '@voxa/shared';
+import type { AttachmentDto, MessageDto, MessagesPageDto } from '@voxa/shared';
 
 import { api } from '../api/client';
 import {
@@ -27,17 +27,29 @@ export function useMessages(channelId: string) {
   });
 }
 
+interface SendMessageVars {
+  content: string;
+  replyToId?: string;
+  attachmentIds?: string[];
+  /** Уже загруженные вложения — для мгновенного оптимистичного рендера */
+  attachments?: AttachmentDto[];
+}
+
 export function useSendMessage(channelId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ content, replyToId }: { content: string; replyToId?: string }) =>
+    mutationFn: ({ content, replyToId, attachmentIds }: SendMessageVars) =>
       api<MessageDto>(`/channels/${channelId}/messages`, {
         method: 'POST',
-        body: { content, ...(replyToId ? { replyToId } : {}) },
+        body: {
+          content,
+          ...(replyToId ? { replyToId } : {}),
+          ...(attachmentIds && attachmentIds.length > 0 ? { attachmentIds } : {}),
+        },
       }),
 
-    onMutate: ({ content, replyToId }) => {
+    onMutate: ({ content, replyToId, attachments }) => {
       const user = useAuthStore.getState().user;
       const temp: ChatMessage = {
         id: `temp-${crypto.randomUUID()}`,
@@ -47,6 +59,8 @@ export function useSendMessage(channelId: string) {
         replyToId: replyToId ?? null,
         replyTo: null,
         reactions: [],
+        attachments: attachments ?? [],
+        linkPreview: null,
         editedAt: null,
         createdAt: new Date().toISOString(),
         pending: true,
