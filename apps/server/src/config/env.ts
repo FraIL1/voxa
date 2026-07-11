@@ -15,6 +15,19 @@ export const envSchema = z.object({
   HIBP_CHECK: z.enum(['on', 'off']).default('on'),
   /** Отключение rate limiting (только для тестов) */
   THROTTLE_DISABLED: z.enum(['0', '1']).default('0'),
+
+  // S3 (MinIO). Дефолты совпадают с docker-compose.dev.yml
+  S3_ENDPOINT: z.string().url().default('http://localhost:9000'),
+  S3_ACCESS_KEY: z.string().min(1).default('voxa'),
+  S3_SECRET_KEY: z.string().min(1).default('voxa-dev-minio'),
+  S3_BUCKET: z.string().min(1).default('voxa-files'),
+  /** Публичный адрес S3 для подписанных ссылок (в проде — https://files.домен) */
+  PUBLIC_S3_ENDPOINT: z.string().url().optional(),
+  MAX_UPLOAD_MB: z.coerce.number().int().min(1).max(500).default(50),
+  /** Квота хранилища на пользователя (раздел 10 PRD) */
+  USER_QUOTA_MB: z.coerce.number().int().min(1).default(2048),
+  /** Предпросмотр ссылок (в CI выключен: нет сети) */
+  LINK_PREVIEW: z.enum(['on', 'off']).default('on'),
 });
 
 export type Env = z.infer<typeof envSchema>;

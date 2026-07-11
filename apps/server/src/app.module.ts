@@ -6,6 +6,7 @@ import type Redis from 'ioredis';
 
 import { AuthModule } from './auth/auth.module';
 import { ChannelsModule } from './channels/channels.module';
+import { FilesModule } from './files/files.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 import { RedisThrottlerStorage } from './common/throttler-redis.storage';
@@ -40,6 +41,7 @@ import { WsModule } from './ws/ws.module';
     AuthModule,
     InvitesModule,
     ChannelsModule,
+    FilesModule,
     MessagesModule,
     ReadStatesModule,
     WsModule,

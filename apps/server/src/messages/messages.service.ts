@@ -5,19 +5,22 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import type { Message, Reaction, User } from '@prisma/client';
+import type { Attachment, Message, Reaction, User } from '@prisma/client';
 import {
   hasPermission,
   MENTION_PATTERN,
   Permissions,
   WsEvents,
   type EditMessageInput,
+  type LinkPreviewDto,
   type MessageDto,
   type MessagesPageDto,
   type MessagesQueryInput,
   type SendMessageInput,
 } from '@voxa/shared';
 
+import { FilesService } from '../files/files.service';
+import { LinkPreviewService } from '../link-preview/link-preview.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReadStatesService } from '../read-states/read-states.service';
 import { UsersService } from '../users/users.service';
@@ -30,6 +33,7 @@ const MAX_DISTINCT_REACTIONS = 20;
 type MessageWithRelations = Message & {
   author: Pick<User, 'id' | 'username' | 'avatarUrl'> | null;
   reactions: Pick<Reaction, 'emoji' | 'userId'>[];
+  attachments: Attachment[];
   replyTo:
     | (Pick<Message, 'id' | 'content' | 'deletedAt'> & {
         author: Pick<User, 'username'> | null;
@@ -42,6 +46,7 @@ const AUTHOR_SELECT = { select: { id: true, username: true, avatarUrl: true } } 
 const MESSAGE_INCLUDE = {
   author: AUTHOR_SELECT,
   reactions: { select: { emoji: true, userId: true }, orderBy: { createdAt: 'asc' } },
+  attachments: true,
   replyTo: {
     select: {
       id: true,
@@ -59,6 +64,8 @@ export class MessagesService {
     private readonly users: UsersService,
     private readonly ws: WsGateway,
     private readonly readStates: ReadStatesService,
+    private readonly files: FilesService,
+    private readonly linkPreview: LinkPreviewService,
   ) {}
 
   /**
@@ -102,7 +109,7 @@ export class MessagesService {
     return [...targets];
   }
 
-  private toDto(message: MessageWithRelations): MessageDto {
+  private async toDto(message: MessageWithRelations): Promise<MessageDto> {
     return {
       id: message.id,
       channelId: message.channelId,
@@ -125,9 +132,32 @@ export class MessagesService {
           }
         : null,
       reactions: message.reactions.map((r) => ({ emoji: r.emoji, userId: r.userId })),
+      attachments: await Promise.all(message.attachments.map((a) => this.files.toDto(a))),
+      linkPreview: (message.linkPreview as LinkPreviewDto | null) ?? null,
       editedAt: message.editedAt?.toISOString() ?? null,
       createdAt: message.createdAt.toISOString(),
     };
+  }
+
+  /**
+   * Асинхронное превью первой ссылки: сообщение уже доставлено, карточка
+   * догоняет событием message.edit. Ошибки сети глотаются.
+   */
+  private attachLinkPreviewLater(messageId: string, channelId: string, content: string): void {
+    const url = this.linkPreview.extractFirstUrl(content);
+    if (!url) return;
+
+    void (async () => {
+      const preview = await this.linkPreview.fetchPreview(url);
+      if (!preview) return;
+      const updated = await this.prisma.message.update({
+        where: { id: messageId },
+        data: { linkPreview: preview as unknown as Prisma.InputJsonValue },
+        include: MESSAGE_INCLUDE,
+      });
+      if (updated.deletedAt) return; // удалили, пока ходили за превью
+      this.ws.emitToChannel(channelId, WsEvents.MessageEdited, await this.toDto(updated));
+    })().catch(() => undefined);
   }
 
   /** Канал существует, текстовый и виден пользователю — иначе 404 (не раскрываем приватные) */
@@ -167,17 +197,31 @@ export class MessagesService {
       }
     }
 
-    const message = await this.prisma.message.create({
+    const created = await this.prisma.message.create({
       data: {
         channelId,
         authorId: userId,
         content: input.content,
         replyToId: input.replyToId ?? null,
       },
-      include: MESSAGE_INCLUDE,
+      select: { id: true },
     });
 
-    const dto = this.toDto(message);
+    // Вложения: только свои и ещё не привязанные
+    if (input.attachmentIds && input.attachmentIds.length > 0) {
+      try {
+        await this.files.attachToMessage(userId, created.id, input.attachmentIds);
+      } catch (error) {
+        await this.prisma.message.delete({ where: { id: created.id } });
+        throw error;
+      }
+    }
+
+    const message = await this.prisma.message.findUniqueOrThrow({
+      where: { id: created.id },
+      include: MESSAGE_INCLUDE,
+    });
+    const dto = await this.toDto(message);
 
     const mentionedUserIds = await this.resolveMentions(input.content, userId, channelId);
     if (mentionedUserIds.length > 0) {
@@ -187,6 +231,7 @@ export class MessagesService {
     // mentionedUserIds — только в WS-событии: клиент по нему решает,
     // увеличивать ли свой счётчик упоминаний
     this.ws.emitToChannel(channelId, WsEvents.MessageNew, { ...dto, mentionedUserIds });
+    this.attachLinkPreviewLater(created.id, channelId, input.content);
     return dto;
   }
 
@@ -210,7 +255,7 @@ export class MessagesService {
       include: MESSAGE_INCLUDE,
     });
 
-    const dto = this.toDto(updated);
+    const dto = await this.toDto(updated);
     this.ws.emitToChannel(channelId, WsEvents.MessageEdited, dto);
     return dto;
   }
@@ -319,6 +364,6 @@ export class MessagesService {
 
     const hasMore = messages.length > query.limit;
     const page = hasMore ? messages.slice(0, query.limit) : messages;
-    return { items: page.map((m) => this.toDto(m)), hasMore };
+    return { items: await Promise.all(page.map((m) => this.toDto(m))), hasMore };
   }
 }

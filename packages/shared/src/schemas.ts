@@ -80,14 +80,18 @@ export const updateChannelSchema = z.object({
 });
 export type UpdateChannelInput = z.infer<typeof updateChannelSchema>;
 
-export const sendMessageSchema = z.object({
-  content: z
-    .string()
-    .min(1, 'Сообщение не может быть пустым')
-    .max(4000, 'Сообщение слишком длинное (максимум 4000 символов)')
-    .refine((s) => s.trim().length > 0, 'Сообщение не может быть пустым'),
-  replyToId: z.string().uuid().optional(),
-});
+export const MAX_ATTACHMENTS_PER_MESSAGE = 10;
+
+export const sendMessageSchema = z
+  .object({
+    content: z.string().max(4000, 'Сообщение слишком длинное (максимум 4000 символов)').default(''),
+    replyToId: z.string().uuid().optional(),
+    attachmentIds: z.array(z.string().uuid()).max(MAX_ATTACHMENTS_PER_MESSAGE).optional(),
+  })
+  .refine(
+    (data) => data.content.trim().length > 0 || (data.attachmentIds?.length ?? 0) > 0,
+    'Сообщение не может быть пустым',
+  );
 export type SendMessageInput = z.infer<typeof sendMessageSchema>;
 
 export const messagesQuerySchema = z.object({

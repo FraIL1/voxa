@@ -56,6 +56,32 @@ export interface CommunityStructureDto {
   uncategorized: ChannelDto[];
 }
 
+export type AttachmentKind = 'image' | 'video' | 'audio' | 'file';
+
+export interface AttachmentDto {
+  id: string;
+  fileName: string;
+  contentType: string;
+  size: number;
+  /** Только для изображений */
+  width: number | null;
+  height: number | null;
+  kind: AttachmentKind;
+  /** Подписанная ссылка (истекает; клиент не должен её кэшировать надолго) */
+  url: string;
+  /** Миниатюра (только изображения) */
+  thumbUrl: string | null;
+}
+
+/** Предпросмотр первой ссылки сообщения (OG-теги) */
+export interface LinkPreviewDto {
+  url: string;
+  title: string;
+  description: string | null;
+  imageUrl: string | null;
+  siteName: string | null;
+}
+
 export interface ReactionDto {
   emoji: string;
   userId: string;
@@ -77,6 +103,8 @@ export interface MessageDto {
   replyToId: string | null;
   replyTo: ReplyPreviewDto | null;
   reactions: ReactionDto[];
+  attachments: AttachmentDto[];
+  linkPreview: LinkPreviewDto | null;
   editedAt: string | null;
   createdAt: string;
   /** Кого упоминает сообщение; присутствует только в WS-событии message.new */
