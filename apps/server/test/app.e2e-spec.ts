@@ -467,4 +467,50 @@ describe('Voxa: критический поток (e2e)', () => {
     expect(event.channelId).toBe(generalChannelId);
     expect(event.lastReadMessageId).toBe(newestId);
   });
+
+  it('загрузка PNG, отправка с вложением; исполняемый файл отклоняется', async () => {
+    // Однопиксельный валидный PNG
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      'base64',
+    );
+    const uploaded = await request(httpServer)
+      .post('/api/uploads')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .attach('file', png, 'pixel.png')
+      .expect(201);
+    expect(uploaded.body.kind).toBe('image');
+    expect(uploaded.body.contentType).toBe('image/png');
+    expect(uploaded.body.thumbUrl).toBeTruthy();
+
+    // Сообщение без текста, только вложение
+    const sent = await request(httpServer)
+      .post(`/api/channels/${generalChannelId}/messages`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ content: '', attachmentIds: [uploaded.body.id] })
+      .expect(201);
+    const message = sent.body as MessageDto;
+    expect(message.attachments).toHaveLength(1);
+    expect(message.attachments[0]?.url).toContain('voxa-e2e');
+
+    // Скачивание по подписанной ссылке возвращает исходные байты
+    const download = await fetch(message.attachments[0]?.url as string);
+    expect(download.status).toBe(200);
+    expect(Buffer.from(await download.arrayBuffer()).equals(png)).toBe(true);
+
+    // Чужое вложение второй раз использовать нельзя
+    await request(httpServer)
+      .post(`/api/channels/${generalChannelId}/messages`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ content: 'краду вложение', attachmentIds: [uploaded.body.id] })
+      .expect(400);
+
+    // Исполняемый файл (PE, «MZ») отклоняется
+    const exe = Buffer.concat([Buffer.from('MZ'), Buffer.alloc(64)]);
+    await request(httpServer)
+      .post('/api/uploads')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .attach('file', exe, 'game.png')
+      .expect(400);
+  });
 });

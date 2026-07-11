@@ -11,3 +11,6 @@ process.env.PUBLIC_URL ??= 'http://localhost:3000';
 // Внешний сервис в тестах не дёргаем, лимиты не мешают проверкам
 process.env.HIBP_CHECK = 'off';
 process.env.THROTTLE_DISABLED = '1';
+// Отдельный бакет: локальные e2e не смешиваются с dev-файлами
+process.env.S3_BUCKET ??= 'voxa-e2e';
+process.env.LINK_PREVIEW = 'off';

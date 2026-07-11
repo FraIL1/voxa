@@ -27,3 +27,14 @@
 		respond "Voxa server is up. API: /api/healthz" 200
 	}
 }
+
+# Файлы (MinIO) — отдельный поддомен с песочницей (раздел 9 PRD):
+# даже если вредоносный файл откроют инлайн, он изолирован от основного origin
+files.{$DOMAIN} {
+	header {
+		Content-Security-Policy "sandbox; default-src 'none'"
+		X-Content-Type-Options nosniff
+		-Server
+	}
+	reverse_proxy minio:9000
+}

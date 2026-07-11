@@ -20,6 +20,8 @@ const ALLOWED = new Set([
   'Python-2.0',
   // Шрифты (Inter через @fontsource): PRD раздел 11 явно разрешает SIL OFL
   'OFL-1.1',
+  // Zlib — разрешительная лицензия без копилефта (уровень MIT/BSD)
+  'Zlib',
 ]);
 
 /** Поддерживает выражения SPDX вида "(MIT OR Apache-2.0)" и "A AND B". */

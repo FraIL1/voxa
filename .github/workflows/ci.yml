@@ -29,6 +29,18 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 10
+      # bitnami-образ: запускается без аргументов команды (services их не поддерживают)
+      minio:
+        image: bitnami/minio:2025.4.22
+        ports: ['9000:9000']
+        env:
+          MINIO_ROOT_USER: voxa
+          MINIO_ROOT_PASSWORD: voxa-dev-minio
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/live"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
     steps:
       - uses: actions/checkout@v4
 
@@ -68,3 +80,5 @@ jobs:
           REDIS_URL: redis://localhost:6379
           JWT_ACCESS_SECRET: ci-access-secret-0123456789
           JWT_REFRESH_SECRET: ci-refresh-secret-0123456789
+          S3_BUCKET: voxa-e2e
+          LINK_PREVIEW: 'off'
