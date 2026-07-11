@@ -9,8 +9,11 @@ import {
   type AuthResponseDto,
   type CommunityStructureDto,
   type MeDto,
+  type MemberDto,
   type MessageDto,
   type MessagesPageDto,
+  type ReadStateDto,
+  type ReadStateUpdatedPayload,
   type TypingPayload,
 } from '@voxa/shared';
 import cookieParser from 'cookie-parser';
@@ -406,5 +409,62 @@ describe('Voxa: критический поток (e2e)', () => {
     expect(payload.channelId).toBe(generalChannelId);
     expect(payload.username).toBe(MEMBER.username);
     memberSocket.disconnect();
+  });
+
+  it('GET /users: статусы присутствия и роли участников', async () => {
+    const res = await request(httpServer)
+      .get('/api/users')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+
+    const members = res.body as MemberDto[];
+    const owner = members.find((m) => m.username === OWNER.username);
+    const member = members.find((m) => m.username === MEMBER.username);
+
+    // Сокет владельца подключён с прошлых тестов, участника — уже отключён
+    expect(owner?.status).toBe('online');
+    expect(member?.status).toBe('offline');
+    expect(owner?.roles[0]?.name).toBe('Владелец');
+    expect(member?.roles[0]?.name).toBe('Участник');
+  });
+
+  it('упоминание увеличивает счётчик; ack сбрасывает и рассылает readstate.update', async () => {
+    await request(httpServer)
+      .post(`/api/channels/${generalChannelId}/messages`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ content: `Смотри, @${OWNER.username}!` })
+      .expect(201);
+
+    const before = await request(httpServer)
+      .get('/api/read-states')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    const state = (before.body as ReadStateDto[]).find((s) => s.channelId === generalChannelId);
+    expect(state?.mentionCount).toBe(1);
+    expect(state?.unreadCount).toBeGreaterThan(0);
+
+    const updated = new Promise<ReadStateUpdatedPayload>((resolve) => {
+      socket?.once(WsEvents.ReadStateUpdated, resolve);
+    });
+
+    const history = await request(httpServer)
+      .get(`/api/channels/${generalChannelId}/messages?limit=1`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    const newestId = (history.body as MessagesPageDto).items[0]?.id as string;
+
+    const ack = await request(httpServer)
+      .post(`/api/channels/${generalChannelId}/ack`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ messageId: newestId })
+      .expect(201);
+    const acked = ack.body as ReadStateDto;
+    expect(acked.unreadCount).toBe(0);
+    expect(acked.mentionCount).toBe(0);
+    expect(acked.lastReadMessageId).toBe(newestId);
+
+    const event = await updated;
+    expect(event.channelId).toBe(generalChannelId);
+    expect(event.lastReadMessageId).toBe(newestId);
   });
 });
