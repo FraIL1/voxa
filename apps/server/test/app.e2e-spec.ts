@@ -411,6 +411,85 @@ describe('Voxa: критический поток (e2e)', () => {
     memberSocket.disconnect();
   });
 
+  it('голосовой токен: комната = канал, права publish/subscribe; текстовый канал — 400', async () => {
+    const structure = await request(httpServer)
+      .get('/api/channels')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    const voiceChannel = (structure.body as CommunityStructureDto).categories
+      .flatMap((c) => c.channels)
+      .find((c) => c.type === 'VOICE') as { id: string };
+
+    const res = await request(httpServer)
+      .post(`/api/channels/${voiceChannel.id}/voice-token`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(201);
+
+    expect(res.body.url).toBeTruthy();
+    expect(res.body.channelId).toBe(voiceChannel.id);
+
+    // Полезная нагрузка JWT: комната и права
+    const payloadPart = (res.body.token as string).split('.')[1] as string;
+    const claims = JSON.parse(Buffer.from(payloadPart, 'base64url').toString()) as {
+      video: { room: string; roomJoin: boolean; canPublish: boolean; canSubscribe: boolean };
+      name: string;
+    };
+    expect(claims.video.room).toBe(voiceChannel.id);
+    expect(claims.video.roomJoin).toBe(true);
+    expect(claims.video.canPublish).toBe(true);
+    expect(claims.video.canSubscribe).toBe(true);
+    expect(claims.name).toBe(OWNER.username);
+
+    // Для текстового канала токен не выдаётся
+    await request(httpServer)
+      .post(`/api/channels/${generalChannelId}/voice-token`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(400);
+  });
+
+  it('voice.state через WS: участник появляется в /voice/states и рассылается voice.update', async () => {
+    const structure = await request(httpServer)
+      .get('/api/channels')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    const voiceChannel = (structure.body as CommunityStructureDto).categories
+      .flatMap((c) => c.channels)
+      .find((c) => c.type === 'VOICE') as { id: string };
+
+    const updated = new Promise<{ channelId: string; participants: { username: string }[] }>(
+      (resolve) => {
+        socket?.once(WsEvents.VoiceUpdate, resolve);
+      },
+    );
+
+    // Владелец «входит» в голосовой канал (его сокет уже подключён)
+    socket?.emit(WsClientEvents.VoiceState, {
+      channelId: voiceChannel.id,
+      muted: false,
+      deafened: false,
+    });
+
+    const event = await updated;
+    expect(event.channelId).toBe(voiceChannel.id);
+    expect(event.participants.map((p) => p.username)).toContain(OWNER.username);
+
+    const states = await request(httpServer)
+      .get('/api/voice/states')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    const state = (states.body as { channelId: string; participants: unknown[] }[]).find(
+      (s) => s.channelId === voiceChannel.id,
+    );
+    expect(state?.participants).toHaveLength(1);
+
+    // Выход из голоса
+    const left = new Promise<{ participants: unknown[] }>((resolve) => {
+      socket?.once(WsEvents.VoiceUpdate, resolve);
+    });
+    socket?.emit(WsClientEvents.VoiceState, { channelId: null, muted: false, deafened: false });
+    expect((await left).participants).toHaveLength(0);
+  });
+
   it('GET /users: статусы присутствия и роли участников', async () => {
     const res = await request(httpServer)
       .get('/api/users')
