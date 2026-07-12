@@ -29,20 +29,21 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 10
-      # bitnami-образ: запускается без аргументов команды (services их не поддерживают)
-      minio:
-        image: bitnami/minio:2025.4.22
-        ports: ['9000:9000']
-        env:
-          MINIO_ROOT_USER: voxa
-          MINIO_ROOT_PASSWORD: voxa-dev-minio
-        options: >-
-          --health-cmd "curl -f http://localhost:9000/minio/health/live"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 20
     steps:
       - uses: actions/checkout@v4
+
+      # services не поддерживают команду запуска, поэтому MinIO — обычным
+      # docker run с тем же зафиксированным образом, что и в docker-compose
+      - name: MinIO для e2e
+        run: |
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=voxa -e MINIO_ROOT_PASSWORD=voxa-dev-minio \
+            minio/minio:RELEASE.2025-04-22T22-12-26Z server /data
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:9000/minio/health/live > /dev/null && exit 0
+            sleep 1
+          done
+          echo "MinIO не поднялся:"; docker logs minio; exit 1
 
       # Версия pnpm берётся из поля packageManager в package.json
       - uses: pnpm/action-setup@v4
