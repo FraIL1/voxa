@@ -28,6 +28,12 @@ export const envSchema = z.object({
   USER_QUOTA_MB: z.coerce.number().int().min(1).default(2048),
   /** Предпросмотр ссылок (в CI выключен: нет сети) */
   LINK_PREVIEW: z.enum(['on', 'off']).default('on'),
+
+  // LiveKit (голос). Дефолты совпадают с infra/livekit/livekit.dev.yaml
+  LIVEKIT_API_KEY: z.string().min(1).default('voxa-dev'),
+  LIVEKIT_API_SECRET: z.string().min(32).default('voxa-dev-livekit-secret-0123456789abcdef'),
+  /** Адрес LiveKit для клиентов (в проде — wss://livekit.домен) */
+  PUBLIC_LIVEKIT_URL: z.string().url().default('ws://localhost:7880'),
 });
 
 export type Env = z.infer<typeof envSchema>;

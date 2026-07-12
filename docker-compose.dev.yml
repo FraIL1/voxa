@@ -52,6 +52,16 @@ services:
       timeout: 3s
       retries: 5
 
+  livekit:
+    image: livekit/livekit-server:v1.13.3
+    command: --config /etc/livekit.yaml
+    ports:
+      - '7880:7880' # сигналинг (WS/HTTP)
+      - '7881:7881' # WebRTC по TCP (фолбэк)
+      - '50000-50019:50000-50019/udp' # медиапотоки
+    volumes:
+      - ./infra/livekit/livekit.dev.yaml:/etc/livekit.yaml:ro
+
 volumes:
   pg_data:
   redis_data:

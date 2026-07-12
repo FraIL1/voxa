@@ -41,6 +41,9 @@ services:
       PUBLIC_S3_ENDPOINT: https://files.${DOMAIN}
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
+      PUBLIC_LIVEKIT_URL: ${PUBLIC_LIVEKIT_URL:-wss://livekit.${DOMAIN}}
     healthcheck:
       test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:3000/api/healthz > /dev/null || exit 1']
       interval: 10s
@@ -98,7 +101,18 @@ services:
       timeout: 3s
       retries: 5
 
-  # LiveKit добавим на этапе 3 (порты 7880-7882/tcp + UDP-диапазон для медиа)
+  livekit:
+    image: livekit/livekit-server:v1.13.3
+    restart: unless-stopped
+    command: --config /etc/livekit.yaml
+    ports:
+      - '7881:7881' # WebRTC по TCP (фолбэк при закрытом UDP)
+      - '50000-50199:50000-50199/udp' # медиапотоки (открыть в UFW!)
+    environment:
+      # формат: "ключ: секрет"
+      LIVEKIT_KEYS: '${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}'
+    volumes:
+      - ./infra/livekit/livekit.yaml:/etc/livekit.yaml:ro
 
 volumes:
   caddy_data:

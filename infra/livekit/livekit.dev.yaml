@@ -1,0 +1,13 @@
+# LiveKit для локальной разработки (docker-compose.dev.yml).
+# Ключи только для dev; прод берёт их из env LIVEKIT_KEYS (см. livekit.yaml).
+port: 7880
+rtc:
+  tcp_port: 7881
+  # Небольшой диапазон: Docker Desktop медленно публикует большие UDP-диапазоны
+  port_range_start: 50000
+  port_range_end: 50019
+  use_external_ip: false
+keys:
+  voxa-dev: voxa-dev-livekit-secret-0123456789abcdef
+logging:
+  level: info
