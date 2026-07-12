@@ -7,16 +7,20 @@ import {
   type ReactionEventPayload,
   type ReadStateUpdatedPayload,
   type TypingPayload,
+  type VoiceChannelStateDto,
 } from '@voxa/shared';
 import { useEffect } from 'react';
 
 import { refreshSession } from '../api/client';
 import { addMessage, applyReaction, removeMessage, updateMessage } from '../api/messages-cache';
 import { bumpUnread, setReadState } from '../api/read-states-cache';
-import { connectSocket, disconnectSocket } from '../api/socket';
+import { connectSocket, disconnectSocket, emitVoiceState } from '../api/socket';
+import { playJoinSound, playLeaveSound } from '../lib/sounds';
 import { MEMBERS_KEY } from './useMembers';
+import { VOICE_STATES_KEY } from './useVoiceStates';
 import { useAuthStore } from '../stores/auth';
 import { useChatStore } from '../stores/chat';
+import { currentVoiceState } from '../stores/voice';
 
 /**
  * Единственное WebSocket-подключение приложения. Пересоздаётся при смене
@@ -67,6 +71,34 @@ export function useRealtime(): void {
 
     socket.on(WsEvents.Typing, (p: TypingPayload) => {
       chat.markTyping(p.channelId, p.userId, p.username);
+    });
+
+    socket.on(WsEvents.VoiceUpdate, (update: VoiceChannelStateDto) => {
+      // Звуки входа/выхода других участников МОЕГО канала
+      const myId = useAuthStore.getState().user?.id;
+      const myChannel = currentVoiceState().channelId;
+      const previous = queryClient.getQueryData<VoiceChannelStateDto[]>(VOICE_STATES_KEY);
+      if (myChannel && update.channelId === myChannel && previous) {
+        const before = new Set(
+          (previous.find((s) => s.channelId === update.channelId)?.participants ?? []).map(
+            (p) => p.userId,
+          ),
+        );
+        const after = new Set(update.participants.map((p) => p.userId));
+        if ([...after].some((id) => !before.has(id) && id !== myId)) playJoinSound();
+        else if ([...before].some((id) => !after.has(id) && id !== myId)) playLeaveSound();
+      }
+
+      queryClient.setQueryData<VoiceChannelStateDto[]>(VOICE_STATES_KEY, (data) => {
+        const rest = (data ?? []).filter((s) => s.channelId !== update.channelId);
+        return update.participants.length > 0 ? [...rest, update] : rest;
+      });
+    });
+
+    // Реконнект (например, после refresh токена): восстановить состояние голоса
+    socket.on('connect', () => {
+      const voice = currentVoiceState();
+      if (voice.channelId) emitVoiceState(voice);
     });
 
     socket.on(WsEvents.PresenceUpdate, (p: PresenceUpdatePayload) => {

@@ -6,6 +6,7 @@ import { allChannelsOf, useStructure } from '../hooks/useStructure';
 import Composer from './Composer';
 import MessageList from './MessageList';
 import TypingIndicator from './TypingIndicator';
+import VoiceView from './VoiceView';
 
 export default function ChannelView() {
   const { t } = useTranslation();
@@ -16,7 +17,8 @@ export default function ChannelView() {
   if (isLoading) return <div className="empty-state">{t('app.loading')}</div>;
 
   const channel = allChannelsOf(structure).find((c) => c.id === channelId);
-  if (!channel || channel.type !== 'TEXT') return <Navigate to="/" replace />;
+  if (!channel) return <Navigate to="/" replace />;
+  if (channel.type === 'VOICE') return <VoiceView channel={channel} />;
 
   return (
     <div className="channel-view">

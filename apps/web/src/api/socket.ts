@@ -1,4 +1,4 @@
-import { WsClientEvents } from '@voxa/shared';
+import { WsClientEvents, type VoiceStateInput } from '@voxa/shared';
 import { io, type Socket } from 'socket.io-client';
 
 /**
@@ -20,4 +20,8 @@ export function disconnectSocket(): void {
 
 export function emitTyping(channelId: string): void {
   socket?.emit(WsClientEvents.Typing, { channelId });
+}
+
+export function emitVoiceState(state: VoiceStateInput): void {
+  socket?.emit(WsClientEvents.VoiceState, state);
 }
