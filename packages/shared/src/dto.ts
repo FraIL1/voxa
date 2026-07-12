@@ -153,3 +153,25 @@ export interface InviteDto {
   createdAt: string;
   isActive: boolean;
 }
+
+/** Участник голосового канала (видно всем ещё до входа — раздел 5.4 PRD) */
+export interface VoiceParticipantDto {
+  userId: string;
+  username: string;
+  muted: boolean;
+  deafened: boolean;
+}
+
+export interface VoiceChannelStateDto {
+  channelId: string;
+  participants: VoiceParticipantDto[];
+}
+
+/** Ответ POST /channels/:id/voice-token */
+export interface VoiceTokenDto {
+  /** WebSocket-адрес LiveKit для клиента */
+  url: string;
+  /** Подписанный JWT доступа в комнату */
+  token: string;
+  channelId: string;
+}

@@ -11,6 +11,7 @@ import {
 } from '@nestjs/websockets';
 import {
   typingSchema,
+  voiceStateSchema,
   WsClientEvents,
   WsEvents,
   type WsEventName,
@@ -21,6 +22,7 @@ import type { Server, Socket } from 'socket.io';
 import type { AccessTokenPayload } from '../common/guards/jwt-auth.guard';
 import { PresenceService } from '../presence/presence.service';
 import { UsersService } from '../users/users.service';
+import { VoiceStateService } from '../voice/voice-state.service';
 
 export function channelRoom(channelId: string): string {
   return `channel:${channelId}`;
@@ -56,7 +58,16 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly jwtService: JwtService,
     private readonly usersService: UsersService,
     private readonly presence: PresenceService,
+    private readonly voiceStates: VoiceStateService,
   ) {}
+
+  /** Рассылка нового состава голосового канала его подписчикам */
+  private broadcastVoiceState(channelId: string): void {
+    this.emitToChannel(channelId, WsEvents.VoiceUpdate, {
+      channelId,
+      participants: this.voiceStates.participantsOf(channelId),
+    });
+  }
 
   async handleConnection(socket: Socket): Promise<void> {
     try {
@@ -98,6 +109,37 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const wentOffline = await this.presence.disconnected(data.userId, socket.id);
     if (wentOffline) {
       this.emitToAll(WsEvents.PresenceUpdate, { userId: data.userId, status: 'offline' });
+
+      // Оборванное соединение = выход из голосового канала
+      const leftChannel = this.voiceStates.drop(data.userId);
+      if (leftChannel) this.broadcastVoiceState(leftChannel);
+    }
+  }
+
+  /**
+   * Состояние голоса клиента: вход/выход/мьют. Доступ к каналу уже
+   * гарантирован членством сокета в комнате канала.
+   */
+  @SubscribeMessage(WsClientEvents.VoiceState)
+  handleVoiceState(@ConnectedSocket() socket: Socket, @MessageBody() body: unknown): void {
+    const data = socket.data as SocketData;
+    if (!data.userId || !data.username) return;
+
+    const parsed = voiceStateSchema.safeParse(body);
+    if (!parsed.success) return;
+    const { channelId, muted, deafened } = parsed.data;
+
+    if (channelId !== null && !socket.rooms.has(channelRoom(channelId))) return;
+
+    const affected = this.voiceStates.update(
+      data.userId,
+      data.username,
+      channelId,
+      muted,
+      deafened,
+    );
+    for (const affectedChannelId of affected) {
+      this.broadcastVoiceState(affectedChannelId);
     }
   }
 

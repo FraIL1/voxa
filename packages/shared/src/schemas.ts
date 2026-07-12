@@ -128,3 +128,11 @@ export type AckInput = z.infer<typeof ackSchema>;
 /** Регулярка упоминаний: @имя (как в usernameSchema) или @everyone */
 export const MENTION_PATTERN = /@([\p{L}\p{N}_.-]{2,24})/gu;
 export const EVERYONE_MENTION = '@everyone';
+
+/** Состояние голоса клиента: null — вышел из голосового канала */
+export const voiceStateSchema = z.object({
+  channelId: z.string().uuid().nullable(),
+  muted: z.boolean(),
+  deafened: z.boolean(),
+});
+export type VoiceStateInput = z.infer<typeof voiceStateSchema>;

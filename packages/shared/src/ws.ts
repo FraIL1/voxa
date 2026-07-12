@@ -1,4 +1,10 @@
-import type { CategoryDto, ChannelDto, MessageDto, PresenceStatus } from './dto';
+import type {
+  CategoryDto,
+  ChannelDto,
+  MessageDto,
+  PresenceStatus,
+  VoiceChannelStateDto,
+} from './dto';
 
 /** События WebSocket (раздел 8.5 PRD). Сервер → клиент. */
 export const WsEvents = {
@@ -11,6 +17,8 @@ export const WsEvents = {
   ReactionRemoved: 'reaction.remove',
   Typing: 'typing',
   PresenceUpdate: 'presence.update',
+  /** Изменение состава/состояния участников голосового канала */
+  VoiceUpdate: 'voice.update',
   /** Адресное событие: синхронизация прочитанности между вкладками/устройствами */
   ReadStateUpdated: 'readstate.update',
   ChannelCreated: 'channel.created',
@@ -26,6 +34,8 @@ export type WsEventName = (typeof WsEvents)[keyof typeof WsEvents];
 /** События клиент → сервер */
 export const WsClientEvents = {
   Typing: 'typing',
+  /** Вход/выход/мьют в голосовом канале (см. voiceStateSchema) */
+  VoiceState: 'voice.state',
 } as const;
 
 export interface WsReadyPayload {
@@ -66,6 +76,7 @@ export interface WsServerEvents {
   [WsEvents.ReactionRemoved]: ReactionEventPayload;
   [WsEvents.Typing]: TypingPayload;
   [WsEvents.PresenceUpdate]: PresenceUpdatePayload;
+  [WsEvents.VoiceUpdate]: VoiceChannelStateDto;
   [WsEvents.ReadStateUpdated]: ReadStateUpdatedPayload;
   [WsEvents.ChannelCreated]: ChannelDto;
   [WsEvents.ChannelUpdated]: ChannelDto;

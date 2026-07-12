@@ -19,6 +19,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { ReadStatesModule } from './read-states/read-states.module';
 import { REDIS, RedisModule } from './redis/redis.module';
 import { SeedModule } from './seed/seed.module';
+import { VoiceModule } from './voice/voice.module';
 import { UsersModule } from './users/users.module';
 import { WsModule } from './ws/ws.module';
 
@@ -44,6 +45,7 @@ import { WsModule } from './ws/ws.module';
     FilesModule,
     MessagesModule,
     ReadStatesModule,
+    VoiceModule,
     WsModule,
     SeedModule,
   ],
