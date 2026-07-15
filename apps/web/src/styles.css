@@ -366,6 +366,7 @@ a {
 }
 
 .channel-view {
+  position: relative; /* якорь для попапа настроек звука */
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -953,6 +954,121 @@ a {
 
 .voice-control.danger {
   color: var(--danger);
+}
+
+.voice-control.sharing {
+  color: #43b581;
+}
+
+/* Область просмотра демонстрации экрана */
+.screen-area {
+  flex: 2;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #000;
+  border-bottom: 1px solid var(--border);
+}
+
+.screen-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--bg);
+}
+
+.screen-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--panel-raised);
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 4px 10px;
+}
+
+.screen-tab.active {
+  color: var(--text);
+  border: 1px solid var(--accent);
+}
+
+.screen-tab.own {
+  color: #43b581;
+  padding: 4px 10px;
+  font-size: 13px;
+}
+
+.screen-video {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+.screen-placeholder {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+}
+
+.voice-grid.compact {
+  flex: 0 0 auto;
+  padding: 10px;
+  gap: 8px;
+}
+
+.voice-grid.compact .voice-tile {
+  padding: 10px 16px;
+  min-width: 110px;
+}
+
+.voice-grid.compact .voice-avatar {
+  width: 36px;
+  height: 36px;
+  font-size: 16px;
+}
+
+/* Слайдер громкости участника */
+.volume-slider {
+  width: 110px;
+  accent-color: var(--accent);
+}
+
+/* Панель выбора аудиоустройств */
+.voice-settings {
+  position: absolute;
+  bottom: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  min-width: 320px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.voice-settings label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.voice-settings select {
+  font: inherit;
+  color: var(--text);
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
 }
 
 /* Правая колонка */
