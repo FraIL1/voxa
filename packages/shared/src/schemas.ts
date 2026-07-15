@@ -136,3 +136,9 @@ export const voiceStateSchema = z.object({
   deafened: z.boolean(),
 });
 export type VoiceStateInput = z.infer<typeof voiceStateSchema>;
+
+/** Изменение профиля (пока только имя) */
+export const updateProfileSchema = z.object({
+  username: usernameSchema,
+});
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;

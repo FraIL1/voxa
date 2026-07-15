@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { combineMasks, hasPermission, Permissions } from '@voxa/shared';
 import type { MeDto, MemberDto, RoleDto } from '@voxa/shared';
 
@@ -109,6 +109,22 @@ export class UsersService {
       select: { userId: true },
     });
     return [...new Set(memberships.map((m) => m.userId))];
+  }
+
+  /** Смена имени. Старые access-токены несут прежнее имя до refresh — это ок */
+  async updateProfile(userId: string, username: string): Promise<MeDto> {
+    const usernameLower = username.toLowerCase();
+    const clash = await this.prisma.user.findFirst({
+      where: { usernameLower, NOT: { id: userId } },
+      select: { id: true },
+    });
+    if (clash) throw new ConflictException('Это имя уже занято');
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { username, usernameLower },
+    });
+    return this.getMe(userId);
   }
 
   async getMe(userId: string): Promise<MeDto> {
