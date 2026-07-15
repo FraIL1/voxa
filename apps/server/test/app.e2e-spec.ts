@@ -592,4 +592,27 @@ describe('Voxa: критический поток (e2e)', () => {
       .attach('file', exe, 'game.png')
       .expect(400);
   });
+
+  it('смена имени: PATCH /users/me, занятое имя — 409', async () => {
+    const renamed = await request(httpServer)
+      .patch('/api/users/me')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ username: 'Артемий' })
+      .expect(200);
+    expect((renamed.body as MeDto).username).toBe('Артемий');
+
+    // Имя, занятое другим пользователем (без учёта регистра), не отдаём
+    await request(httpServer)
+      .patch('/api/users/me')
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ username: 'артемий' })
+      .expect(409);
+
+    // Возвращаем как было
+    await request(httpServer)
+      .patch('/api/users/me')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ username: OWNER.username })
+      .expect(200);
+  });
 });
