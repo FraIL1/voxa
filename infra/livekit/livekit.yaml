@@ -1,11 +1,11 @@
 # LiveKit для прода (docker-compose.yml). Ключи приходят из env LIVEKIT_KEYS.
 # Сигналинг (WSS) идёт через Caddy: livekit.{DOMAIN} → livekit:7880;
-# медиатрафик — напрямую по UDP 50000-50199 (открыть в UFW!).
+# медиатрафик — напрямую через единый UDP-порт 7882 (открыть в UFW!).
 port: 7880
 rtc:
   tcp_port: 7881
-  port_range_start: 50000
-  port_range_end: 50199
+  # Единый мультиплексированный UDP-порт — проще firewall, нет диапазонов
+  udp_port: 7882
   # Автоопределение публичного IP VPS для ICE-кандидатов
   use_external_ip: true
 logging:

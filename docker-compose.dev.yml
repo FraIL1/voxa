@@ -58,7 +58,7 @@ services:
     ports:
       - '7880:7880' # сигналинг (WS/HTTP)
       - '7881:7881' # WebRTC по TCP (фолбэк)
-      - '50000-50019:50000-50019/udp' # медиапотоки
+      - '7882:7882/udp' # медиапотоки (единый мультиплексированный порт)
     volumes:
       - ./infra/livekit/livekit.dev.yaml:/etc/livekit.yaml:ro
 

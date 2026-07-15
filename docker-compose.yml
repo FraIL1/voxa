@@ -107,7 +107,7 @@ services:
     command: --config /etc/livekit.yaml
     ports:
       - '7881:7881' # WebRTC по TCP (фолбэк при закрытом UDP)
-      - '50000-50199:50000-50199/udp' # медиапотоки (открыть в UFW!)
+      - '7882:7882/udp' # медиапотоки, единый порт (открыть в UFW!)
     environment:
       # формат: "ключ: секрет"
       LIVEKIT_KEYS: '${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}'

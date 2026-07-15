@@ -3,9 +3,9 @@
 port: 7880
 rtc:
   tcp_port: 7881
-  # Небольшой диапазон: Docker Desktop медленно публикует большие UDP-диапазоны
-  port_range_start: 50000
-  port_range_end: 50019
+  # Единый мультиплексированный UDP-порт: все участники через 7882.
+  # Диапазон портов в Docker исчерпывался — load-test пускал только 8 из 15.
+  udp_port: 7882
   use_external_ip: false
 keys:
   voxa-dev: voxa-dev-livekit-secret-0123456789abcdef
