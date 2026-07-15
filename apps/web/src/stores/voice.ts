@@ -4,6 +4,7 @@ import {
   RoomEvent,
   Track,
   type LocalTrackPublication,
+  type LocalVideoTrack,
   type RemoteParticipant,
   type RemoteTrack,
   type RemoteVideoTrack,
@@ -70,13 +71,18 @@ interface VoiceState {
   watch: (userId: string | null) => void;
 }
 
+/** Ключ самопросмотра собственной демонстрации в поле watching */
+export const SELF_SCREEN = 'self';
+
 /** Комната LiveKit, аудиоэлементы и видеотреки живут вне стора: они не для рендера */
 let room: Room | null = null;
+let localScreenTrack: LocalVideoTrack | null = null;
 const audioElements = new Map<string, HTMLMediaElement>();
 const screenVideoTracks = new Map<string, RemoteVideoTrack>();
 
 /** Видеотрек демонстрации экрана участника (для attach в компоненте) */
-export function screenVideoTrackOf(userId: string): RemoteVideoTrack | undefined {
+export function screenVideoTrackOf(userId: string): RemoteVideoTrack | LocalVideoTrack | undefined {
+  if (userId === SELF_SCREEN) return localScreenTrack ?? undefined;
   return screenVideoTracks.get(userId);
 }
 
@@ -97,6 +103,7 @@ function cleanupRoom(): void {
   for (const element of audioElements.values()) element.remove();
   audioElements.clear();
   screenVideoTracks.clear();
+  localScreenTrack = null;
   room = null;
 }
 
@@ -180,7 +187,13 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
 
       // «Остановить демонстрацию» из панели браузера
       next.on(RoomEvent.LocalTrackUnpublished, (pub: LocalTrackPublication) => {
-        if (pub.source === Track.Source.ScreenShare) set({ sharing: false });
+        if (pub.source === Track.Source.ScreenShare) {
+          localScreenTrack = null;
+          set((s) => ({
+            sharing: false,
+            watching: s.watching === SELF_SCREEN ? (s.screenSharers[0] ?? null) : s.watching,
+          }));
+        }
       });
 
       next.on(RoomEvent.Disconnected, () => {
@@ -222,6 +235,7 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
     for (const element of audioElements.values()) element.remove();
     audioElements.clear();
     screenVideoTracks.clear();
+    localScreenTrack = null;
     set({
       channelId: null,
       connecting: false,
@@ -287,7 +301,20 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
         audio: true,
         resolution: { width: 1280, height: 720, frameRate: 30 },
       });
-      set({ sharing: sharing ? false : Boolean(publication) });
+      if (sharing) {
+        localScreenTrack = null;
+        set((s) => ({
+          sharing: false,
+          watching: s.watching === SELF_SCREEN ? (s.screenSharers[0] ?? null) : s.watching,
+        }));
+      } else {
+        localScreenTrack = (publication?.videoTrack as LocalVideoTrack | undefined) ?? null;
+        // самопросмотр открываем сразу — видно, что именно стримишь
+        set({
+          sharing: Boolean(publication),
+          watching: publication ? SELF_SCREEN : get().watching,
+        });
+      }
     } catch {
       // пользователь закрыл диалог выбора экрана — не ошибка
     }

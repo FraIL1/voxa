@@ -8,6 +8,8 @@ interface AuthState {
   accessToken: string | null;
   user: MeDto | null;
   setSession: (token: string, user: MeDto) => void;
+  /** Обновление профиля без смены токена (после PATCH /users/me) */
+  setUser: (user: MeDto) => void;
   clearSession: () => void;
   /** Восстановление сессии по refresh-cookie при старте приложения */
   bootstrap: () => Promise<void>;
@@ -19,6 +21,8 @@ export const useAuthStore = create<AuthState>()((set) => ({
   user: null,
 
   setSession: (accessToken, user) => set({ status: 'authed', accessToken, user }),
+
+  setUser: (user) => set({ user }),
 
   clearSession: () => set({ status: 'guest', accessToken: null, user: null }),
 

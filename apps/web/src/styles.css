@@ -1030,10 +1030,174 @@ a {
   font-size: 16px;
 }
 
-/* Слайдер громкости участника */
+/* Слайдер громкости участника: свои стили — одинаково во всех браузерах,
+   виден только при наведении на плитку */
 .volume-slider {
   width: 110px;
-  accent-color: var(--accent);
+  height: 14px;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+
+.voice-tile:hover .volume-slider,
+.volume-slider:focus-visible {
+  opacity: 1;
+}
+
+.volume-slider::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--panel-raised);
+}
+
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+}
+
+.volume-slider::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--panel-raised);
+}
+
+.volume-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+}
+
+/* Окно настроек */
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(0, 0, 0, 0.65);
+  display: grid;
+  place-items: center;
+}
+
+.settings-panel {
+  position: relative;
+  display: flex;
+  width: min(760px, 94vw);
+  height: min(560px, 90vh);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.settings-nav {
+  width: 190px;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 8px;
+}
+
+.settings-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
+.settings-tab:hover {
+  background: var(--panel-raised);
+  color: var(--text);
+}
+
+.settings-tab.active {
+  background: var(--panel-raised);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.settings-tab.danger {
+  color: var(--danger);
+}
+
+.settings-nav-spacer {
+  flex: 1;
+}
+
+.settings-content {
+  flex: 1;
+  padding: 22px 26px;
+  overflow-y: auto;
+}
+
+.settings-content h2 {
+  margin: 18px 0 12px;
+  font-size: 17px;
+}
+
+.settings-content h2:first-child {
+  margin-top: 0;
+}
+
+.settings-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 360px;
+  margin-bottom: 10px;
+}
+
+.settings-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.settings-form select {
+  font: inherit;
+  color: var(--text);
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+}
+
+.settings-form .btn-primary {
+  align-self: flex-start;
+}
+
+.settings-ok {
+  color: #43b581;
+  font-size: 13px;
+  min-height: 18px;
+  margin: 0;
+}
+
+.settings-form .auth-error {
+  min-height: 0;
 }
 
 /* Панель выбора аудиоустройств */

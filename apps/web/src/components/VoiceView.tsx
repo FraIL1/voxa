@@ -14,7 +14,7 @@ import { useTranslation } from 'react-i18next';
 
 import { participantsOf, useVoiceStates } from '../hooks/useVoiceStates';
 import { useAuthStore } from '../stores/auth';
-import { screenVideoTrackOf, useVoiceStore } from '../stores/voice';
+import { screenVideoTrackOf, SELF_SCREEN, useVoiceStore } from '../stores/voice';
 import VoiceSettings from './VoiceSettings';
 
 export default function VoiceView({ channel }: { channel: ChannelDto }) {
@@ -64,14 +64,19 @@ export default function VoiceView({ channel }: { channel: ChannelDto }) {
                 <MonitorUp size={13} /> {nameOf(userId)}
               </button>
             ))}
-            {voice.sharing && <span className="screen-tab own">{t('voice.yourScreen')}</span>}
+            {voice.sharing && (
+              <button
+                className={`screen-tab own${voice.watching === SELF_SCREEN ? ' active' : ''}`}
+                onClick={() => voice.watch(voice.watching === SELF_SCREEN ? null : SELF_SCREEN)}
+              >
+                <MonitorUp size={13} /> {t('voice.yourScreen')}
+              </button>
+            )}
           </div>
           {voice.watching && watchingTrackReady ? (
             <video ref={videoRef} className="screen-video" autoPlay playsInline muted />
           ) : (
-            <div className="screen-placeholder">
-              {voice.screenSharers.length > 0 ? t('voice.pickScreen') : t('voice.onlyYouShare')}
-            </div>
+            <div className="screen-placeholder">{t('voice.pickScreen')}</div>
           )}
         </div>
       )}

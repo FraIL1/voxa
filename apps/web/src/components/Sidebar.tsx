@@ -3,21 +3,22 @@ import {
   Hash,
   Headphones,
   HeadphoneOff,
-  LogOut,
   Mic,
   MicOff,
   PhoneOff,
+  Settings,
   Volume2,
 } from 'lucide-react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink, useNavigate } from 'react-router';
 
-import { logout } from '../api/auth';
 import { useReadStates } from '../hooks/useReadStates';
 import { allChannelsOf, useStructure } from '../hooks/useStructure';
 import { participantsOf, useVoiceStates } from '../hooks/useVoiceStates';
 import { useAuthStore } from '../stores/auth';
 import { useVoiceStore } from '../stores/voice';
+import SettingsModal from './SettingsModal';
 
 function VoiceParticipants({ participants }: { participants: VoiceParticipantDto[] }) {
   const speaking = useVoiceStore((s) => s.speaking);
@@ -100,6 +101,7 @@ export default function Sidebar() {
   const { data: voiceStates } = useVoiceStates();
   const user = useAuthStore((s) => s.user);
   const voice = useVoiceStore();
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const stateOf = new Map((readStates ?? []).map((s) => [s.channelId, s]));
   const voiceChannelName = voice.channelId
@@ -173,10 +175,16 @@ export default function Sidebar() {
         >
           {voice.deafened ? <HeadphoneOff size={17} /> : <Headphones size={17} />}
         </button>
-        <button className="icon-button" title={t('auth.logout')} onClick={() => void logout()}>
-          <LogOut size={17} />
+        <button
+          className="icon-button"
+          title={t('settings.title')}
+          onClick={() => setSettingsOpen(true)}
+        >
+          <Settings size={17} />
         </button>
       </div>
+
+      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
     </nav>
   );
 }
