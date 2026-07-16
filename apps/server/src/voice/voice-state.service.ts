@@ -44,6 +44,14 @@ export class VoiceStateService {
     return [...affected];
   }
 
+  /** Смена имени пользователя в голосе; вернёт канал для рассылки или null */
+  rename(userId: string, username: string): string | null {
+    const state = this.states.get(userId);
+    if (!state) return null;
+    state.participant = { ...state.participant, username };
+    return state.channelId;
+  }
+
   /** Снятие состояния при разрыве последнего сокета; вернёт покинутый канал */
   drop(userId: string): string | null {
     const state = this.states.get(userId);

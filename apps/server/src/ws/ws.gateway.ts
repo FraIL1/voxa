@@ -69,6 +69,25 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
+  /**
+   * Пользователь сменил профиль: обновляем имя в живых сокетах (typing и
+   * voice.state шлются с ним), в голосовом присутствии, и оповещаем всех.
+   */
+  async handleUserRenamed(
+    userId: string,
+    username: string,
+    avatarUrl: string | null,
+  ): Promise<void> {
+    for (const socket of await this.server.in(userRoom(userId)).fetchSockets()) {
+      (socket.data as SocketData).username = username;
+    }
+
+    const voiceChannelId = this.voiceStates.rename(userId, username);
+    if (voiceChannelId) this.broadcastVoiceState(voiceChannelId);
+
+    this.emitToAll(WsEvents.UserUpdated, { id: userId, username, avatarUrl });
+  }
+
   async handleConnection(socket: Socket): Promise<void> {
     try {
       const auth = socket.handshake.auth as Record<string, unknown>;

@@ -3,6 +3,7 @@ import type {
   ChannelDto,
   MessageDto,
   PresenceStatus,
+  UserPublicDto,
   VoiceChannelStateDto,
 } from './dto';
 
@@ -17,6 +18,8 @@ export const WsEvents = {
   ReactionRemoved: 'reaction.remove',
   Typing: 'typing',
   PresenceUpdate: 'presence.update',
+  /** Профиль пользователя изменился (имя/аватар) — обновить кэши */
+  UserUpdated: 'user.updated',
   /** Изменение состава/состояния участников голосового канала */
   VoiceUpdate: 'voice.update',
   /** Адресное событие: синхронизация прочитанности между вкладками/устройствами */
@@ -76,6 +79,7 @@ export interface WsServerEvents {
   [WsEvents.ReactionRemoved]: ReactionEventPayload;
   [WsEvents.Typing]: TypingPayload;
   [WsEvents.PresenceUpdate]: PresenceUpdatePayload;
+  [WsEvents.UserUpdated]: UserPublicDto;
   [WsEvents.VoiceUpdate]: VoiceChannelStateDto;
   [WsEvents.ReadStateUpdated]: ReadStateUpdatedPayload;
   [WsEvents.ChannelCreated]: ChannelDto;
