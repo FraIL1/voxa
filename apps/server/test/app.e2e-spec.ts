@@ -593,13 +593,21 @@ describe('Voxa: критический поток (e2e)', () => {
       .expect(400);
   });
 
-  it('смена имени: PATCH /users/me, занятое имя — 409', async () => {
+  it('смена имени: PATCH /users/me, рассылка user.updated, занятое имя — 409', async () => {
+    const broadcast = new Promise<{ id: string; username: string }>((resolve) => {
+      socket?.once(WsEvents.UserUpdated, resolve);
+    });
+
     const renamed = await request(httpServer)
       .patch('/api/users/me')
       .set('Authorization', `Bearer ${ownerAccess}`)
       .send({ username: 'Артемий' })
       .expect(200);
     expect((renamed.body as MeDto).username).toBe('Артемий');
+
+    // Все клиенты получают событие для обновления кэшей
+    const event = await broadcast;
+    expect(event.username).toBe('Артемий');
 
     // Имя, занятое другим пользователем (без учёта регистра), не отдаём
     await request(httpServer)
