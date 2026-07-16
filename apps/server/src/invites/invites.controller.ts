@@ -16,6 +16,7 @@ import {
   type InviteDto,
 } from '@voxa/shared';
 
+import { AuditService } from '../audit/audit.service';
 import { CurrentUser, type RequestUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
@@ -24,7 +25,10 @@ import { InvitesService } from './invites.service';
 
 @Controller('invites')
 export class InvitesController {
-  constructor(private readonly invitesService: InvitesService) {}
+  constructor(
+    private readonly invitesService: InvitesService,
+    private readonly audit: AuditService,
+  ) {}
 
   @Post()
   @RequirePermissions(Permissions.CREATE_INVITES)
@@ -33,7 +37,9 @@ export class InvitesController {
     @CurrentUser() user: RequestUser,
     @Body(new ZodValidationPipe(createInviteSchema)) body: CreateInviteInput,
   ): Promise<InviteDto> {
-    return this.invitesService.create(user.id, body);
+    const dto = await this.invitesService.create(user.id, body);
+    this.audit.log(user.id, 'invite.create', { type: 'invite', id: dto.id });
+    return dto;
   }
 
   @Get()
@@ -45,8 +51,12 @@ export class InvitesController {
   @Delete(':id')
   @RequirePermissions(Permissions.CREATE_INVITES)
   @HttpCode(204)
-  async revoke(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
+  async revoke(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<void> {
     await this.invitesService.revoke(id);
+    this.audit.log(user.id, 'invite.revoke', { type: 'invite', id });
   }
 
   /** Проверка кода перед регистрацией — без авторизации */

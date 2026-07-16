@@ -10,13 +10,15 @@ datasource db {
 }
 
 model User {
-  id            String   @id @default(uuid(7))
+  id            String    @id @default(uuid(7))
   username      String
-  usernameLower String   @unique @map("username_lower")
-  passwordHash  String   @map("password_hash")
-  avatarUrl     String?  @map("avatar_url")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  usernameLower String    @unique @map("username_lower")
+  passwordHash  String    @map("password_hash")
+  avatarUrl     String?   @map("avatar_url")
+  /// Таймаут: до этого момента не может писать и говорить (раздел 5.10 PRD)
+  timedOutUntil DateTime? @map("timed_out_until")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
 
   roles          UserRole[]
   sessions       RefreshSession[]
@@ -25,8 +27,39 @@ model User {
   readStates     ChannelReadState[]
   attachments    Attachment[]
   invitesCreated Invite[]           @relation("InviteCreator")
+  ban            Ban?               @relation("BannedUser")
+  bansIssued     Ban[]              @relation("BanIssuer")
+  auditActions   AuditLog[]         @relation("AuditActor")
 
   @@map("users")
+}
+
+/// Бан по аккаунту: вход запрещён до разбана (раздел 5.10 PRD)
+model Ban {
+  userId     String   @id @map("user_id")
+  user       User     @relation("BannedUser", fields: [userId], references: [id], onDelete: Cascade)
+  reason     String?
+  bannedById String?  @map("banned_by_id")
+  bannedBy   User?    @relation("BanIssuer", fields: [bannedById], references: [id], onDelete: SetNull)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("bans")
+}
+
+/// Журнал аудита: кто что сделал (раздел 5.10 PRD)
+model AuditLog {
+  id         BigInt   @id @default(autoincrement())
+  actorId    String?  @map("actor_id")
+  actor      User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  /// user.kick / user.ban / channel.create / invite.revoke / message.delete.other ...
+  action     String
+  targetType String?  @map("target_type")
+  targetId   String?  @map("target_id")
+  meta       Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("audit_log")
 }
 
 model Invite {

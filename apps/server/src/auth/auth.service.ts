@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   HttpException,
   HttpStatus,
   Injectable,
@@ -128,6 +129,14 @@ export class AuthService {
 
     if (!user || !passwordOk) {
       throw new UnauthorizedException('Неверное имя пользователя или пароль');
+    }
+
+    // Бан по аккаунту: вход запрещён до разбана (раздел 5.10 PRD)
+    const ban = await this.prisma.ban.findUnique({ where: { userId: user.id } });
+    if (ban) {
+      throw new ForbiddenException(
+        ban.reason ? `Аккаунт заблокирован: ${ban.reason}` : 'Аккаунт заблокирован',
+      );
     }
 
     await this.tokens.pruneExpired(user.id);

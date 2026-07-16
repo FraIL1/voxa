@@ -4,8 +4,11 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import type Redis from 'ioredis';
 
+import { AdminModule } from './admin/admin.module';
+import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { ChannelsModule } from './channels/channels.module';
+import { ModerationModule } from './moderation/moderation.module';
 import { FilesModule } from './files/files.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
@@ -39,6 +42,7 @@ import { WsModule } from './ws/ws.module';
     }),
     UsersModule,
     PresenceModule,
+    AuditModule,
     AuthModule,
     InvitesModule,
     ChannelsModule,
@@ -46,6 +50,8 @@ import { WsModule } from './ws/ws.module';
     MessagesModule,
     ReadStatesModule,
     VoiceModule,
+    ModerationModule,
+    AdminModule,
     WsModule,
     SeedModule,
   ],

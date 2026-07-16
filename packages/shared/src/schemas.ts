@@ -142,3 +142,27 @@ export const updateProfileSchema = z.object({
   username: usernameSchema,
 });
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+
+/** Причина модерационного действия (кик/бан) */
+export const moderationReasonSchema = z.object({
+  reason: z.string().trim().max(500).optional(),
+});
+export type ModerationReasonInput = z.infer<typeof moderationReasonSchema>;
+
+/** Таймаут: от минуты до 28 дней */
+export const timeoutSchema = z.object({
+  minutes: z
+    .number()
+    .int()
+    .min(1)
+    .max(60 * 24 * 28),
+  reason: z.string().trim().max(500).optional(),
+});
+export type TimeoutInput = z.infer<typeof timeoutSchema>;
+
+export const auditQuerySchema = z.object({
+  /** id записи, ДО которой грузить (курсор) */
+  before: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+});
+export type AuditQueryInput = z.infer<typeof auditQuerySchema>;

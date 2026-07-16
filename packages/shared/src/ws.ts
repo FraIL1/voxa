@@ -20,6 +20,10 @@ export const WsEvents = {
   PresenceUpdate: 'presence.update',
   /** Профиль пользователя изменился (имя/аватар) — обновить кэши */
   UserUpdated: 'user.updated',
+  /** Адресное: сессия принудительно завершена (кик/бан) — выйти из аккаунта */
+  ForceLogout: 'force_logout',
+  /** Адресное: изменился мой таймаут (null — снят) */
+  MeTimedOut: 'me.timeout',
   /** Изменение состава/состояния участников голосового канала */
   VoiceUpdate: 'voice.update',
   /** Адресное событие: синхронизация прочитанности между вкладками/устройствами */
@@ -80,6 +84,8 @@ export interface WsServerEvents {
   [WsEvents.Typing]: TypingPayload;
   [WsEvents.PresenceUpdate]: PresenceUpdatePayload;
   [WsEvents.UserUpdated]: UserPublicDto;
+  [WsEvents.ForceLogout]: { reason: string };
+  [WsEvents.MeTimedOut]: { until: string | null };
   [WsEvents.VoiceUpdate]: VoiceChannelStateDto;
   [WsEvents.ReadStateUpdated]: ReadStateUpdatedPayload;
   [WsEvents.ChannelCreated]: ChannelDto;

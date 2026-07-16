@@ -82,6 +82,7 @@ export class UsersService {
         .map((ur) => ur.role)
         .sort((a, b) => b.position - a.position)
         .map((r) => ({ id: r.id, name: r.name, color: r.color, position: r.position })),
+      timedOutUntil: user.timedOutUntil?.toISOString() ?? null,
     }));
   }
 
@@ -153,6 +154,7 @@ export class UsersService {
       avatarUrl: user.avatarUrl,
       permissions: combineMasks(roles.map((r) => r.permissions)),
       roles,
+      timedOutUntil: user.timedOutUntil?.toISOString() ?? null,
       createdAt: user.createdAt.toISOString(),
     };
   }

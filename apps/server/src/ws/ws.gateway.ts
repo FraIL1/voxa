@@ -69,6 +69,14 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
+  /** Кик/бан: адресное событие и принудительное отключение всех сокетов */
+  async forceLogout(userId: string, reason: string): Promise<void> {
+    this.emitToUsers([userId], WsEvents.ForceLogout, { reason });
+    for (const socket of await this.server.in(userRoom(userId)).fetchSockets()) {
+      socket.disconnect(true);
+    }
+  }
+
   /**
    * Пользователь сменил профиль: обновляем имя в живых сокетах (typing и
    * voice.state шлются с ним), в голосовом присутствии, и оповещаем всех.

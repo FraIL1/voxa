@@ -21,6 +21,7 @@ import {
 
 import { FilesService } from '../files/files.service';
 import { LinkPreviewService } from '../link-preview/link-preview.service';
+import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReadStatesService } from '../read-states/read-states.service';
 import { UsersService } from '../users/users.service';
@@ -66,6 +67,7 @@ export class MessagesService {
     private readonly readStates: ReadStatesService,
     private readonly files: FilesService,
     private readonly linkPreview: LinkPreviewService,
+    private readonly audit: AuditService,
   ) {}
 
   /**
@@ -184,7 +186,21 @@ export class MessagesService {
     return message;
   }
 
+  /** Активный таймаут запрещает писать и говорить (раздел 5.10 PRD) */
+  private async assertNotTimedOut(userId: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { timedOutUntil: true },
+    });
+    if (user?.timedOutUntil && user.timedOutUntil > new Date()) {
+      throw new ForbiddenException(
+        `Вы в таймауте до ${user.timedOutUntil.toLocaleString('ru-RU')}`,
+      );
+    }
+  }
+
   async send(userId: string, channelId: string, input: SendMessageInput): Promise<MessageDto> {
+    await this.assertNotTimedOut(userId);
     await this.assertTextChannelAccess(userId, channelId);
 
     if (input.replyToId) {
@@ -265,7 +281,8 @@ export class MessagesService {
     await this.assertTextChannelAccess(userId, channelId);
     const message = await this.findAliveOrThrow(channelId, messageId);
 
-    if (message.authorId !== userId) {
+    const isForeign = message.authorId !== userId;
+    if (isForeign) {
       const mask = await this.users.permissionMaskOf(userId);
       if (!hasPermission(mask, Permissions.DELETE_MESSAGES)) {
         throw new ForbiddenException('Недостаточно прав для удаления чужого сообщения');
@@ -276,6 +293,19 @@ export class MessagesService {
       where: { id: messageId },
       data: { deletedAt: new Date() },
     });
+
+    // Удаление чужого — модерационное действие, фиксируем в журнале
+    if (isForeign) {
+      this.audit.log(
+        userId,
+        'message.delete.other',
+        { type: 'message', id: messageId },
+        {
+          channelId,
+          authorId: message.authorId,
+        },
+      );
+    }
 
     this.ws.emitToChannel(channelId, WsEvents.MessageDeleted, { id: messageId, channelId });
   }

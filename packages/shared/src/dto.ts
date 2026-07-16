@@ -20,6 +20,8 @@ export interface MeDto extends UserPublicDto {
   /** Итоговая маска прав (все роли через OR) */
   permissions: number;
   roles: RoleDto[];
+  /** Активный таймаут: до этого момента нельзя писать и говорить */
+  timedOutUntil: string | null;
   createdAt: string;
 }
 
@@ -125,6 +127,7 @@ export interface MemberDto extends UserPublicDto {
   status: PresenceStatus;
   /** По убыванию старшинства */
   roles: MemberRoleDto[];
+  timedOutUntil: string | null;
 }
 
 /** Состояние прочитанности канала для текущего пользователя */
@@ -174,4 +177,40 @@ export interface VoiceTokenDto {
   /** Подписанный JWT доступа в комнату */
   token: string;
   channelId: string;
+}
+
+// ---------- Модерация и панель владельца (раздел 5.10 PRD) ----------
+
+export interface BanDto {
+  userId: string;
+  username: string;
+  reason: string | null;
+  bannedByUsername: string | null;
+  createdAt: string;
+}
+
+export interface AuditEntryDto {
+  /** BigInt сериализуется строкой */
+  id: string;
+  actorUsername: string | null;
+  action: string;
+  targetType: string | null;
+  targetId: string | null;
+  meta: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface AuditPageDto {
+  items: AuditEntryDto[];
+  hasMore: boolean;
+}
+
+export interface AdminOverviewDto {
+  usersTotal: number;
+  onlineNow: number;
+  activeSessions: number;
+  /** Суммарный размер загруженных файлов, МБ */
+  filesTotalMb: number;
+  serverVersion: string;
+  uptimeSeconds: number;
 }
