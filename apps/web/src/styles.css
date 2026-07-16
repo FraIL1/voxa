@@ -1200,41 +1200,6 @@ a {
   min-height: 0;
 }
 
-/* Панель выбора аудиоустройств */
-.voice-settings {
-  position: absolute;
-  bottom: 70px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 14px;
-  min-width: 320px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-}
-
-.voice-settings label {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-.voice-settings select {
-  font: inherit;
-  color: var(--text);
-  background: var(--panel-raised);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 8px 10px;
-}
-
 /* Правая колонка */
 
 .members {

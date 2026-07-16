@@ -1,28 +1,17 @@
 import type { ChannelDto } from '@voxa/shared';
-import {
-  Headphones,
-  HeadphoneOff,
-  Mic,
-  MicOff,
-  MonitorUp,
-  PhoneOff,
-  Settings,
-  Volume2,
-} from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { Headphones, HeadphoneOff, Mic, MicOff, MonitorUp, PhoneOff, Volume2 } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { participantsOf, useVoiceStates } from '../hooks/useVoiceStates';
 import { useAuthStore } from '../stores/auth';
 import { screenVideoTrackOf, SELF_SCREEN, useVoiceStore } from '../stores/voice';
-import VoiceSettings from './VoiceSettings';
 
 export default function VoiceView({ channel }: { channel: ChannelDto }) {
   const { t } = useTranslation();
   const { data: voiceStates } = useVoiceStates();
   const voice = useVoiceStore();
   const myId = useAuthStore((s) => s.user?.id);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const participants = participantsOf(voiceStates, channel.id);
@@ -143,13 +132,6 @@ export default function VoiceView({ channel }: { channel: ChannelDto }) {
               <MonitorUp size={20} />
             </button>
             <button
-              className="icon-button voice-control"
-              title={t('voice.settings')}
-              onClick={() => setSettingsOpen((v) => !v)}
-            >
-              <Settings size={20} />
-            </button>
-            <button
               className="icon-button voice-control danger"
               title={t('voice.leave')}
               onClick={() => void voice.leave()}
@@ -167,8 +149,6 @@ export default function VoiceView({ channel }: { channel: ChannelDto }) {
           </button>
         )}
       </div>
-
-      {settingsOpen && <VoiceSettings onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 }

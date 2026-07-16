@@ -7,12 +7,19 @@ import {
   type ReactionEventPayload,
   type ReadStateUpdatedPayload,
   type TypingPayload,
+  type UserPublicDto,
   type VoiceChannelStateDto,
 } from '@voxa/shared';
 import { useEffect } from 'react';
 
 import { refreshSession } from '../api/client';
-import { addMessage, applyReaction, removeMessage, updateMessage } from '../api/messages-cache';
+import {
+  addMessage,
+  applyReaction,
+  removeMessage,
+  renameMessageAuthor,
+  updateMessage,
+} from '../api/messages-cache';
 import { bumpUnread, setReadState } from '../api/read-states-cache';
 import { connectSocket, disconnectSocket, emitVoiceState } from '../api/socket';
 import { playJoinSound, playLeaveSound } from '../lib/sounds';
@@ -105,6 +112,20 @@ export function useRealtime(): void {
       queryClient.setQueryData<MemberDto[]>(MEMBERS_KEY, (members) =>
         members?.map((m) => (m.id === p.userId ? { ...m, status: p.status } : m)),
       );
+    });
+
+    // Смена профиля: список участников, авторы сообщений, своя сессия в других вкладках
+    socket.on(WsEvents.UserUpdated, (u: UserPublicDto) => {
+      queryClient.setQueryData<MemberDto[]>(MEMBERS_KEY, (members) =>
+        members?.map((m) =>
+          m.id === u.id ? { ...m, username: u.username, avatarUrl: u.avatarUrl } : m,
+        ),
+      );
+      renameMessageAuthor(queryClient, u);
+      const me = useAuthStore.getState().user;
+      if (me && me.id === u.id && me.username !== u.username) {
+        useAuthStore.getState().setUser({ ...me, username: u.username });
+      }
     });
 
     // Ack из другой вкладки/устройства этого же пользователя

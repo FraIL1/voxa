@@ -1,5 +1,5 @@
 import type { InfiniteData, QueryClient } from '@tanstack/react-query';
-import type { MessageDto, MessagesPageDto } from '@voxa/shared';
+import type { MessageDto, MessagesPageDto, UserPublicDto } from '@voxa/shared';
 
 /** Сообщение в кэше; pending — оптимистичное, ещё не подтверждено сервером */
 export type ChatMessage = MessageDto & { pending?: boolean };
@@ -67,6 +67,19 @@ export function updateMessage(queryClient: QueryClient, message: MessageDto): vo
 export function removeMessage(queryClient: QueryClient, channelId: string, id: string): void {
   queryClient.setQueryData<MessagesData>(messagesKey(channelId), (data) =>
     mapPages(data, (items) => items.filter((m) => m.id !== id)),
+  );
+}
+
+/** Смена профиля автора: обновить его имя во всех закэшированных сообщениях */
+export function renameMessageAuthor(queryClient: QueryClient, user: UserPublicDto): void {
+  queryClient.setQueriesData<MessagesData>({ queryKey: ['messages'] }, (data) =>
+    mapPages(data, (items) =>
+      items.map((m) =>
+        m.author?.id === user.id
+          ? { ...m, author: { ...m.author, username: user.username, avatarUrl: user.avatarUrl } }
+          : m,
+      ),
+    ),
   );
 }
 
