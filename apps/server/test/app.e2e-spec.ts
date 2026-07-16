@@ -623,4 +623,137 @@ describe('Voxa: критический поток (e2e)', () => {
       .send({ username: OWNER.username })
       .expect(200);
   });
+
+  it('таймаут запрещает писать и говорить; снятие — возвращает', async () => {
+    const me = await request(httpServer)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(200);
+    const memberId = (me.body as MeDto).id;
+
+    const res = await request(httpServer)
+      .post(`/api/moderation/users/${memberId}/timeout`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ minutes: 5, reason: 'спам' })
+      .expect(201);
+    expect(res.body.until).toBeTruthy();
+
+    // Писать нельзя
+    await request(httpServer)
+      .post(`/api/channels/${generalChannelId}/messages`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ content: 'в таймауте' })
+      .expect(403);
+
+    // И в голос нельзя
+    const structure = await request(httpServer)
+      .get('/api/channels')
+      .set('Authorization', `Bearer ${ownerAccess}`);
+    const voiceChannel = (structure.body as CommunityStructureDto).categories
+      .flatMap((c) => c.channels)
+      .find((c) => c.type === 'VOICE') as { id: string };
+    await request(httpServer)
+      .post(`/api/channels/${voiceChannel.id}/voice-token`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(403);
+
+    // Снятие таймаута
+    await request(httpServer)
+      .delete(`/api/moderation/users/${memberId}/timeout`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(204);
+    await request(httpServer)
+      .post(`/api/channels/${generalChannelId}/messages`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ content: 'таймаут снят' })
+      .expect(201);
+  });
+
+  it('кик завершает сессии; бан запрещает вход; разбан возвращает доступ', async () => {
+    const invite = await request(httpServer)
+      .post('/api/invites')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ maxUses: 1 })
+      .expect(201);
+
+    const victim = { username: 'Нарушитель', password: 'пароль-нарушителя-123' };
+    const registered = await request(httpServer)
+      .post('/api/auth/register')
+      .send({ inviteCode: invite.body.code, ...victim })
+      .expect(201);
+    const victimId = (registered.body as AuthResponseDto).user.id;
+    const victimCookie = refreshCookieOf(registered);
+
+    // Кик: refresh-сессии отозваны, но вход снова возможен
+    await request(httpServer)
+      .post(`/api/moderation/users/${victimId}/kick`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ reason: 'проверка' })
+      .expect(204);
+    await request(httpServer).post('/api/auth/refresh').set('Cookie', victimCookie).expect(401);
+    await request(httpServer).post('/api/auth/login').send(victim).expect(200);
+
+    // Бан: вход запрещён с причиной
+    await request(httpServer)
+      .post(`/api/moderation/users/${victimId}/ban`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ reason: 'нарушение правил' })
+      .expect(204);
+    const denied = await request(httpServer).post('/api/auth/login').send(victim).expect(403);
+    expect(denied.body.message).toContain('нарушение правил');
+
+    // Участник без прав не видит списка банов
+    await request(httpServer)
+      .get('/api/moderation/bans')
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(403);
+
+    // Владелец видит бан в списке
+    const bans = await request(httpServer)
+      .get('/api/moderation/bans')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    expect(bans.body.some((b: { userId: string }) => b.userId === victimId)).toBe(true);
+
+    // Разбан возвращает вход
+    await request(httpServer)
+      .delete(`/api/moderation/bans/${victimId}`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(204);
+    await request(httpServer).post('/api/auth/login').send(victim).expect(200);
+
+    // Владельца нельзя модерировать даже владельцу (сам себя — 400)
+    const ownerMe = await request(httpServer)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${ownerAccess}`);
+    await request(httpServer)
+      .post(`/api/moderation/users/${(ownerMe.body as MeDto).id}/ban`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({})
+      .expect(400);
+  });
+
+  it('журнал аудита и обзор доступны только администратору', async () => {
+    await request(httpServer)
+      .get('/api/admin/audit')
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(403);
+
+    const audit = await request(httpServer)
+      .get('/api/admin/audit?limit=50')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    const actions = (audit.body.items as { action: string }[]).map((i) => i.action);
+    expect(actions).toContain('user.ban');
+    expect(actions).toContain('user.kick');
+    expect(actions).toContain('user.timeout');
+    expect(actions).toContain('invite.create');
+
+    const overview = await request(httpServer)
+      .get('/api/admin/overview')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    expect(overview.body.usersTotal).toBeGreaterThanOrEqual(3);
+    expect(overview.body.serverVersion).toBeTruthy();
+  });
 });
