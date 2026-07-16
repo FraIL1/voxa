@@ -151,6 +151,17 @@ export function useRealtime(): void {
       void refreshSession();
     });
 
+    // Кик/бан: сервер уже отозвал сессии — показываем причину на входе
+    socket.on(WsEvents.ForceLogout, ({ reason }: { reason: string }) => {
+      useAuthStore.getState().clearSession(reason);
+    });
+
+    // Таймаут выдан или снят
+    socket.on(WsEvents.MeTimedOut, ({ until }: { until: string | null }) => {
+      const me = useAuthStore.getState().user;
+      if (me) useAuthStore.getState().setUser({ ...me, timedOutUntil: until });
+    });
+
     return () => {
       disconnectSocket();
     };

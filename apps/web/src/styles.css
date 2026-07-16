@@ -1078,6 +1078,177 @@ a {
   border: none;
 }
 
+/* Контекст-меню модерации */
+.context-menu {
+  position: fixed;
+  z-index: 60;
+  min-width: 200px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 5px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.menu-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-faint);
+  padding: 5px 9px 7px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font-size: 13px;
+  padding: 7px 9px;
+}
+
+.menu-item:hover {
+  background: var(--panel-raised);
+}
+
+.menu-item.danger {
+  color: var(--danger);
+}
+
+/* Баннер собственного таймаута вместо поля ввода */
+.timeout-banner {
+  background: rgba(240, 86, 79, 0.12);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  color: var(--danger);
+  font-size: 13px;
+  padding: 12px 14px;
+  text-align: center;
+}
+
+/* Вкладка «Сообщество» */
+.admin-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.admin-tile {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  text-align: center;
+}
+
+.admin-tile-value {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.admin-tile-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.invite-form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.invite-form input {
+  width: 210px;
+}
+
+.invite-form select {
+  font: inherit;
+  color: var(--text);
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+}
+
+.admin-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 4px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.invite-code {
+  background: var(--panel-raised);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.admin-row-name {
+  font-weight: 600;
+}
+
+.admin-row-info {
+  flex: 1;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-secondary {
+  background: var(--panel-raised);
+  color: var(--text);
+  font-size: 13px;
+  padding: 6px 12px;
+}
+
+.btn-secondary:hover {
+  background: var(--border);
+}
+
+.settings-hint {
+  color: var(--text-faint);
+  font-size: 13px;
+}
+
+.audit-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 5px 4px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.audit-time {
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+
+.audit-actor {
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.audit-action {
+  color: var(--accent);
+}
+
+.audit-meta {
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Окно настроек */
 .settings-overlay {
   position: fixed;

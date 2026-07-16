@@ -1,7 +1,10 @@
 import type { MemberDto } from '@voxa/shared';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useMembers } from '../hooks/useMembers';
+import { useAuthStore } from '../stores/auth';
+import MemberContextMenu, { type MenuState } from './MemberContextMenu';
 
 interface Group {
   label: string;
@@ -27,6 +30,8 @@ function groupMembers(members: MemberDto[], offlineLabel: string): Group[] {
 export default function MemberList() {
   const { t } = useTranslation();
   const { data: members } = useMembers();
+  const myId = useAuthStore((s) => s.user?.id);
+  const [menu, setMenu] = useState<MenuState | null>(null);
 
   if (!members) {
     return <aside className="members" />;
@@ -45,7 +50,15 @@ export default function MemberList() {
             const color =
               member.status === 'online' ? (member.roles[0]?.color ?? undefined) : undefined;
             return (
-              <div key={member.id} className={`member ${member.status}`}>
+              <div
+                key={member.id}
+                className={`member ${member.status}`}
+                onContextMenu={(e) => {
+                  if (member.id === myId) return;
+                  e.preventDefault();
+                  setMenu({ x: e.clientX, y: e.clientY, member });
+                }}
+              >
                 <div className="avatar member-avatar" aria-hidden>
                   {member.username.slice(0, 1).toUpperCase()}
                   <span className={`status-dot ${member.status}`} />
@@ -58,6 +71,8 @@ export default function MemberList() {
           })}
         </div>
       ))}
+
+      {menu && <MemberContextMenu menu={menu} onClose={() => setMenu(null)} />}
     </aside>
   );
 }

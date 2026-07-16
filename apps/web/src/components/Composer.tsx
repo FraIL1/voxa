@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next';
 import { emitTyping } from '../api/socket';
 import { uploadFile } from '../api/uploads';
 import { useSendMessage } from '../hooks/useMessages';
+import { useAuthStore } from '../stores/auth';
 import { useChatStore } from '../stores/chat';
 
 /** Не слать typing чаще, чем раз в это время (сервер троттлит с запасом) */
@@ -43,6 +44,8 @@ export default function Composer({
   const setReplyTo = useChatStore((s) => s.setReplyTo);
   const lastTypingAt = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const timedOutUntil = useAuthStore((s) => s.user?.timedOutUntil);
+  const [, setTick] = useState(0);
 
   // Черновик, ответ и файлы не переносятся между каналами
   useEffect(() => {
@@ -50,6 +53,16 @@ export default function Composer({
     setValue('');
     setFiles([]);
   }, [channelId, setReplyTo]);
+
+  // Перерисовка по истечении таймаута — композер оживает сам
+  const timedOut = Boolean(timedOutUntil && new Date(timedOutUntil) > new Date());
+  useEffect(() => {
+    if (!timedOutUntil) return;
+    const ms = new Date(timedOutUntil).getTime() - Date.now();
+    if (ms <= 0) return;
+    const timer = setTimeout(() => setTick((n) => n + 1), ms + 500);
+    return () => clearTimeout(timer);
+  }, [timedOutUntil]);
 
   const patchFile = (localId: string, patch: Partial<PendingFile>): void => {
     setFiles((prev) => prev.map((f) => (f.localId === localId ? { ...f, ...patch } : f)));
@@ -111,6 +124,18 @@ export default function Composer({
     setDragOver(false);
     if (e.dataTransfer.files.length > 0) addFiles(e.dataTransfer.files);
   };
+
+  if (timedOut && timedOutUntil) {
+    return (
+      <div className="composer">
+        <div className="timeout-banner">
+          {t('moderation.youAreTimedOut', {
+            until: new Date(timedOutUntil).toLocaleString('ru-RU'),
+          })}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

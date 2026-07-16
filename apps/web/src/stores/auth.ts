@@ -7,10 +7,12 @@ interface AuthState {
   status: AuthStatus;
   accessToken: string | null;
   user: MeDto | null;
+  /** Причина принудительного выхода (кик/бан) — показывается на странице входа */
+  logoutNotice: string | null;
   setSession: (token: string, user: MeDto) => void;
   /** Обновление профиля без смены токена (после PATCH /users/me) */
   setUser: (user: MeDto) => void;
-  clearSession: () => void;
+  clearSession: (notice?: string) => void;
   /** Восстановление сессии по refresh-cookie при старте приложения */
   bootstrap: () => Promise<void>;
 }
@@ -19,12 +21,15 @@ export const useAuthStore = create<AuthState>()((set) => ({
   status: 'loading',
   accessToken: null,
   user: null,
+  logoutNotice: null,
 
-  setSession: (accessToken, user) => set({ status: 'authed', accessToken, user }),
+  setSession: (accessToken, user) =>
+    set({ status: 'authed', accessToken, user, logoutNotice: null }),
 
   setUser: (user) => set({ user }),
 
-  clearSession: () => set({ status: 'guest', accessToken: null, user: null }),
+  clearSession: (notice) =>
+    set({ status: 'guest', accessToken: null, user: null, logoutNotice: notice ?? null }),
 
   bootstrap: async () => {
     try {

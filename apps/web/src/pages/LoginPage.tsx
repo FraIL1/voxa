@@ -10,6 +10,7 @@ import { useAuthStore } from '../stores/auth';
 export default function LoginPage() {
   const { t } = useTranslation();
   const status = useAuthStore((s) => s.status);
+  const logoutNotice = useAuthStore((s) => s.logoutNotice);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -59,7 +60,7 @@ export default function LoginPage() {
             autoComplete="current-password"
           />
         </label>
-        <p className="auth-error">{error}</p>
+        <p className="auth-error">{error || logoutNotice}</p>
         <button className="btn-primary" type="submit" disabled={busy}>
           {busy ? t('auth.working') : t('auth.loginButton')}
         </button>
