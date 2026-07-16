@@ -16,3 +16,5 @@ Thumbs.db
 
 # Tauri (этап 4)
 apps/desktop/src-tauri/target/
+
+*.docx
