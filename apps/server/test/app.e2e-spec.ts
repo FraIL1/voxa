@@ -129,7 +129,7 @@ describe('Voxa: критический поток (e2e)', () => {
       .expect(401);
   });
 
-  it('ротация refresh-токена и детекция повторного использования', async () => {
+  it('ротация refresh-токена; свежий повтор (гонка вкладок) не гасит семейство', async () => {
     // Ротация: старый cookie обменивается на новый
     const rotated = await request(httpServer)
       .post('/api/auth/refresh')
@@ -138,19 +138,20 @@ describe('Voxa: критический поток (e2e)', () => {
     const newCookie = refreshCookieOf(rotated);
     expect(newCookie).not.toBe(ownerRefreshCookie);
 
-    // Повторное использование старого токена — признак кражи
+    // Повтор старого токена всегда отклоняется (он уже обменян)
     await request(httpServer)
       .post('/api/auth/refresh')
       .set('Cookie', ownerRefreshCookie)
       .expect(401);
 
-    // Всё семейство отозвано, новый токен тоже недействителен
-    await request(httpServer).post('/api/auth/refresh').set('Cookie', newCookie).expect(401);
-
-    // Перелогин восстанавливает доступ
-    const relogin = await request(httpServer).post('/api/auth/login').send(OWNER).expect(200);
-    ownerAccess = (relogin.body as AuthResponseDto).accessToken;
-    ownerRefreshCookie = refreshCookieOf(relogin);
+    // Но свежий повтор (< 10 с) — гонка двух вкладок, а не кража: семейство
+    // НЕ гасится, легитимный новый токен продолжает работать (фикс вылета)
+    const stillValid = await request(httpServer)
+      .post('/api/auth/refresh')
+      .set('Cookie', newCookie)
+      .expect(200);
+    ownerAccess = (stillValid.body as AuthResponseDto).accessToken;
+    ownerRefreshCookie = refreshCookieOf(stillValid);
   });
 
   it('владелец создаёт обычный инвайт, по нему регистрируется участник', async () => {
@@ -701,6 +702,13 @@ describe('Voxa: критический поток (e2e)', () => {
       .expect(204);
     const denied = await request(httpServer).post('/api/auth/login').send(victim).expect(403);
     expect(denied.body.message).toContain('нарушение правил');
+
+    // Повторный бан бессмыслен — 400
+    await request(httpServer)
+      .post(`/api/moderation/users/${victimId}/ban`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({})
+      .expect(400);
 
     // Участник без прав не видит списка банов
     await request(httpServer)
