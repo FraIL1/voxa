@@ -1,0 +1,14 @@
+{
+  "name": "@voxa/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Voxa desktop: Tauri 2-обёртка над веб-клиентом",
+  "scripts": {
+    "dev": "tauri dev",
+    "build:desktop": "tauri build",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.9.0"
+  }
+}
