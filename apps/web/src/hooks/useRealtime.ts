@@ -28,7 +28,7 @@ import { MEMBERS_KEY } from './useMembers';
 import { VOICE_STATES_KEY } from './useVoiceStates';
 import { useAuthStore } from '../stores/auth';
 import { useChatStore } from '../stores/chat';
-import { currentVoiceState } from '../stores/voice';
+import { currentVoiceState, useVoiceStore } from '../stores/voice';
 
 /**
  * Единственное WebSocket-подключение приложения. Пересоздаётся при смене
@@ -105,10 +105,13 @@ export function useRealtime(): void {
       });
     });
 
-    // Реконнект (например, после refresh токена): восстановить состояние голоса
+    // Реконнект (например, после refresh токена): восстановить состояние
+    // голоса и обновить снапшоты, которые могли устареть за время разрыва
     socket.on('connect', () => {
       const voice = currentVoiceState();
       if (voice.channelId) emitVoiceState(voice);
+      void queryClient.invalidateQueries({ queryKey: VOICE_STATES_KEY });
+      void queryClient.invalidateQueries({ queryKey: MEMBERS_KEY });
     });
 
     socket.on(WsEvents.PresenceUpdate, (p: PresenceUpdatePayload) => {
@@ -154,8 +157,12 @@ export function useRealtime(): void {
       void refreshSession();
     });
 
-    // Кик/бан: сервер уже отозвал сессии — показываем причину на входе
+    // Кик/бан: сервер уже отозвал сессии — выходим из голоса и показываем причину
     socket.on(WsEvents.ForceLogout, ({ reason }: { reason: string }) => {
+      void useVoiceStore
+        .getState()
+        .leave()
+        .catch(() => undefined);
       useAuthStore.getState().clearSession(reason);
     });
 
@@ -163,6 +170,11 @@ export function useRealtime(): void {
     socket.on(WsEvents.MeTimedOut, ({ until }: { until: string | null }) => {
       const me = useAuthStore.getState().user;
       if (me) useAuthStore.getState().setUser({ ...me, timedOutUntil: until });
+      if (until) {
+        // Модалка по центру + принудительный мут, если сидим в голосе
+        useChatStore.getState().setTimeoutNotice(until);
+        void useVoiceStore.getState().forceMuteLocal();
+      }
     });
 
     return () => {

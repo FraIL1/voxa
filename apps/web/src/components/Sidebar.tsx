@@ -9,25 +9,37 @@ import {
   Settings,
   Volume2,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink, useNavigate } from 'react-router';
 
+import { useMembers } from '../hooks/useMembers';
 import { useReadStates } from '../hooks/useReadStates';
 import { allChannelsOf, useStructure } from '../hooks/useStructure';
 import { participantsOf, useVoiceStates } from '../hooks/useVoiceStates';
 import { useAuthStore } from '../stores/auth';
 import { useVoiceStore } from '../stores/voice';
+import MemberContextMenu, { type MenuState } from './MemberContextMenu';
 import SettingsModal from './SettingsModal';
 
-function VoiceParticipants({ participants }: { participants: VoiceParticipantDto[] }) {
+function VoiceParticipants({
+  participants,
+  onContextMenu,
+}: {
+  participants: VoiceParticipantDto[];
+  onContextMenu: (e: ReactMouseEvent, userId: string, username: string) => void;
+}) {
   const speaking = useVoiceStore((s) => s.speaking);
   if (participants.length === 0) return null;
 
   return (
     <div className="voice-participants">
       {participants.map((p) => (
-        <div key={p.userId} className={`voice-participant${speaking[p.userId] ? ' speaking' : ''}`}>
+        <div
+          key={p.userId}
+          className={`voice-participant${speaking[p.userId] ? ' speaking' : ''}`}
+          onContextMenu={(e) => onContextMenu(e, p.userId, p.username)}
+        >
           <div className="avatar voice-participant-avatar" aria-hidden>
             {p.username.slice(0, 1).toUpperCase()}
           </div>
@@ -44,10 +56,12 @@ function ChannelItem({
   channel,
   state,
   voiceParticipants,
+  onVoiceContextMenu,
 }: {
   channel: ChannelDto;
   state?: ReadStateDto;
   voiceParticipants?: VoiceParticipantDto[];
+  onVoiceContextMenu: (e: ReactMouseEvent, userId: string, username: string) => void;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -68,7 +82,10 @@ function ChannelItem({
           <Volume2 size={16} />
           <span className="channel-name">{channel.name}</span>
         </button>
-        <VoiceParticipants participants={voiceParticipants ?? []} />
+        <VoiceParticipants
+          participants={voiceParticipants ?? []}
+          onContextMenu={onVoiceContextMenu}
+        />
       </div>
     );
   }
@@ -102,6 +119,23 @@ export default function Sidebar() {
   const user = useAuthStore((s) => s.user);
   const voice = useVoiceStore();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const { data: members } = useMembers();
+  const [memberMenu, setMemberMenu] = useState<MenuState | null>(null);
+
+  const openVoiceMemberMenu = (e: ReactMouseEvent, userId: string, username: string): void => {
+    if (userId === user?.id) return;
+    e.preventDefault();
+    const member = members?.find((m) => m.id === userId) ?? {
+      id: userId,
+      username,
+      avatarUrl: null,
+      status: 'online' as const,
+      roles: [],
+      timedOutUntil: null,
+      banned: false,
+    };
+    setMemberMenu({ x: e.clientX, y: e.clientY, member });
+  };
 
   const stateOf = new Map((readStates ?? []).map((s) => [s.channelId, s]));
   const voiceChannelName = voice.channelId
@@ -114,6 +148,7 @@ export default function Sidebar() {
       channel={channel}
       state={stateOf.get(channel.id)}
       voiceParticipants={participantsOf(voiceStates, channel.id)}
+      onVoiceContextMenu={openVoiceMemberMenu}
     />
   );
 
@@ -185,6 +220,7 @@ export default function Sidebar() {
       </div>
 
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
+      {memberMenu && <MemberContextMenu menu={memberMenu} onClose={() => setMemberMenu(null)} />}
     </nav>
   );
 }

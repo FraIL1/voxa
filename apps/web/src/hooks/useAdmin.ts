@@ -49,7 +49,11 @@ export function useUnban() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (userId: string) => api<void>(`/moderation/bans/${userId}`, { method: 'DELETE' }),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: BANS_KEY }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: BANS_KEY });
+      // Флаг banned в списке участников тоже должен обновиться
+      void queryClient.invalidateQueries({ queryKey: ['members'] });
+    },
   });
 }
 

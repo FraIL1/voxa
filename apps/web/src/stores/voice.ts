@@ -13,6 +13,7 @@ import { create } from 'zustand';
 
 import { api } from '../api/client';
 import { emitVoiceState } from '../api/socket';
+import { useAuthStore } from './auth';
 import { playJoinSound, playLeaveSound } from '../lib/sounds';
 
 const DEVICES_KEY = 'voxa-audio-devices';
@@ -62,6 +63,8 @@ interface VoiceState {
   watching: string | null;
 
   join: (channelId: string) => Promise<void>;
+  /** Принудительный мут при таймауте */
+  forceMuteLocal: () => Promise<void>;
   leave: () => Promise<void>;
   toggleMute: () => Promise<void>;
   toggleDeafen: () => Promise<void>;
@@ -250,9 +253,21 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
     playLeaveSound();
   },
 
+  /** Таймаут: мгновенный мут без права размутиться (сервер дублирует на SFU) */
+  forceMuteLocal: async () => {
+    const { channelId, muted } = get();
+    if (!room || !channelId || muted) return;
+    await room.localParticipant.setMicrophoneEnabled(false).catch(() => undefined);
+    set({ muted: true });
+    emitVoiceState({ channelId, muted: true, deafened: get().deafened });
+  },
+
   toggleMute: async () => {
     const { channelId, muted, deafened } = get();
     if (!room || !channelId) return;
+    // Активный таймаут: размутиться нельзя (SFU всё равно не даст)
+    const timedOutUntil = useAuthStore.getState().user?.timedOutUntil;
+    if (muted && timedOutUntil && new Date(timedOutUntil) > new Date()) return;
     const nextMuted = !muted;
     // Снятие мьюта выводит и из deafen (как в Discord)
     const nextDeafened = nextMuted ? deafened : false;

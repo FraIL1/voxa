@@ -17,15 +17,22 @@ let refreshInFlight: Promise<boolean> | null = null;
 
 export function refreshSession(): Promise<boolean> {
   refreshInFlight ??= (async () => {
-    try {
-      const res = await fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' });
-      if (!res.ok) return false;
-      const data = (await res.json()) as AuthResponseDto;
-      useAuthStore.getState().setSession(data.accessToken, data.user);
-      return true;
-    } catch {
-      return false;
-    }
+    const attempt = async (): Promise<boolean> => {
+      try {
+        const res = await fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' });
+        if (!res.ok) return false;
+        const data = (await res.json()) as AuthResponseDto;
+        useAuthStore.getState().setSession(data.accessToken, data.user);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    if (await attempt()) return true;
+    // Гонка вкладок: другая вкладка могла обновить cookie — пробуем ещё раз
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    return attempt();
   })().finally(() => {
     refreshInFlight = null;
   });

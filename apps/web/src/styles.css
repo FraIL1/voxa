@@ -1119,6 +1119,32 @@ a {
   color: var(--danger);
 }
 
+/* Модалка «выдан таймаут» по центру */
+.timeout-modal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  background: var(--panel);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  padding: 28px 34px;
+  max-width: 420px;
+  text-align: center;
+  color: var(--danger);
+}
+
+.timeout-modal h3 {
+  margin: 0;
+  color: var(--text);
+}
+
+.timeout-modal p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
 /* Баннер собственного таймаута вместо поля ввода */
 .timeout-banner {
   background: rgba(240, 86, 79, 0.12);

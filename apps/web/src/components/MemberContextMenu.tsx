@@ -1,8 +1,9 @@
 import { hasPermission, Permissions, type MemberDto } from '@voxa/shared';
-import { Clock, ShieldBan, UserX } from 'lucide-react';
+import { Clock, ShieldBan, ShieldCheck, UserX } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { ApiError } from '../api/client';
+import { useUnban } from '../hooks/useAdmin';
 import { useModeration } from '../hooks/useModeration';
 import { useAuthStore } from '../stores/auth';
 
@@ -23,6 +24,7 @@ export default function MemberContextMenu({
   const { t } = useTranslation();
   const me = useAuthStore((s) => s.user);
   const { kick, ban, timeout, clearTimeout } = useModeration();
+  const unban = useUnban();
 
   const mask = me?.permissions ?? 0;
   const canMute = hasPermission(mask, Permissions.MUTE_MEMBERS);
@@ -96,7 +98,7 @@ export default function MemberContextMenu({
             <UserX size={14} /> {t('moderation.kick')}
           </button>
         )}
-        {canBan && (
+        {canBan && !menu.member.banned && (
           <button
             className="menu-item danger"
             onClick={() =>
@@ -106,6 +108,11 @@ export default function MemberContextMenu({
             }
           >
             <ShieldBan size={14} /> {t('moderation.ban')}
+          </button>
+        )}
+        {canBan && menu.member.banned && (
+          <button className="menu-item" onClick={() => run(unban.mutateAsync(menu.member.id))}>
+            <ShieldCheck size={14} /> {t('community.unban')}
           </button>
         )}
       </div>

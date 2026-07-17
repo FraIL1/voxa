@@ -12,6 +12,10 @@ interface ChatState {
   replyTo: MessageDto | null;
   setReplyTo: (message: MessageDto | null) => void;
 
+  /** Только что выданный таймаут — модалка по центру (null — скрыта) */
+  timeoutNotice: string | null;
+  setTimeoutNotice: (until: string | null) => void;
+
   /** channelId → userId → кто печатает */
   typing: Record<string, Record<string, TypingEntry>>;
   markTyping: (channelId: string, userId: string, username: string) => void;
@@ -26,6 +30,9 @@ const TYPING_TTL_MS = 4000;
 export const useChatStore = create<ChatState>()((set) => ({
   replyTo: null,
   setReplyTo: (message) => set({ replyTo: message }),
+
+  timeoutNotice: null,
+  setTimeoutNotice: (until) => set({ timeoutNotice: until }),
 
   typing: {},
 

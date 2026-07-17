@@ -8,6 +8,7 @@ import { useAuthStore } from '../stores/auth';
 import { useVoiceStore } from '../stores/voice';
 import MemberList from './MemberList';
 import Sidebar from './Sidebar';
+import TimeoutNotice from './TimeoutNotice';
 
 export default function AppShell() {
   const { t } = useTranslation();
@@ -55,6 +56,7 @@ export default function AppShell() {
         <Outlet />
       </main>
       <MemberList />
+      <TimeoutNotice />
     </div>
   );
 }

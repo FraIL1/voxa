@@ -14,6 +14,14 @@ export async function register(input: RegisterInput): Promise<void> {
 }
 
 export async function logout(): Promise<void> {
+  // Выход из голосового канала до разрыва сессии — LiveKit-соединение
+  // socket.io не трогает, его надо закрывать явно
+  const { useVoiceStore } = await import('../stores/voice');
+  await useVoiceStore
+    .getState()
+    .leave()
+    .catch(() => undefined);
+
   try {
     await api<void>('/auth/logout', { method: 'POST' });
   } finally {
