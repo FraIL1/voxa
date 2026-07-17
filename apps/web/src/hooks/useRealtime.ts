@@ -22,6 +22,7 @@ import {
 } from '../api/messages-cache';
 import { bumpUnread, setReadState } from '../api/read-states-cache';
 import { connectSocket, disconnectSocket, emitVoiceState } from '../api/socket';
+import { notify } from '../lib/notify';
 import { playJoinSound, playLeaveSound } from '../lib/sounds';
 import { MEMBERS_KEY } from './useMembers';
 import { VOICE_STATES_KEY } from './useVoiceStates';
@@ -52,11 +53,13 @@ export function useRealtime(): void {
       // Чужое сообщение — плюс к непрочитанным; авто-ack открытого канала снимет
       const myId = useAuthStore.getState().user?.id;
       if (myId && message.author?.id !== myId) {
-        bumpUnread(
-          queryClient,
-          message.channelId,
-          message.mentionedUserIds?.includes(myId) ?? false,
-        );
+        const mentioned = message.mentionedUserIds?.includes(myId) ?? false;
+        bumpUnread(queryClient, message.channelId, mentioned);
+
+        // Нативное уведомление об упоминании, когда окно не на виду (раздел 5.8 PRD)
+        if (mentioned && document.hidden) {
+          void notify(message.author?.username ?? 'Voxa', message.content.slice(0, 120) || '…');
+        }
       }
     });
 

@@ -11,11 +11,39 @@ import { useTranslation } from 'react-i18next';
 
 import { logout } from '../api/auth';
 import { api, ApiError } from '../api/client';
+import { getAutostart, isTauri, setAutostart } from '../lib/tauri';
 import { useAuthStore } from '../stores/auth';
 import AudioDeviceSelects from './AudioDeviceSelects';
 import CommunityTab from './CommunityTab';
 
-type Tab = 'profile' | 'voice' | 'community';
+type Tab = 'profile' | 'voice' | 'community' | 'app';
+
+/** Вкладка «Приложение» (только в десктоп-клиенте): автозапуск */
+function AppTab() {
+  const { t } = useTranslation();
+  const [autostart, setAutostartState] = useState(false);
+
+  useEffect(() => {
+    void getAutostart().then(setAutostartState);
+  }, []);
+
+  const toggle = (): void => {
+    const next = !autostart;
+    setAutostartState(next);
+    void setAutostart(next);
+  };
+
+  return (
+    <>
+      <h2>{t('settings.appTab')}</h2>
+      <label className="settings-toggle">
+        <input type="checkbox" checked={autostart} onChange={toggle} />
+        {t('settings.autostart')}
+      </label>
+      <p className="settings-hint">{t('settings.trayHint')}</p>
+    </>
+  );
+}
 
 /** Полноэкранные настройки: профиль (ник, пароль), звук, выход из аккаунта */
 export default function SettingsModal({ onClose }: { onClose: () => void }) {
@@ -116,6 +144,14 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
               {t('community.title')}
             </button>
           )}
+          {isTauri() && (
+            <button
+              className={`settings-tab${tab === 'app' ? ' active' : ''}`}
+              onClick={() => setTab('app')}
+            >
+              {t('settings.appTab')}
+            </button>
+          )}
           <div className="settings-nav-spacer" />
           <button className="settings-tab danger" onClick={() => void logout()}>
             <LogOut size={15} /> {t('settings.logout')}
@@ -186,6 +222,8 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           )}
 
           {tab === 'community' && <CommunityTab />}
+
+          {tab === 'app' && <AppTab />}
         </div>
       </div>
     </div>
