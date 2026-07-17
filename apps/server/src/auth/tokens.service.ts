@@ -84,12 +84,17 @@ export class TokensService {
       throw new UnauthorizedException('Сессия не найдена, войдите заново');
     }
     if (session.revokedAt) {
-      // Токен уже был обменян — кто-то использует украденную копию.
-      // Гасим всё семейство: и вора, и легитимного клиента (перелогин).
-      await this.prisma.refreshSession.updateMany({
-        where: { family: session.family, revokedAt: null },
-        data: { revokedAt: new Date() },
-      });
+      // Свежий повтор (< 10 с) — почти наверняка гонка двух вкладок одного
+      // браузера, отправивших один cookie одновременно: не кража, семью не гасим.
+      const reuseAgeMs = Date.now() - session.revokedAt.getTime();
+      if (reuseAgeMs > 10_000) {
+        // Токен обменяли давно — кто-то использует украденную копию.
+        // Гасим всё семейство: и вора, и легитимного клиента (перелогин).
+        await this.prisma.refreshSession.updateMany({
+          where: { family: session.family, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+      }
       throw new UnauthorizedException('Обнаружено повторное использование токена, войдите заново');
     }
     if (session.expiresAt < new Date()) {

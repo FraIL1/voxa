@@ -69,6 +69,7 @@ export class UsersService {
         roles: {
           include: { role: { select: { id: true, name: true, color: true, position: true } } },
         },
+        ban: { select: { userId: true } },
       },
       orderBy: { usernameLower: 'asc' },
     });
@@ -83,6 +84,7 @@ export class UsersService {
         .sort((a, b) => b.position - a.position)
         .map((r) => ({ id: r.id, name: r.name, color: r.color, position: r.position })),
       timedOutUntil: user.timedOutUntil?.toISOString() ?? null,
+      banned: user.ban !== null,
     }));
   }
 

@@ -8,6 +8,8 @@ import { WsEvents, type BanDto } from '@voxa/shared';
 
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { LiveKitAdminService } from '../voice/livekit-admin.service';
+import { VoiceStateService } from '../voice/voice-state.service';
 import { WsGateway } from '../ws/ws.gateway';
 
 @Injectable()
@@ -16,7 +18,17 @@ export class ModerationService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly ws: WsGateway,
+    private readonly voiceStates: VoiceStateService,
+    private readonly livekit: LiveKitAdminService,
   ) {}
+
+  /** Выбросить из голосового канала на всех уровнях (состояние + LiveKit) */
+  private async removeFromVoice(userId: string): Promise<void> {
+    const channelId = this.voiceStates.drop(userId);
+    if (!channelId) return;
+    this.ws.broadcastVoiceState(channelId);
+    await this.livekit.removeFromRoom(channelId, userId);
+  }
 
   /** Владельца нельзя кикать/банить/таймаутить; себя — тоже */
   private async assertModeratable(actorId: string, targetId: string): Promise<void> {
@@ -45,6 +57,7 @@ export class ModerationService {
   /** Кик: принудительный выход со всех устройств (вход снова — можно) */
   async kick(actorId: string, targetId: string, reason?: string): Promise<void> {
     await this.assertModeratable(actorId, targetId);
+    await this.removeFromVoice(targetId);
     await this.terminateSessions(
       targetId,
       reason ? `Вы были кикнуты: ${reason}` : 'Вы были кикнуты',
@@ -61,12 +74,14 @@ export class ModerationService {
   async ban(actorId: string, targetId: string, reason?: string): Promise<void> {
     await this.assertModeratable(actorId, targetId);
 
-    await this.prisma.ban.upsert({
-      where: { userId: targetId },
-      create: { userId: targetId, reason: reason ?? null, bannedById: actorId },
-      update: { reason: reason ?? null, bannedById: actorId },
+    const existing = await this.prisma.ban.findUnique({ where: { userId: targetId } });
+    if (existing) throw new BadRequestException('Пользователь уже забанен');
+
+    await this.prisma.ban.create({
+      data: { userId: targetId, reason: reason ?? null, bannedById: actorId },
     });
 
+    await this.removeFromVoice(targetId);
     await this.terminateSessions(
       targetId,
       reason ? `Вы заблокированы: ${reason}` : 'Вы заблокированы',
@@ -117,6 +132,14 @@ export class ModerationService {
       data: { timedOutUntil: until },
     });
 
+    // Если человек в голосе — не выкидываем, а принудительно мутим:
+    // на уровне SFU (canPublish=false) и в видимом состоянии канала
+    const voiceChannelId = this.voiceStates.forceMute(targetId);
+    if (voiceChannelId) {
+      this.ws.broadcastVoiceState(voiceChannelId);
+      await this.livekit.setCanPublish(voiceChannelId, targetId, false);
+    }
+
     this.ws.emitToUsers([targetId], WsEvents.MeTimedOut, { until: until.toISOString() });
     this.audit.log(
       actorId,
@@ -132,6 +155,13 @@ export class ModerationService {
       where: { id: targetId },
       data: { timedOutUntil: null },
     });
+
+    // Возвращаем право говорить (размутится человек сам)
+    const voiceChannelId = this.voiceStates.channelOf(targetId);
+    if (voiceChannelId) {
+      await this.livekit.setCanPublish(voiceChannelId, targetId, true);
+    }
+
     this.ws.emitToUsers([targetId], WsEvents.MeTimedOut, { until: null });
     this.audit.log(actorId, 'user.timeout.clear', { type: 'user', id: targetId });
   }

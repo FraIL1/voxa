@@ -44,6 +44,19 @@ export class VoiceStateService {
     return [...affected];
   }
 
+  /** В каком голосовом канале пользователь (null — не в голосе) */
+  channelOf(userId: string): string | null {
+    return this.states.get(userId)?.channelId ?? null;
+  }
+
+  /** Принудительный мут (таймаут); вернёт канал для рассылки или null */
+  forceMute(userId: string): string | null {
+    const state = this.states.get(userId);
+    if (!state) return null;
+    state.participant = { ...state.participant, muted: true };
+    return state.channelId;
+  }
+
   /** Смена имени пользователя в голосе; вернёт канал для рассылки или null */
   rename(userId: string, username: string): string | null {
     const state = this.states.get(userId);

@@ -128,6 +128,7 @@ export interface MemberDto extends UserPublicDto {
   /** По убыванию старшинства */
   roles: MemberRoleDto[];
   timedOutUntil: string | null;
+  banned: boolean;
 }
 
 /** Состояние прочитанности канала для текущего пользователя */

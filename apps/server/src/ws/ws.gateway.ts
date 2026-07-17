@@ -21,6 +21,7 @@ import type { Server, Socket } from 'socket.io';
 
 import type { AccessTokenPayload } from '../common/guards/jwt-auth.guard';
 import { PresenceService } from '../presence/presence.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { VoiceStateService } from '../voice/voice-state.service';
 
@@ -59,10 +60,11 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly usersService: UsersService,
     private readonly presence: PresenceService,
     private readonly voiceStates: VoiceStateService,
+    private readonly prisma: PrismaService,
   ) {}
 
   /** Рассылка нового состава голосового канала его подписчикам */
-  private broadcastVoiceState(channelId: string): void {
+  broadcastVoiceState(channelId: string): void {
     this.emitToChannel(channelId, WsEvents.VoiceUpdate, {
       channelId,
       participants: this.voiceStates.participantsOf(channelId),
@@ -72,6 +74,8 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   /** Кик/бан: адресное событие и принудительное отключение всех сокетов */
   async forceLogout(userId: string, reason: string): Promise<void> {
     this.emitToUsers([userId], WsEvents.ForceLogout, { reason });
+    // Пауза, чтобы событие с причиной успело дойти до разрыва соединения
+    await new Promise((resolve) => setTimeout(resolve, 300));
     for (const socket of await this.server.in(userRoom(userId)).fetchSockets()) {
       socket.disconnect(true);
     }
@@ -104,6 +108,19 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (!token) throw new Error('token missing');
 
       const payload = await this.jwtService.verifyAsync<AccessTokenPayload>(token);
+
+      // Access-токен живёт 15 минут и сам по себе не отзываем; для сокетов
+      // проверяем живость refresh-сессии и отсутствие бана — иначе кикнутый
+      // клиент тихо переподключался бы до истечения токена
+      const [session, ban] = await Promise.all([
+        this.prisma.refreshSession.findFirst({
+          where: { id: payload.sid, revokedAt: null, expiresAt: { gt: new Date() } },
+          select: { id: true },
+        }),
+        this.prisma.ban.findUnique({ where: { userId: payload.sub }, select: { userId: true } }),
+      ]);
+      if (!session || ban) throw new Error('session revoked or banned');
+
       const data = socket.data as SocketData;
       data.userId = payload.sub;
       data.username = payload.username;
@@ -148,15 +165,28 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * гарантирован членством сокета в комнате канала.
    */
   @SubscribeMessage(WsClientEvents.VoiceState)
-  handleVoiceState(@ConnectedSocket() socket: Socket, @MessageBody() body: unknown): void {
+  async handleVoiceState(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody() body: unknown,
+  ): Promise<void> {
     const data = socket.data as SocketData;
     if (!data.userId || !data.username) return;
 
     const parsed = voiceStateSchema.safeParse(body);
     if (!parsed.success) return;
-    const { channelId, muted, deafened } = parsed.data;
+    const { channelId, deafened } = parsed.data;
+    let { muted } = parsed.data;
 
     if (channelId !== null && !socket.rooms.has(channelRoom(channelId))) return;
+
+    // Активный таймаут: клиент не может объявить себя размученным
+    if (channelId !== null && !muted) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: data.userId },
+        select: { timedOutUntil: true },
+      });
+      if (user?.timedOutUntil && user.timedOutUntil > new Date()) muted = true;
+    }
 
     const affected = this.voiceStates.update(
       data.userId,
