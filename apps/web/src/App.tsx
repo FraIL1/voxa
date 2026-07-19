@@ -5,6 +5,7 @@ import { createBrowserRouter, RouterProvider } from 'react-router';
 import AppShell from './components/AppShell';
 import ChannelRedirect from './components/ChannelRedirect';
 import ChannelView from './components/ChannelView';
+import DmView from './components/DmView';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import { useAuthStore } from './stores/auth';
@@ -25,6 +26,7 @@ const router = createBrowserRouter([
     children: [
       { index: true, Component: ChannelRedirect },
       { path: 'channels/:channelId', Component: ChannelView },
+      { path: 'dm/:conversationId', Component: DmView },
     ],
   },
 ]);

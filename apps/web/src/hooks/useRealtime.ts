@@ -1,6 +1,8 @@
 import { useQueryClient } from '@tanstack/react-query';
 import {
   WsEvents,
+  type DmConversationDto,
+  type DmMessageDto,
   type MemberDto,
   type MessageDto,
   type PresenceUpdatePayload,
@@ -20,6 +22,12 @@ import {
   renameMessageAuthor,
   updateMessage,
 } from '../api/messages-cache';
+import {
+  addDmMessage,
+  DM_CONVERSATIONS_KEY,
+  removeDmMessage,
+  updateDmMessage,
+} from '../api/dm-cache';
 import { bumpUnread, setReadState } from '../api/read-states-cache';
 import { connectSocket, disconnectSocket, emitVoiceState } from '../api/socket';
 import { notify } from '../lib/notify';
@@ -164,6 +172,33 @@ export function useRealtime(): void {
         .leave()
         .catch(() => undefined);
       useAuthStore.getState().clearSession(reason);
+    });
+
+    // Личные сообщения
+    socket.on(WsEvents.DmMessageNew, (message: DmMessageDto) => {
+      addDmMessage(queryClient, message);
+      const myId = useAuthStore.getState().user?.id;
+      // Уведомление, если пришло от собеседника и окно скрыто (раздел 5.8 PRD)
+      if (myId && message.author?.id !== myId && document.hidden) {
+        void notify(message.author?.username ?? 'Voxa', message.content.slice(0, 120) || '…');
+      }
+    });
+    socket.on(WsEvents.DmMessageEdited, (message: DmMessageDto) => {
+      updateDmMessage(queryClient, message);
+    });
+    socket.on(
+      WsEvents.DmMessageDeleted,
+      ({ id, conversationId }: { id: string; conversationId: string }) => {
+        removeDmMessage(queryClient, conversationId, id);
+      },
+    );
+    socket.on(WsEvents.DmConversationUpdated, (conv: DmConversationDto) => {
+      queryClient.setQueryData<DmConversationDto[]>(DM_CONVERSATIONS_KEY, (list) => {
+        const rest = (list ?? []).filter((c) => c.id !== conv.id);
+        return [conv, ...rest].sort(
+          (a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime(),
+        );
+      });
     });
 
     // Таймаут выдан или снят

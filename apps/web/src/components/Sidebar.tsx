@@ -1,5 +1,6 @@
 import type { ChannelDto, ReadStateDto, VoiceParticipantDto } from '@voxa/shared';
 import {
+  AtSign,
   Hash,
   Headphones,
   HeadphoneOff,
@@ -13,6 +14,7 @@ import { useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink, useNavigate } from 'react-router';
 
+import { useDmConversations } from '../hooks/useDm';
 import { useMembers } from '../hooks/useMembers';
 import { useReadStates } from '../hooks/useReadStates';
 import { allChannelsOf, useStructure } from '../hooks/useStructure';
@@ -21,6 +23,32 @@ import { useAuthStore } from '../stores/auth';
 import { useVoiceStore } from '../stores/voice';
 import MemberContextMenu, { type MenuState } from './MemberContextMenu';
 import SettingsModal from './SettingsModal';
+
+function DmSection() {
+  const { t } = useTranslation();
+  const { data: conversations } = useDmConversations();
+  const list = conversations ?? [];
+  if (list.length === 0) return null;
+
+  return (
+    <div>
+      <div className="category-name">{t('dm.section')}</div>
+      {list.map((c) => (
+        <NavLink
+          key={c.id}
+          to={`/dm/${c.id}`}
+          className={({ isActive }) =>
+            `channel-link${isActive ? ' active' : ''}${c.unreadCount > 0 ? ' unread' : ''}`
+          }
+        >
+          <AtSign size={16} />
+          <span className="channel-name">{c.peer.username}</span>
+          {c.unreadCount > 0 && <span className="mention-badge">{c.unreadCount}</span>}
+        </NavLink>
+      ))}
+    </div>
+  );
+}
 
 function VoiceParticipants({
   participants,
@@ -157,6 +185,7 @@ export default function Sidebar() {
       <div className="sidebar-header">{t('app.communityName')}</div>
 
       <div className="channel-tree">
+        <DmSection />
         {structure?.categories.map((category) => (
           <div key={category.id}>
             <div className="category-name">{category.name}</div>

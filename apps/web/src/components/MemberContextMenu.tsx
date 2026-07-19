@@ -1,9 +1,11 @@
 import { hasPermission, Permissions, type MemberDto } from '@voxa/shared';
-import { Clock, ShieldBan, ShieldCheck, UserX } from 'lucide-react';
+import { Clock, MessageSquare, ShieldBan, ShieldCheck, UserX } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router';
 
 import { ApiError } from '../api/client';
 import { useUnban } from '../hooks/useAdmin';
+import { useOpenDm } from '../hooks/useDm';
 import { useModeration } from '../hooks/useModeration';
 import { useAuthStore } from '../stores/auth';
 
@@ -22,9 +24,11 @@ export default function MemberContextMenu({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const me = useAuthStore((s) => s.user);
   const { kick, ban, timeout, clearTimeout } = useModeration();
   const unban = useUnban();
+  const openDm = useOpenDm();
 
   const mask = me?.permissions ?? 0;
   const canMute = hasPermission(mask, Permissions.MUTE_MEMBERS);
@@ -69,6 +73,19 @@ export default function MemberContextMenu({
       />
       <div className="context-menu" style={{ left: menu.x, top: menu.y }}>
         <div className="menu-title">{menu.member.username}</div>
+
+        <button
+          className="menu-item"
+          onClick={() => {
+            onClose();
+            openDm
+              .mutateAsync(menu.member.id)
+              .then(({ id }) => navigate(`/dm/${id}`))
+              .catch(() => undefined);
+          }}
+        >
+          <MessageSquare size={14} /> {t('dm.write')}
+        </button>
 
         {canMute && !isTimedOut && (
           <>
