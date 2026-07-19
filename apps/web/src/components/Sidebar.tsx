@@ -1,54 +1,17 @@
 import type { ChannelDto, ReadStateDto, VoiceParticipantDto } from '@voxa/shared';
-import {
-  AtSign,
-  Hash,
-  Headphones,
-  HeadphoneOff,
-  Mic,
-  MicOff,
-  PhoneOff,
-  Settings,
-  Volume2,
-} from 'lucide-react';
+import { Hash, HeadphoneOff, MicOff, Volume2 } from 'lucide-react';
 import { useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink, useNavigate } from 'react-router';
 
-import { useDmConversations } from '../hooks/useDm';
 import { useMembers } from '../hooks/useMembers';
 import { useReadStates } from '../hooks/useReadStates';
-import { allChannelsOf, useStructure } from '../hooks/useStructure';
+import { useStructure } from '../hooks/useStructure';
 import { participantsOf, useVoiceStates } from '../hooks/useVoiceStates';
 import { useAuthStore } from '../stores/auth';
 import { useVoiceStore } from '../stores/voice';
 import MemberContextMenu, { type MenuState } from './MemberContextMenu';
-import SettingsModal from './SettingsModal';
-
-function DmSection() {
-  const { t } = useTranslation();
-  const { data: conversations } = useDmConversations();
-  const list = conversations ?? [];
-  if (list.length === 0) return null;
-
-  return (
-    <div>
-      <div className="category-name">{t('dm.section')}</div>
-      {list.map((c) => (
-        <NavLink
-          key={c.id}
-          to={`/dm/${c.id}`}
-          className={({ isActive }) =>
-            `channel-link${isActive ? ' active' : ''}${c.unreadCount > 0 ? ' unread' : ''}`
-          }
-        >
-          <AtSign size={16} />
-          <span className="channel-name">{c.peer.username}</span>
-          {c.unreadCount > 0 && <span className="mention-badge">{c.unreadCount}</span>}
-        </NavLink>
-      ))}
-    </div>
-  );
-}
+import UserCard from './UserCard';
 
 function VoiceParticipants({
   participants,
@@ -145,8 +108,6 @@ export default function Sidebar() {
   const { data: readStates } = useReadStates();
   const { data: voiceStates } = useVoiceStates();
   const user = useAuthStore((s) => s.user);
-  const voice = useVoiceStore();
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const { data: members } = useMembers();
   const [memberMenu, setMemberMenu] = useState<MenuState | null>(null);
 
@@ -166,9 +127,6 @@ export default function Sidebar() {
   };
 
   const stateOf = new Map((readStates ?? []).map((s) => [s.channelId, s]));
-  const voiceChannelName = voice.channelId
-    ? (allChannelsOf(structure).find((c) => c.id === voice.channelId)?.name ?? '')
-    : null;
 
   const renderChannel = (channel: ChannelDto) => (
     <ChannelItem
@@ -185,7 +143,6 @@ export default function Sidebar() {
       <div className="sidebar-header">{t('app.communityName')}</div>
 
       <div className="channel-tree">
-        <DmSection />
         {structure?.categories.map((category) => (
           <div key={category.id}>
             <div className="category-name">{category.name}</div>
@@ -200,55 +157,8 @@ export default function Sidebar() {
         )}
       </div>
 
-      {voice.channelId && (
-        <div className="voice-panel">
-          <div className="voice-panel-info">
-            <Volume2 size={15} />
-            <span className="voice-panel-name">
-              {voice.connecting ? t('voice.connecting') : voiceChannelName}
-            </span>
-          </div>
-          <button
-            className="icon-button danger"
-            title={t('voice.leave')}
-            onClick={() => void voice.leave()}
-          >
-            <PhoneOff size={16} />
-          </button>
-        </div>
-      )}
+      <UserCard />
 
-      <div className="user-card">
-        <div className="avatar" aria-hidden>
-          {user?.username.slice(0, 1).toUpperCase()}
-        </div>
-        <span className="username">{user?.username}</span>
-        <button
-          className={`icon-button${voice.muted ? ' engaged' : ''}`}
-          title={voice.muted ? t('voice.unmute') : t('voice.mute')}
-          disabled={!voice.channelId}
-          onClick={() => void voice.toggleMute()}
-        >
-          {voice.muted ? <MicOff size={17} /> : <Mic size={17} />}
-        </button>
-        <button
-          className={`icon-button${voice.deafened ? ' engaged' : ''}`}
-          title={voice.deafened ? t('voice.undeafen') : t('voice.deafen')}
-          disabled={!voice.channelId}
-          onClick={() => void voice.toggleDeafen()}
-        >
-          {voice.deafened ? <HeadphoneOff size={17} /> : <Headphones size={17} />}
-        </button>
-        <button
-          className="icon-button"
-          title={t('settings.title')}
-          onClick={() => setSettingsOpen(true)}
-        >
-          <Settings size={17} />
-        </button>
-      </div>
-
-      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
       {memberMenu && <MemberContextMenu menu={memberMenu} onClose={() => setMemberMenu(null)} />}
     </nav>
   );

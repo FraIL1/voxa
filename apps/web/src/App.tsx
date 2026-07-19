@@ -1,11 +1,14 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { createBrowserRouter, RouterProvider } from 'react-router';
+import { createBrowserRouter, Navigate, RouterProvider } from 'react-router';
 
 import AppShell from './components/AppShell';
 import ChannelRedirect from './components/ChannelRedirect';
 import ChannelView from './components/ChannelView';
 import DmView from './components/DmView';
+import FriendsView from './components/FriendsView';
+import HomeLayout from './components/HomeLayout';
+import ServerLayout from './components/ServerLayout';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import { useAuthStore } from './stores/auth';
@@ -24,9 +27,22 @@ const router = createBrowserRouter([
     path: '/',
     Component: AppShell,
     children: [
-      { index: true, Component: ChannelRedirect },
-      { path: 'channels/:channelId', Component: ChannelView },
-      { path: 'dm/:conversationId', Component: DmView },
+      // Вход открывает домашний экран (как в Discord)
+      { index: true, element: <Navigate to="/home" replace /> },
+      {
+        Component: HomeLayout,
+        children: [
+          { path: 'home', Component: FriendsView },
+          { path: 'dm/:conversationId', Component: DmView },
+        ],
+      },
+      {
+        Component: ServerLayout,
+        children: [
+          { path: 'channels', Component: ChannelRedirect },
+          { path: 'channels/:channelId', Component: ChannelView },
+        ],
+      },
     ],
   },
 ]);

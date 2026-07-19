@@ -6,8 +6,7 @@ import { useRealtime } from '../hooks/useRealtime';
 import { registerGlobalShortcuts } from '../lib/tauri';
 import { useAuthStore } from '../stores/auth';
 import { useVoiceStore } from '../stores/voice';
-import MemberList from './MemberList';
-import Sidebar from './Sidebar';
+import ServerRail from './ServerRail';
 import TimeoutNotice from './TimeoutNotice';
 
 export default function AppShell() {
@@ -50,12 +49,9 @@ export default function AppShell() {
   if (status === 'guest') return <Navigate to="/login" replace />;
 
   return (
-    <div className="app-shell">
-      <Sidebar />
-      <main className="main-column">
-        <Outlet />
-      </main>
-      <MemberList />
+    <div className="app-root">
+      <ServerRail />
+      <Outlet />
       <TimeoutNotice />
     </div>
   );
