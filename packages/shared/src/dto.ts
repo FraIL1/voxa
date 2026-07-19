@@ -215,3 +215,35 @@ export interface AdminOverviewDto {
   serverVersion: string;
   uptimeSeconds: number;
 }
+
+// ---------- Личные сообщения (раздел 5.6 PRD) ----------
+
+export interface DmMessageDto {
+  id: string;
+  conversationId: string;
+  author: UserPublicDto | null;
+  content: string;
+  replyToId: string | null;
+  replyTo: ReplyPreviewDto | null;
+  attachments: AttachmentDto[];
+  editedAt: string | null;
+  createdAt: string;
+}
+
+export interface DmMessagesPageDto {
+  items: DmMessageDto[];
+  hasMore: boolean;
+}
+
+/** Диалог в списке: собеседник + превью последнего сообщения + непрочитанные */
+export interface DmConversationDto {
+  id: string;
+  peer: UserPublicDto;
+  lastMessage: {
+    content: string;
+    authorId: string | null;
+    createdAt: string;
+  } | null;
+  unreadCount: number;
+  lastMessageAt: string;
+}

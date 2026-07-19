@@ -1,6 +1,8 @@
 import type {
   CategoryDto,
   ChannelDto,
+  DmConversationDto,
+  DmMessageDto,
   MessageDto,
   PresenceStatus,
   UserPublicDto,
@@ -34,6 +36,12 @@ export const WsEvents = {
   CategoryCreated: 'category.created',
   CategoryUpdated: 'category.updated',
   CategoryDeleted: 'category.deleted',
+  /** Личные сообщения (адресные — обоим участникам диалога) */
+  DmMessageNew: 'dm.message.new',
+  DmMessageEdited: 'dm.message.edit',
+  DmMessageDeleted: 'dm.message.delete',
+  /** Диалог создан/поднялся в списке (обновить превью и порядок) */
+  DmConversationUpdated: 'dm.conversation.updated',
 } as const;
 
 export type WsEventName = (typeof WsEvents)[keyof typeof WsEvents];
@@ -94,4 +102,8 @@ export interface WsServerEvents {
   [WsEvents.CategoryCreated]: CategoryDto;
   [WsEvents.CategoryUpdated]: CategoryDto;
   [WsEvents.CategoryDeleted]: { id: string };
+  [WsEvents.DmMessageNew]: DmMessageDto;
+  [WsEvents.DmMessageEdited]: DmMessageDto;
+  [WsEvents.DmMessageDeleted]: { id: string; conversationId: string };
+  [WsEvents.DmConversationUpdated]: DmConversationDto;
 }

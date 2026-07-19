@@ -189,8 +189,20 @@ export class FilesService implements OnModuleInit {
   async attachToMessage(uploaderId: string, messageId: string, ids: string[]): Promise<void> {
     if (ids.length === 0) return;
     const { count } = await this.prisma.attachment.updateMany({
-      where: { id: { in: ids }, uploaderId, messageId: null },
+      where: { id: { in: ids }, uploaderId, messageId: null, dmMessageId: null },
       data: { messageId },
+    });
+    if (count !== ids.length) {
+      throw new BadRequestException('Некоторые вложения не найдены или уже использованы');
+    }
+  }
+
+  /** Привязка загруженных вложений к личному сообщению */
+  async attachToDmMessage(uploaderId: string, dmMessageId: string, ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    const { count } = await this.prisma.attachment.updateMany({
+      where: { id: { in: ids }, uploaderId, messageId: null, dmMessageId: null },
+      data: { dmMessageId },
     });
     if (count !== ids.length) {
       throw new BadRequestException('Некоторые вложения не найдены или уже использованы');

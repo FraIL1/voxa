@@ -30,6 +30,10 @@ model User {
   ban            Ban?               @relation("BannedUser")
   bansIssued     Ban[]              @relation("BanIssuer")
   auditActions   AuditLog[]         @relation("AuditActor")
+  dmAsUserA      DmConversation[]   @relation("DmUserA")
+  dmAsUserB      DmConversation[]   @relation("DmUserB")
+  dmMessages     DmMessage[]
+  dmReadStates   DmReadState[]
 
   @@map("users")
 }
@@ -214,11 +218,14 @@ model Message {
 
 /// Файл в MinIO; привязывается к сообщению при отправке
 model Attachment {
-  id         String  @id @default(uuid(7))
-  uploaderId String? @map("uploader_id")
-  uploader   User?   @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
-  messageId  String? @map("message_id")
-  message    Message? @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  id          String     @id @default(uuid(7))
+  uploaderId  String?    @map("uploader_id")
+  uploader    User?      @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
+  messageId   String?    @map("message_id")
+  message     Message?   @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  /// Привязка к личному сообщению (взаимоисключающе с messageId)
+  dmMessageId String?    @map("dm_message_id")
+  dmMessage   DmMessage? @relation(fields: [dmMessageId], references: [id], onDelete: Cascade)
 
   /// Ключ объекта в бакете
   key         String  @unique
@@ -234,7 +241,62 @@ model Attachment {
 
   @@index([uploaderId])
   @@index([messageId])
+  @@index([dmMessageId])
   @@map("attachments")
+}
+
+/// Диалог 1-на-1 (раздел 5.6 PRD). Пара упорядочена (userAId < userBId),
+/// поэтому на двух пользователей — ровно одна строка.
+model DmConversation {
+  id            String   @id @default(uuid(7))
+  userAId       String   @map("user_a_id")
+  userBId       String   @map("user_b_id")
+  userA         User     @relation("DmUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB         User     @relation("DmUserB", fields: [userBId], references: [id], onDelete: Cascade)
+  /// Для сортировки списка диалогов по свежести
+  lastMessageAt DateTime @default(now()) @map("last_message_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  messages   DmMessage[]
+  readStates DmReadState[]
+
+  @@unique([userAId, userBId])
+  @@index([userAId])
+  @@index([userBId])
+  @@map("dm_conversations")
+}
+
+model DmMessage {
+  id             String         @id @default(uuid(7))
+  conversationId String         @map("conversation_id")
+  conversation   DmConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  authorId       String?        @map("author_id")
+  author         User?          @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  content        String
+  replyToId      String?        @map("reply_to_id")
+  replyTo        DmMessage?     @relation("DmReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies        DmMessage[]    @relation("DmReplies")
+  editedAt       DateTime?      @map("edited_at")
+  deletedAt      DateTime?      @map("deleted_at")
+  createdAt      DateTime       @default(now()) @map("created_at")
+
+  attachments Attachment[]
+
+  @@index([conversationId, id])
+  @@map("dm_messages")
+}
+
+/// Прочитанность диалога участником
+model DmReadState {
+  conversationId    String         @map("conversation_id")
+  conversation      DmConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId            String         @map("user_id")
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastReadMessageId String?        @map("last_read_message_id")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+
+  @@id([conversationId, userId])
+  @@map("dm_read_states")
 }
 
 model Reaction {

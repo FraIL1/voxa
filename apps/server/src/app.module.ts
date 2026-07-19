@@ -8,6 +8,7 @@ import { AdminModule } from './admin/admin.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { ChannelsModule } from './channels/channels.module';
+import { DmModule } from './dm/dm.module';
 import { ModerationModule } from './moderation/moderation.module';
 import { FilesModule } from './files/files.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -52,6 +53,7 @@ import { WsModule } from './ws/ws.module';
     VoiceModule,
     ModerationModule,
     AdminModule,
+    DmModule,
     WsModule,
     SeedModule,
   ],

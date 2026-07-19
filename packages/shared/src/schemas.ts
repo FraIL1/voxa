@@ -166,3 +166,30 @@ export const auditQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });
 export type AuditQueryInput = z.infer<typeof auditQuerySchema>;
+
+// Личные сообщения (раздел 5.6 PRD)
+export const openDmSchema = z.object({
+  userId: z.string().uuid(),
+});
+export type OpenDmInput = z.infer<typeof openDmSchema>;
+
+export const sendDmSchema = z
+  .object({
+    content: z.string().max(4000, 'Сообщение слишком длинное (максимум 4000 символов)').default(''),
+    replyToId: z.string().uuid().optional(),
+    attachmentIds: z.array(z.string().uuid()).max(MAX_ATTACHMENTS_PER_MESSAGE).optional(),
+  })
+  .refine(
+    (data) => data.content.trim().length > 0 || (data.attachmentIds?.length ?? 0) > 0,
+    'Сообщение не может быть пустым',
+  );
+export type SendDmInput = z.infer<typeof sendDmSchema>;
+
+export const editDmSchema = z.object({
+  content: z
+    .string()
+    .min(1, 'Сообщение не может быть пустым')
+    .max(4000, 'Сообщение слишком длинное (максимум 4000 символов)')
+    .refine((s) => s.trim().length > 0, 'Сообщение не может быть пустым'),
+});
+export type EditDmInput = z.infer<typeof editDmSchema>;
