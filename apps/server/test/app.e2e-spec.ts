@@ -764,4 +764,105 @@ describe('Voxa: критический поток (e2e)', () => {
     expect(overview.body.usersTotal).toBeGreaterThanOrEqual(3);
     expect(overview.body.serverVersion).toBeTruthy();
   });
+
+  it('личные сообщения: диалог, доставка обоим по WS, непрочитанные, доступ', async () => {
+    const ownerMe = await request(httpServer)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${ownerAccess}`);
+    const memberMe = await request(httpServer)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${memberAccess}`);
+    const ownerId = (ownerMe.body as MeDto).id;
+    const memberId = (memberMe.body as MeDto).id;
+
+    // Владелец открывает диалог с участником
+    const opened = await request(httpServer)
+      .post('/api/dm/conversations')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ userId: memberId })
+      .expect(201);
+    const conversationId = opened.body.id as string;
+
+    // Повторное открытие — тот же диалог (одна строка на пару)
+    const reopened = await request(httpServer)
+      .post('/api/dm/conversations')
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ userId: ownerId })
+      .expect(201);
+    expect(reopened.body.id).toBe(conversationId);
+
+    // Участник слушает своё адресное DM-событие
+    const memberSocket = io(baseUrl, { auth: { token: memberAccess }, transports: ['websocket'] });
+    await new Promise((resolve, reject) => {
+      memberSocket.once(WsEvents.Ready, resolve);
+      memberSocket.once('auth_error', () => reject(new Error('WS-авторизация не прошла')));
+    });
+    const delivered = new Promise<{ conversationId: string; content: string }>((resolve) => {
+      memberSocket.once(WsEvents.DmMessageNew, resolve);
+    });
+
+    const sent = await request(httpServer)
+      .post(`/api/dm/conversations/${conversationId}/messages`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ content: 'Привет в личку!' })
+      .expect(201);
+    expect(sent.body.author.username).toBe(OWNER.username);
+
+    const wsMessage = await delivered;
+    expect(wsMessage.conversationId).toBe(conversationId);
+    expect(wsMessage.content).toBe('Привет в личку!');
+
+    // У участника диалог с 1 непрочитанным
+    const list = await request(httpServer)
+      .get('/api/dm/conversations')
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(200);
+    const conv = (
+      list.body as { id: string; unreadCount: number; peer: { username: string } }[]
+    ).find((c) => c.id === conversationId);
+    expect(conv?.unreadCount).toBe(1);
+    expect(conv?.peer.username).toBe(OWNER.username);
+
+    // Ack сбрасывает непрочитанные
+    await request(httpServer)
+      .post(`/api/dm/conversations/${conversationId}/ack`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ messageId: sent.body.id })
+      .expect(204);
+    const afterAck = await request(httpServer)
+      .get('/api/dm/conversations')
+      .set('Authorization', `Bearer ${memberAccess}`);
+    expect(
+      (afterAck.body as { id: string; unreadCount: number }[]).find((c) => c.id === conversationId)
+        ?.unreadCount,
+    ).toBe(0);
+
+    // Правка только своего сообщения (участник не может чужое)
+    await request(httpServer)
+      .patch(`/api/dm/conversations/${conversationId}/messages/${sent.body.id}`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ content: 'взлом' })
+      .expect(403);
+
+    // Третий пользователь не имеет доступа к чужому диалогу
+    const outsiderInvite = await request(httpServer)
+      .post('/api/invites')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ maxUses: 1 })
+      .expect(201);
+    const outsider = await request(httpServer)
+      .post('/api/auth/register')
+      .send({
+        inviteCode: outsiderInvite.body.code,
+        username: 'Чужак',
+        password: 'пароль-чужака-123',
+      })
+      .expect(201);
+    await request(httpServer)
+      .get(`/api/dm/conversations/${conversationId}/messages`)
+      .set('Authorization', `Bearer ${(outsider.body as AuthResponseDto).accessToken}`)
+      .expect(403);
+
+    memberSocket.disconnect();
+  });
 });
