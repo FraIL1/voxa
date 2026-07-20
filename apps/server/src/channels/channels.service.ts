@@ -31,6 +31,7 @@ export class ChannelsService {
   private toChannelDto(channel: ChannelWithAccess): ChannelDto {
     return {
       id: channel.id,
+      guildId: channel.guildId,
       name: channel.name,
       type: channel.type,
       topic: channel.topic,
@@ -42,15 +43,23 @@ export class ChannelsService {
   }
 
   private toCategoryDto(category: Category, channels: ChannelDto[]): CategoryDto {
-    return { id: category.id, name: category.name, position: category.position, channels };
+    return {
+      id: category.id,
+      guildId: category.guildId,
+      name: category.name,
+      position: category.position,
+      channels,
+    };
   }
 
-  /** Полная структура сообщества, отфильтрованная по видимости для пользователя */
-  async getStructure(userId: string): Promise<CommunityStructureDto> {
-    const visibleIds = new Set(await this.users.visibleChannelIdsOf(userId));
+  /** Структура сервера, отфильтрованная по видимости для пользователя */
+  async getStructure(userId: string, guildId: string): Promise<CommunityStructureDto> {
+    await this.users.assertMember(guildId, userId);
+    const visibleIds = new Set(await this.users.visibleChannelIdsInGuild(userId, guildId));
     const [categories, channels] = await Promise.all([
-      this.prisma.category.findMany({ orderBy: { position: 'asc' } }),
+      this.prisma.category.findMany({ where: { guildId }, orderBy: { position: 'asc' } }),
       this.prisma.channel.findMany({
+        where: { guildId },
         orderBy: { position: 'asc' },
         include: { allowedRoles: { select: { roleId: true } } },
       }),
@@ -72,13 +81,16 @@ export class ChannelsService {
 
   // ---------- Категории ----------
 
-  async createCategory(input: CreateCategoryInput): Promise<CategoryDto> {
-    const max = await this.prisma.category.aggregate({ _max: { position: true } });
+  async createCategory(guildId: string, input: CreateCategoryInput): Promise<CategoryDto> {
+    const max = await this.prisma.category.aggregate({
+      _max: { position: true },
+      where: { guildId },
+    });
     const category = await this.prisma.category.create({
-      data: { name: input.name, position: (max._max.position ?? -1) + 1 },
+      data: { guildId, name: input.name, position: (max._max.position ?? -1) + 1 },
     });
     const dto = this.toCategoryDto(category, []);
-    this.ws.emitToAll(WsEvents.CategoryCreated, dto);
+    this.ws.emitToGuild(guildId, WsEvents.CategoryCreated, dto);
     return dto;
   }
 
@@ -93,35 +105,43 @@ export class ChannelsService {
     // channels в событии пустой: получатели уже знают состав из структуры,
     // здесь важны только имя и позиция
     const dto = this.toCategoryDto(category, []);
-    this.ws.emitToAll(WsEvents.CategoryUpdated, dto);
+    this.ws.emitToGuild(category.guildId, WsEvents.CategoryUpdated, dto);
     return dto;
   }
 
-  async deleteCategory(id: string): Promise<void> {
+  async deleteCategory(id: string): Promise<string> {
     const existing = await this.prisma.category.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Категория не найдена');
 
     // Каналы категории не удаляются, а становятся «вне категории» (SetNull)
     await this.prisma.category.delete({ where: { id } });
-    this.ws.emitToAll(WsEvents.CategoryDeleted, { id });
+    this.ws.emitToGuild(existing.guildId, WsEvents.CategoryDeleted, { id });
+    return existing.guildId;
   }
 
   // ---------- Каналы ----------
 
-  async createChannel(input: CreateChannelInput): Promise<ChannelDto> {
+  async createChannel(guildId: string, input: CreateChannelInput): Promise<ChannelDto> {
     if (input.categoryId) {
-      const category = await this.prisma.category.findUnique({ where: { id: input.categoryId } });
+      const category = await this.prisma.category.findFirst({
+        where: { id: input.categoryId, guildId },
+      });
       if (!category) throw new BadRequestException('Категория не найдена');
     }
-    const allowedRoleIds = await this.validatedRoleIds(input.isPrivate, input.allowedRoleIds);
+    const allowedRoleIds = await this.validatedRoleIds(
+      guildId,
+      input.isPrivate,
+      input.allowedRoleIds,
+    );
 
     const max = await this.prisma.channel.aggregate({
       _max: { position: true },
-      where: { categoryId: input.categoryId ?? null },
+      where: { guildId, categoryId: input.categoryId ?? null },
     });
 
     const channel = await this.prisma.channel.create({
       data: {
+        guildId,
         name: input.name,
         type: input.type,
         topic: input.topic ?? null,
@@ -146,14 +166,16 @@ export class ChannelsService {
     if (!existing) throw new NotFoundException('Канал не найден');
 
     if (input.categoryId) {
-      const category = await this.prisma.category.findUnique({ where: { id: input.categoryId } });
+      const category = await this.prisma.category.findFirst({
+        where: { id: input.categoryId, guildId: existing.guildId },
+      });
       if (!category) throw new BadRequestException('Категория не найдена');
     }
 
     const willBePrivate = input.isPrivate ?? existing.isPrivate;
     const allowedRoleIds =
       input.allowedRoleIds !== undefined
-        ? await this.validatedRoleIds(willBePrivate, input.allowedRoleIds)
+        ? await this.validatedRoleIds(existing.guildId, willBePrivate, input.allowedRoleIds)
         : undefined;
 
     const channel = await this.prisma.$transaction(async (tx) => {
@@ -181,17 +203,19 @@ export class ChannelsService {
     return dto;
   }
 
-  async deleteChannel(id: string): Promise<void> {
+  async deleteChannel(id: string): Promise<string> {
     const existing = await this.prisma.channel.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Канал не найден');
 
     await this.prisma.channel.delete({ where: { id } });
-    this.ws.emitToAll(WsEvents.ChannelDeleted, { id });
+    this.ws.emitToGuild(existing.guildId, WsEvents.ChannelDeleted, { id });
     this.ws.removeChannelRoom(id);
+    return existing.guildId;
   }
 
-  /** Приватному каналу нужен непустой список ролей */
+  /** Приватному каналу нужен непустой список ролей этого сервера */
   private async validatedRoleIds(
+    guildId: string,
     isPrivate: boolean | undefined,
     roleIds: string[] | undefined,
   ): Promise<string[]> {
@@ -199,7 +223,7 @@ export class ChannelsService {
     if (!roleIds || roleIds.length === 0) {
       throw new BadRequestException('Для приватного канала укажите хотя бы одну роль');
     }
-    const found = await this.prisma.role.count({ where: { id: { in: roleIds } } });
+    const found = await this.prisma.role.count({ where: { id: { in: roleIds }, guildId } });
     if (found !== roleIds.length) {
       throw new BadRequestException('Некоторые из указанных ролей не существуют');
     }
@@ -207,9 +231,9 @@ export class ChannelsService {
   }
 
   /**
-   * Рассылка события создания/изменения канала с учётом приватности:
-   * публичный — всем; приватный — только допущенным, остальным channel.deleted
-   * (чтобы канал исчез из их списка). Комнаты WS синхронизируются.
+   * Рассылка создания/изменения канала с учётом приватности: публичный —
+   * всем участникам сервера; приватный — только допущенным, остальным
+   * channel.deleted (чтобы канал исчез из их списка).
    */
   private async broadcastChannelUpsert(
     channel: ChannelWithAccess,
@@ -217,32 +241,48 @@ export class ChannelsService {
     event: typeof WsEvents.ChannelCreated | typeof WsEvents.ChannelUpdated,
   ): Promise<void> {
     if (!channel.isPrivate) {
-      this.ws.emitToAll(event, dto);
-      this.ws.joinAllToChannel(channel.id);
+      this.ws.emitToGuild(channel.guildId, event, dto);
+      this.ws.joinGuildToChannel(channel.guildId, channel.id);
       return;
     }
 
-    const users = await this.prisma.user.findMany({
-      select: {
-        id: true,
-        roles: { select: { roleId: true, role: { select: { permissions: true } } } },
-      },
-    });
+    const [guild, members] = await Promise.all([
+      this.prisma.guild.findUniqueOrThrow({
+        where: { id: channel.guildId },
+        select: { ownerId: true },
+      }),
+      this.prisma.guildMember.findMany({
+        where: { guildId: channel.guildId },
+        select: {
+          userId: true,
+          user: {
+            select: {
+              roles: {
+                where: { role: { guildId: channel.guildId } },
+                select: { roleId: true, role: { select: { permissions: true } } },
+              },
+            },
+          },
+        },
+      }),
+    ]);
+
     const allowedRoleIds = new Set(channel.allowedRoles.map((r) => r.roleId));
     const allowedUserIds: string[] = [];
     const restUserIds: string[] = [];
-    for (const user of users) {
-      const mask = combineMasks(user.roles.map((r) => r.role.permissions));
+    for (const member of members) {
+      const mask = combineMasks(member.user.roles.map((r) => r.role.permissions));
       const allowed =
+        member.userId === guild.ownerId ||
         hasPermission(mask, Permissions.ADMINISTRATOR) ||
-        user.roles.some((r) => allowedRoleIds.has(r.roleId));
-      (allowed ? allowedUserIds : restUserIds).push(user.id);
+        member.user.roles.some((r) => allowedRoleIds.has(r.roleId));
+      (allowed ? allowedUserIds : restUserIds).push(member.userId);
     }
 
     this.ws.syncPrivateChannelMembership(
       channel.id,
       allowedUserIds,
-      users.map((u) => u.id),
+      members.map((m) => m.userId),
     );
     this.ws.emitToUsers(allowedUserIds, event, dto);
     if (event === WsEvents.ChannelUpdated) {

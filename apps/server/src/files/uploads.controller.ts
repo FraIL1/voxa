@@ -7,10 +7,9 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
-import { Permissions, type AttachmentDto } from '@voxa/shared';
+import type { AttachmentDto } from '@voxa/shared';
 
 import { CurrentUser, type RequestUser } from '../common/decorators/current-user.decorator';
-import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
 import { FilesService } from './files.service';
 
 /**
@@ -28,7 +27,6 @@ export class UploadsController {
 
   /** Лимит размера файла задаётся в MulterModule (files.module) */
   @Post()
-  @RequirePermissions(Permissions.UPLOAD_FILES)
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @UseInterceptors(FileInterceptor('file'))
   async upload(

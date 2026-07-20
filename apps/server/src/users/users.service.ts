@@ -1,6 +1,11 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { combineMasks, hasPermission, Permissions } from '@voxa/shared';
-import type { MeDto, MemberDto, RoleDto } from '@voxa/shared';
+import type { MeDto, MemberDto } from '@voxa/shared';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -8,36 +13,67 @@ import { PrismaService } from '../prisma/prisma.service';
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Итоговая маска прав пользователя (OR всех его ролей) */
-  async permissionMaskOf(userId: string): Promise<number> {
-    const userRoles = await this.prisma.userRole.findMany({
+  /** Участник ли пользователь сервера */
+  async isMember(guildId: string, userId: string): Promise<boolean> {
+    const member = await this.prisma.guildMember.findUnique({
+      where: { guildId_userId: { guildId, userId } },
+      select: { userId: true },
+    });
+    return member !== null;
+  }
+
+  async assertMember(guildId: string, userId: string): Promise<void> {
+    if (!(await this.isMember(guildId, userId))) {
+      throw new ForbiddenException('Вы не участник этого сервера');
+    }
+  }
+
+  /** id серверов, где пользователь состоит */
+  async guildIdsOf(userId: string): Promise<string[]> {
+    const memberships = await this.prisma.guildMember.findMany({
       where: { userId },
+      select: { guildId: true },
+    });
+    return memberships.map((m) => m.guildId);
+  }
+
+  /** Итоговая маска прав пользователя на сервере (владелец — все права) */
+  async permissionMaskOf(userId: string, guildId: string): Promise<number> {
+    const guild = await this.prisma.guild.findUnique({
+      where: { id: guildId },
+      select: { ownerId: true },
+    });
+    if (guild?.ownerId === userId) return Permissions.ADMINISTRATOR;
+
+    const userRoles = await this.prisma.userRole.findMany({
+      where: { userId, role: { guildId } },
       include: { role: { select: { permissions: true } } },
     });
     return combineMasks(userRoles.map((ur) => ur.role.permissions));
   }
 
-  async roleIdsOf(userId: string): Promise<string[]> {
+  async roleIdsOf(userId: string, guildId: string): Promise<string[]> {
     const userRoles = await this.prisma.userRole.findMany({
-      where: { userId },
+      where: { userId, role: { guildId } },
       select: { roleId: true },
     });
     return userRoles.map((ur) => ur.roleId);
   }
 
   /**
-   * id каналов, видимых пользователю: все публичные + приватные,
+   * id каналов сервера, видимых пользователю: публичные + приватные,
    * доступные его ролям (ADMINISTRATOR видит всё).
    */
-  async visibleChannelIdsOf(userId: string): Promise<string[]> {
-    const mask = await this.permissionMaskOf(userId);
+  async visibleChannelIdsInGuild(userId: string, guildId: string): Promise<string[]> {
+    const mask = await this.permissionMaskOf(userId, guildId);
     if (hasPermission(mask, Permissions.ADMINISTRATOR)) {
-      const all = await this.prisma.channel.findMany({ select: { id: true } });
+      const all = await this.prisma.channel.findMany({ where: { guildId }, select: { id: true } });
       return all.map((c) => c.id);
     }
-    const roleIds = await this.roleIdsOf(userId);
+    const roleIds = await this.roleIdsOf(userId, guildId);
     const channels = await this.prisma.channel.findMany({
       where: {
+        guildId,
         OR: [{ isPrivate: false }, { allowedRoles: { some: { roleId: { in: roleIds } } } }],
       },
       select: { id: true },
@@ -45,73 +81,102 @@ export class UsersService {
     return channels.map((c) => c.id);
   }
 
-  /** Видим ли канал пользователю */
+  /** Видимые каналы всех серверов пользователя (подписки WS) */
+  async visibleChannelIdsOf(userId: string): Promise<string[]> {
+    const guildIds = await this.guildIdsOf(userId);
+    const perGuild = await Promise.all(
+      guildIds.map((guildId) => this.visibleChannelIdsInGuild(userId, guildId)),
+    );
+    return perGuild.flat();
+  }
+
+  /** Видим ли канал пользователю (членство на сервере + приватность) */
   async canSeeChannel(userId: string, channelId: string): Promise<boolean> {
     const channel = await this.prisma.channel.findUnique({
       where: { id: channelId },
       include: { allowedRoles: { select: { roleId: true } } },
     });
     if (!channel) return false;
+    if (!(await this.isMember(channel.guildId, userId))) return false;
     if (!channel.isPrivate) return true;
 
-    const mask = await this.permissionMaskOf(userId);
+    const mask = await this.permissionMaskOf(userId, channel.guildId);
     if (hasPermission(mask, Permissions.ADMINISTRATOR)) return true;
 
-    const roleIds = await this.roleIdsOf(userId);
+    const roleIds = await this.roleIdsOf(userId, channel.guildId);
     const allowed = new Set(channel.allowedRoles.map((ar) => ar.roleId));
     return roleIds.some((id) => allowed.has(id));
   }
 
-  /** Все участники сообщества со статусом присутствия и ролями (по старшинству) */
-  async listMembers(onlineUserIds: ReadonlySet<string>): Promise<MemberDto[]> {
-    const users = await this.prisma.user.findMany({
+  /** Участники сервера со статусом присутствия и ролями (по старшинству) */
+  async listMembers(guildId: string, onlineUserIds: ReadonlySet<string>): Promise<MemberDto[]> {
+    const members = await this.prisma.guildMember.findMany({
+      where: { guildId },
       include: {
-        roles: {
-          include: { role: { select: { id: true, name: true, color: true, position: true } } },
+        user: {
+          include: {
+            roles: {
+              where: { role: { guildId } },
+              include: { role: { select: { id: true, name: true, color: true, position: true } } },
+            },
+            bansReceived: { where: { guildId }, select: { guildId: true } },
+          },
         },
-        ban: { select: { userId: true } },
       },
-      orderBy: { usernameLower: 'asc' },
     });
 
-    return users.map((user) => ({
-      id: user.id,
-      username: user.username,
-      avatarUrl: user.avatarUrl,
-      status: onlineUserIds.has(user.id) ? ('online' as const) : ('offline' as const),
-      roles: user.roles
-        .map((ur) => ur.role)
-        .sort((a, b) => b.position - a.position)
-        .map((r) => ({ id: r.id, name: r.name, color: r.color, position: r.position })),
-      timedOutUntil: user.timedOutUntil?.toISOString() ?? null,
-      banned: user.ban !== null,
-    }));
+    return members
+      .map(({ user }) => ({
+        id: user.id,
+        username: user.username,
+        avatarUrl: user.avatarUrl,
+        status: onlineUserIds.has(user.id) ? ('online' as const) : ('offline' as const),
+        roles: user.roles
+          .map((ur) => ur.role)
+          .sort((a, b) => b.position - a.position)
+          .map((r) => ({ id: r.id, name: r.name, color: r.color, position: r.position })),
+        timedOutUntil: user.timedOutUntil?.toISOString() ?? null,
+        banned: user.bansReceived.length > 0,
+      }))
+      .sort((a, b) => a.username.localeCompare(b.username, 'ru'));
   }
 
-  /** Кому виден канал (для адресатов упоминаний): все или роли приватного канала + админы */
+  /** Кому виден канал (адресаты упоминаний): участники сервера с доступом */
   async visibleUserIdsOfChannel(channelId: string): Promise<string[]> {
     const channel = await this.prisma.channel.findUnique({
       where: { id: channelId },
-      include: { allowedRoles: { select: { roleId: true } } },
+      include: {
+        allowedRoles: { select: { roleId: true } },
+        guild: { select: { ownerId: true } },
+      },
     });
     if (!channel) return [];
 
-    if (!channel.isPrivate) {
-      const all = await this.prisma.user.findMany({ select: { id: true } });
-      return all.map((u) => u.id);
-    }
+    const members = await this.prisma.guildMember.findMany({
+      where: { guildId: channel.guildId },
+      select: { userId: true },
+    });
+    const memberIds = members.map((m) => m.userId);
+    if (!channel.isPrivate) return memberIds;
 
-    const roles = await this.prisma.role.findMany({ select: { id: true, permissions: true } });
+    const roles = await this.prisma.role.findMany({
+      where: { guildId: channel.guildId },
+      select: { id: true, permissions: true },
+    });
     const adminRoleIds = roles
       .filter((r) => hasPermission(r.permissions, Permissions.ADMINISTRATOR))
       .map((r) => r.id);
     const allowedRoleIds = [...channel.allowedRoles.map((ar) => ar.roleId), ...adminRoleIds];
 
     const memberships = await this.prisma.userRole.findMany({
-      where: { roleId: { in: allowedRoleIds } },
+      where: { roleId: { in: allowedRoleIds }, userId: { in: memberIds } },
       select: { userId: true },
     });
-    return [...new Set(memberships.map((m) => m.userId))];
+    const ids = new Set(memberships.map((m) => m.userId));
+    if (channel.guild.ownerId && memberIds.includes(channel.guild.ownerId)) {
+      ids.add(channel.guild.ownerId);
+    }
+    return [...ids];
   }
 
   /** Смена имени. Старые access-токены несут прежнее имя до refresh — это ок */
@@ -131,31 +196,13 @@ export class UsersService {
   }
 
   async getMe(userId: string): Promise<MeDto> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: { roles: { include: { role: true } } },
-    });
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('Пользователь не найден');
-
-    const roles: RoleDto[] = user.roles
-      .map((ur) => ur.role)
-      .sort((a, b) => b.position - a.position)
-      .map((r) => ({
-        id: r.id,
-        name: r.name,
-        color: r.color,
-        permissions: r.permissions,
-        position: r.position,
-        isDefault: r.isDefault,
-        isOwnerRole: r.isOwnerRole,
-      }));
 
     return {
       id: user.id,
       username: user.username,
       avatarUrl: user.avatarUrl,
-      permissions: combineMasks(roles.map((r) => r.permissions)),
-      roles,
       timedOutUntil: user.timedOutUntil?.toISOString() ?? null,
       createdAt: user.createdAt.toISOString(),
     };

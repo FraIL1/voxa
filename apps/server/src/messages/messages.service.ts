@@ -92,7 +92,11 @@ export class MessagesService {
     const targets = new Set<string>();
 
     if (hasEveryone) {
-      const mask = await this.users.permissionMaskOf(authorId);
+      const channel = await this.prisma.channel.findUniqueOrThrow({
+        where: { id: channelId },
+        select: { guildId: true },
+      });
+      const mask = await this.users.permissionMaskOf(authorId, channel.guildId);
       if (hasPermission(mask, Permissions.MENTION_EVERYONE)) {
         for (const id of visible) targets.add(id);
       }
@@ -203,6 +207,18 @@ export class MessagesService {
     await this.assertNotTimedOut(userId);
     await this.assertTextChannelAccess(userId, channelId);
 
+    // Вложения в канал сервера требуют права UPLOAD_FILES на этом сервере
+    if (input.attachmentIds && input.attachmentIds.length > 0) {
+      const channel = await this.prisma.channel.findUniqueOrThrow({
+        where: { id: channelId },
+        select: { guildId: true },
+      });
+      const mask = await this.users.permissionMaskOf(userId, channel.guildId);
+      if (!hasPermission(mask, Permissions.UPLOAD_FILES)) {
+        throw new ForbiddenException('Недостаточно прав для загрузки файлов');
+      }
+    }
+
     if (input.replyToId) {
       const target = await this.prisma.message.findFirst({
         where: { id: input.replyToId, channelId, deletedAt: null },
@@ -283,7 +299,11 @@ export class MessagesService {
 
     const isForeign = message.authorId !== userId;
     if (isForeign) {
-      const mask = await this.users.permissionMaskOf(userId);
+      const channel = await this.prisma.channel.findUniqueOrThrow({
+        where: { id: channelId },
+        select: { guildId: true },
+      });
+      const mask = await this.users.permissionMaskOf(userId, channel.guildId);
       if (!hasPermission(mask, Permissions.DELETE_MESSAGES)) {
         throw new ForbiddenException('Недостаточно прав для удаления чужого сообщения');
       }
@@ -296,7 +316,12 @@ export class MessagesService {
 
     // Удаление чужого — модерационное действие, фиксируем в журнале
     if (isForeign) {
+      const channel = await this.prisma.channel.findUniqueOrThrow({
+        where: { id: channelId },
+        select: { guildId: true },
+      });
       this.audit.log(
+        channel.guildId,
         userId,
         'message.delete.other',
         { type: 'message', id: messageId },

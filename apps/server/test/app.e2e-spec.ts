@@ -43,6 +43,7 @@ describe('Voxa: критический поток (e2e)', () => {
   let socket: Socket | undefined;
 
   let ownerInviteCode: string;
+  let guildId: string;
   let ownerAccess: string;
   let ownerRefreshCookie: string;
   let memberAccess: string;
@@ -108,11 +109,22 @@ describe('Voxa: критический поток (e2e)', () => {
 
     const body = res.body as AuthResponseDto;
     expect(body.user.username).toBe(OWNER.username);
-    expect(body.user.roles.map((r) => r.name)).toContain('Владелец');
-    expect(body.user.permissions & Permissions.ADMINISTRATOR).toBe(Permissions.ADMINISTRATOR);
 
     ownerAccess = body.accessToken;
     ownerRefreshCookie = refreshCookieOf(res);
+
+    // Владелец состоит в стартовом сервере «Voxa» с правами администратора
+    const guilds = await request(httpServer)
+      .get('/api/guilds')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    expect(guilds.body).toHaveLength(1);
+    expect(guilds.body[0].name).toBe('Voxa');
+    expect(guilds.body[0].ownerId).toBe(body.user.id);
+    expect(guilds.body[0].myPermissions & Permissions.ADMINISTRATOR).toBe(
+      Permissions.ADMINISTRATOR,
+    );
+    guildId = guilds.body[0].id as string;
   });
 
   it('одноразовый bootstrap-инвайт больше не работает', async () => {
@@ -156,7 +168,7 @@ describe('Voxa: критический поток (e2e)', () => {
 
   it('владелец создаёт обычный инвайт, по нему регистрируется участник', async () => {
     const created = await request(httpServer)
-      .post('/api/invites')
+      .post(`/api/guilds/${guildId}/invites`)
       .set('Authorization', `Bearer ${ownerAccess}`)
       .send({ maxUses: 5, expiresInHours: 24 })
       .expect(201);
@@ -171,13 +183,21 @@ describe('Voxa: критический поток (e2e)', () => {
       .send({ inviteCode: created.body.code, ...MEMBER })
       .expect(201);
     const body = res.body as AuthResponseDto;
-    expect(body.user.roles.map((r) => r.name)).toEqual(['Участник']);
     memberAccess = body.accessToken;
+
+    // Регистрация по инвайту = вступление на его сервер (без прав админа)
+    const guilds = await request(httpServer)
+      .get('/api/guilds')
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(200);
+    expect(guilds.body).toHaveLength(1);
+    expect(guilds.body[0].id).toBe(guildId);
+    expect(guilds.body[0].myPermissions & Permissions.ADMINISTRATOR).toBe(0);
   });
 
   it('участник без права «Управление каналами» получает 403', async () => {
     await request(httpServer)
-      .post('/api/channels')
+      .post(`/api/guilds/${guildId}/channels`)
       .set('Authorization', `Bearer ${memberAccess}`)
       .send({ name: 'хакерский', type: 'TEXT' })
       .expect(403);
@@ -185,7 +205,7 @@ describe('Voxa: критический поток (e2e)', () => {
 
   it('структура сообщества доступна и содержит #общий', async () => {
     const res = await request(httpServer)
-      .get('/api/channels')
+      .get(`/api/guilds/${guildId}/structure`)
       .set('Authorization', `Bearer ${ownerAccess}`)
       .expect(200);
 
@@ -198,7 +218,7 @@ describe('Voxa: критический поток (e2e)', () => {
   });
 
   it('запрос без токена отклоняется', async () => {
-    await request(httpServer).get('/api/channels').expect(401);
+    await request(httpServer).get(`/api/guilds/${guildId}/structure`).expect(401);
   });
 
   it('WebSocket отклоняет подключение с неверным токеном', async () => {
@@ -246,7 +266,7 @@ describe('Voxa: критический поток (e2e)', () => {
 
   it('ответ (reply) на сообщение из другого канала отклоняется', async () => {
     const res = await request(httpServer)
-      .get('/api/channels')
+      .get(`/api/guilds/${guildId}/structure`)
       .set('Authorization', `Bearer ${ownerAccess}`)
       .expect(200);
     const structure = res.body as CommunityStructureDto;
@@ -414,7 +434,7 @@ describe('Voxa: критический поток (e2e)', () => {
 
   it('голосовой токен: комната = канал, права publish/subscribe; текстовый канал — 400', async () => {
     const structure = await request(httpServer)
-      .get('/api/channels')
+      .get(`/api/guilds/${guildId}/structure`)
       .set('Authorization', `Bearer ${ownerAccess}`)
       .expect(200);
     const voiceChannel = (structure.body as CommunityStructureDto).categories
@@ -450,7 +470,7 @@ describe('Voxa: критический поток (e2e)', () => {
 
   it('voice.state через WS: участник появляется в /voice/states и рассылается voice.update', async () => {
     const structure = await request(httpServer)
-      .get('/api/channels')
+      .get(`/api/guilds/${guildId}/structure`)
       .set('Authorization', `Bearer ${ownerAccess}`)
       .expect(200);
     const voiceChannel = (structure.body as CommunityStructureDto).categories
@@ -493,7 +513,7 @@ describe('Voxa: критический поток (e2e)', () => {
 
   it('GET /users: статусы присутствия и роли участников', async () => {
     const res = await request(httpServer)
-      .get('/api/users')
+      .get(`/api/guilds/${guildId}/members`)
       .set('Authorization', `Bearer ${ownerAccess}`)
       .expect(200);
 
@@ -633,7 +653,7 @@ describe('Voxa: критический поток (e2e)', () => {
     const memberId = (me.body as MeDto).id;
 
     const res = await request(httpServer)
-      .post(`/api/moderation/users/${memberId}/timeout`)
+      .post(`/api/guilds/${guildId}/members/${memberId}/timeout`)
       .set('Authorization', `Bearer ${ownerAccess}`)
       .send({ minutes: 5, reason: 'спам' })
       .expect(201);
@@ -648,7 +668,7 @@ describe('Voxa: критический поток (e2e)', () => {
 
     // И в голос нельзя
     const structure = await request(httpServer)
-      .get('/api/channels')
+      .get(`/api/guilds/${guildId}/structure`)
       .set('Authorization', `Bearer ${ownerAccess}`);
     const voiceChannel = (structure.body as CommunityStructureDto).categories
       .flatMap((c) => c.channels)
@@ -660,7 +680,7 @@ describe('Voxa: критический поток (e2e)', () => {
 
     // Снятие таймаута
     await request(httpServer)
-      .delete(`/api/moderation/users/${memberId}/timeout`)
+      .delete(`/api/guilds/${guildId}/members/${memberId}/timeout`)
       .set('Authorization', `Bearer ${ownerAccess}`)
       .expect(204);
     await request(httpServer)
@@ -670,11 +690,11 @@ describe('Voxa: критический поток (e2e)', () => {
       .expect(201);
   });
 
-  it('кик завершает сессии; бан запрещает вход; разбан возвращает доступ', async () => {
+  it('кик убирает с сервера; бан запрещает вступление; разбан возвращает', async () => {
     const invite = await request(httpServer)
-      .post('/api/invites')
+      .post(`/api/guilds/${guildId}/invites`)
       .set('Authorization', `Bearer ${ownerAccess}`)
-      .send({ maxUses: 1 })
+      .send({ maxUses: 5 })
       .expect(201);
 
     const victim = { username: 'Нарушитель', password: 'пароль-нарушителя-123' };
@@ -683,59 +703,82 @@ describe('Voxa: критический поток (e2e)', () => {
       .send({ inviteCode: invite.body.code, ...victim })
       .expect(201);
     const victimId = (registered.body as AuthResponseDto).user.id;
-    const victimCookie = refreshCookieOf(registered);
+    const victimAccess = (registered.body as AuthResponseDto).accessToken;
 
-    // Кик: refresh-сессии отозваны, но вход снова возможен
+    // Кик: аккаунт жив, но сервера в списке больше нет и структура закрыта
     await request(httpServer)
-      .post(`/api/moderation/users/${victimId}/kick`)
+      .post(`/api/guilds/${guildId}/members/${victimId}/kick`)
       .set('Authorization', `Bearer ${ownerAccess}`)
       .send({ reason: 'проверка' })
       .expect(204);
-    await request(httpServer).post('/api/auth/refresh').set('Cookie', victimCookie).expect(401);
-    await request(httpServer).post('/api/auth/login').send(victim).expect(200);
-
-    // Бан: вход запрещён с причиной
     await request(httpServer)
-      .post(`/api/moderation/users/${victimId}/ban`)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${victimAccess}`)
+      .expect(200);
+    const afterKick = await request(httpServer)
+      .get('/api/guilds')
+      .set('Authorization', `Bearer ${victimAccess}`)
+      .expect(200);
+    expect(afterKick.body).toHaveLength(0);
+    await request(httpServer)
+      .get(`/api/guilds/${guildId}/structure`)
+      .set('Authorization', `Bearer ${victimAccess}`)
+      .expect(403);
+
+    // Кикнутый может вернуться по инвайту
+    await request(httpServer)
+      .post(`/api/invites/${invite.body.code}/join`)
+      .set('Authorization', `Bearer ${victimAccess}`)
+      .expect(200);
+
+    // Бан: убирает с сервера и запрещает вступление по инвайту
+    await request(httpServer)
+      .post(`/api/guilds/${guildId}/members/${victimId}/ban`)
       .set('Authorization', `Bearer ${ownerAccess}`)
       .send({ reason: 'нарушение правил' })
       .expect(204);
-    const denied = await request(httpServer).post('/api/auth/login').send(victim).expect(403);
+    const denied = await request(httpServer)
+      .post(`/api/invites/${invite.body.code}/join`)
+      .set('Authorization', `Bearer ${victimAccess}`)
+      .expect(403);
     expect(denied.body.message).toContain('нарушение правил');
 
     // Повторный бан бессмыслен — 400
     await request(httpServer)
-      .post(`/api/moderation/users/${victimId}/ban`)
+      .post(`/api/guilds/${guildId}/members/${victimId}/ban`)
       .set('Authorization', `Bearer ${ownerAccess}`)
       .send({})
       .expect(400);
 
     // Участник без прав не видит списка банов
     await request(httpServer)
-      .get('/api/moderation/bans')
+      .get(`/api/guilds/${guildId}/bans`)
       .set('Authorization', `Bearer ${memberAccess}`)
       .expect(403);
 
     // Владелец видит бан в списке
     const bans = await request(httpServer)
-      .get('/api/moderation/bans')
+      .get(`/api/guilds/${guildId}/bans`)
       .set('Authorization', `Bearer ${ownerAccess}`)
       .expect(200);
     expect(bans.body.some((b: { userId: string }) => b.userId === victimId)).toBe(true);
 
-    // Разбан возвращает вход
+    // Разбан возвращает возможность вступить
     await request(httpServer)
-      .delete(`/api/moderation/bans/${victimId}`)
+      .delete(`/api/guilds/${guildId}/bans/${victimId}`)
       .set('Authorization', `Bearer ${ownerAccess}`)
       .expect(204);
-    await request(httpServer).post('/api/auth/login').send(victim).expect(200);
+    await request(httpServer)
+      .post(`/api/invites/${invite.body.code}/join`)
+      .set('Authorization', `Bearer ${victimAccess}`)
+      .expect(200);
 
     // Владельца нельзя модерировать даже владельцу (сам себя — 400)
     const ownerMe = await request(httpServer)
       .get('/api/auth/me')
       .set('Authorization', `Bearer ${ownerAccess}`);
     await request(httpServer)
-      .post(`/api/moderation/users/${(ownerMe.body as MeDto).id}/ban`)
+      .post(`/api/guilds/${guildId}/members/${(ownerMe.body as MeDto).id}/ban`)
       .set('Authorization', `Bearer ${ownerAccess}`)
       .send({})
       .expect(400);
@@ -743,12 +786,12 @@ describe('Voxa: критический поток (e2e)', () => {
 
   it('журнал аудита и обзор доступны только администратору', async () => {
     await request(httpServer)
-      .get('/api/admin/audit')
+      .get(`/api/guilds/${guildId}/audit`)
       .set('Authorization', `Bearer ${memberAccess}`)
       .expect(403);
 
     const audit = await request(httpServer)
-      .get('/api/admin/audit?limit=50')
+      .get(`/api/guilds/${guildId}/audit?limit=50`)
       .set('Authorization', `Bearer ${ownerAccess}`)
       .expect(200);
     const actions = (audit.body.items as { action: string }[]).map((i) => i.action);
@@ -846,7 +889,7 @@ describe('Voxa: критический поток (e2e)', () => {
 
     // Третий пользователь не имеет доступа к чужому диалогу
     const outsiderInvite = await request(httpServer)
-      .post('/api/invites')
+      .post(`/api/guilds/${guildId}/invites`)
       .set('Authorization', `Bearer ${ownerAccess}`)
       .send({ maxUses: 1 })
       .expect(201);
@@ -996,5 +1039,72 @@ describe('Voxa: критический поток (e2e)', () => {
       .set('Authorization', `Bearer ${ownerAccess}`)
       .expect(200);
     expect((finalFriends.body as { id: string }[]).some((f) => f.id === memberId)).toBe(false);
+  });
+
+  it('мультисервер: создание сервера, инвайт, вступление и выход', async () => {
+    // Участник создаёт собственный сервер и становится его владельцем
+    const created = await request(httpServer)
+      .post('/api/guilds')
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ name: 'Уютный уголок' })
+      .expect(201);
+    const newGuildId = created.body.id as string;
+    expect(created.body.myPermissions & Permissions.ADMINISTRATOR).toBe(Permissions.ADMINISTRATOR);
+
+    // Стартовая структура нового сервера создана
+    const structure = await request(httpServer)
+      .get(`/api/guilds/${newGuildId}/structure`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(200);
+    const channels = (structure.body as CommunityStructureDto).categories.flatMap(
+      (c) => c.channels,
+    );
+    expect(channels.some((c) => c.name === 'общий' && c.type === 'TEXT')).toBe(true);
+    expect(channels.some((c) => c.type === 'VOICE')).toBe(true);
+
+    // Чужому серверу структура не видна
+    await request(httpServer)
+      .get(`/api/guilds/${newGuildId}/structure`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(403);
+
+    // Создатель зовёт владельца «Voxa» инвайтом — тот вступает
+    const invite = await request(httpServer)
+      .post(`/api/guilds/${newGuildId}/invites`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ maxUses: 5 })
+      .expect(201);
+    await request(httpServer)
+      .post(`/api/invites/${invite.body.code}/join`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+
+    const ownerGuilds = await request(httpServer)
+      .get('/api/guilds')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    expect((ownerGuilds.body as { id: string }[]).some((g) => g.id === newGuildId)).toBe(true);
+    await request(httpServer)
+      .get(`/api/guilds/${newGuildId}/structure`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+
+    // Владелец сервера не может его покинуть, обычный участник — может
+    await request(httpServer)
+      .post(`/api/guilds/${newGuildId}/leave`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(400);
+    await request(httpServer)
+      .post(`/api/guilds/${newGuildId}/leave`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(204);
+    const afterLeave = await request(httpServer)
+      .get('/api/guilds')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    expect((afterLeave.body as { id: string }[]).some((g) => g.id === newGuildId)).toBe(false);
+
+    // Родной сервер «Voxa» при этом остаётся на месте
+    expect((afterLeave.body as { name: string }[]).some((g) => g.name === 'Voxa')).toBe(true);
   });
 });

@@ -1,33 +1,31 @@
-import { Controller, Get, Query } from '@nestjs/common';
-import {
-  auditQuerySchema,
-  Permissions,
-  type AdminOverviewDto,
-  type AuditPageDto,
-  type AuditQueryInput,
-} from '@voxa/shared';
+import { Controller, ForbiddenException, Get } from '@nestjs/common';
+import type { AdminOverviewDto } from '@voxa/shared';
 import { createRequire } from 'node:module';
 
-import { AuditService } from '../audit/audit.service';
-import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
-import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { CurrentUser, type RequestUser } from '../common/decorators/current-user.decorator';
 import { PresenceService } from '../presence/presence.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 const pkg = createRequire(__filename)('../../package.json') as { version: string };
 
-/** Панель владельца (раздел 5.10 PRD) — только ADMINISTRATOR */
+/** Обзор инстанса — доступен владельцам серверов */
 @Controller('admin')
-@RequirePermissions(Permissions.ADMINISTRATOR)
 export class AdminController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly presence: PresenceService,
-    private readonly audit: AuditService,
   ) {}
 
   @Get('overview')
-  async overview(): Promise<AdminOverviewDto> {
+  async overview(@CurrentUser() user: RequestUser): Promise<AdminOverviewDto> {
+    const ownsGuild = await this.prisma.guild.findFirst({
+      where: { ownerId: user.id },
+      select: { id: true },
+    });
+    if (!ownsGuild) {
+      throw new ForbiddenException('Обзор доступен владельцам серверов');
+    }
+
     const [usersTotal, activeSessions, files] = await Promise.all([
       this.prisma.user.count(),
       this.prisma.refreshSession.count({
@@ -44,12 +42,5 @@ export class AdminController {
       serverVersion: pkg.version,
       uptimeSeconds: Math.round(process.uptime()),
     };
-  }
-
-  @Get('audit')
-  async auditLog(
-    @Query(new ZodValidationPipe(auditQuerySchema)) query: AuditQueryInput,
-  ): Promise<AuditPageDto> {
-    return this.audit.list(query);
   }
 }

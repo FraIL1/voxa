@@ -20,26 +20,61 @@ model User {
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  roles           UserRole[]
-  sessions        RefreshSession[]
-  messages        Message[]
-  reactions       Reaction[]
-  readStates      ChannelReadState[]
-  attachments     Attachment[]
-  invitesCreated  Invite[]           @relation("InviteCreator")
-  ban             Ban?               @relation("BannedUser")
-  bansIssued      Ban[]              @relation("BanIssuer")
-  auditActions    AuditLog[]         @relation("AuditActor")
-  dmAsUserA       DmConversation[]   @relation("DmUserA")
-  dmAsUserB       DmConversation[]   @relation("DmUserB")
-  dmMessages      DmMessage[]
-  dmReadStates    DmReadState[]
-  friendsSent     Friendship[]       @relation("FriendRequester")
-  friendsReceived Friendship[]       @relation("FriendAddressee")
-  blocksMade      UserBlock[]        @relation("Blocker")
-  blocksReceived  UserBlock[]        @relation("Blocked")
+  roles            UserRole[]
+  sessions         RefreshSession[]
+  messages         Message[]
+  reactions        Reaction[]
+  readStates       ChannelReadState[]
+  attachments      Attachment[]
+  invitesCreated   Invite[]           @relation("InviteCreator")
+  bansReceived     Ban[]              @relation("BannedUser")
+  bansIssued       Ban[]              @relation("BanIssuer")
+  auditActions     AuditLog[]         @relation("AuditActor")
+  guildsOwned      Guild[]            @relation("GuildOwner")
+  guildMemberships GuildMember[]
+  dmAsUserA        DmConversation[]   @relation("DmUserA")
+  dmAsUserB        DmConversation[]   @relation("DmUserB")
+  dmMessages       DmMessage[]
+  dmReadStates     DmReadState[]
+  friendsSent      Friendship[]       @relation("FriendRequester")
+  friendsReceived  Friendship[]       @relation("FriendAddressee")
+  blocksMade       UserBlock[]        @relation("Blocker")
+  blocksReceived   UserBlock[]        @relation("Blocked")
 
   @@map("users")
+}
+
+/// Сервер (guild): отдельное пространство с каналами, ролями и участниками
+model Guild {
+  id        String   @id @default(uuid(7))
+  name      String
+  iconUrl   String?  @map("icon_url")
+  ownerId   String?  @map("owner_id")
+  owner     User?    @relation("GuildOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  members    GuildMember[]
+  categories Category[]
+  channels   Channel[]
+  roles      Role[]
+  invites    Invite[]
+  bans       Ban[]
+
+  @@map("guilds")
+}
+
+/// Членство пользователя на сервере
+model GuildMember {
+  guildId  String   @map("guild_id")
+  guild    Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  userId   String   @map("user_id")
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt DateTime @default(now()) @map("joined_at")
+
+  @@id([guildId, userId])
+  @@index([userId])
+  @@map("guild_members")
 }
 
 enum FriendshipStatus {
@@ -75,21 +110,26 @@ model UserBlock {
   @@map("user_blocks")
 }
 
-/// Бан по аккаунту: вход запрещён до разбана (раздел 5.10 PRD)
+/// Бан на сервере: участник удалён и не может зайти по инвайту до разбана
 model Ban {
-  userId     String   @id @map("user_id")
+  guildId    String   @map("guild_id")
+  guild      Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  userId     String   @map("user_id")
   user       User     @relation("BannedUser", fields: [userId], references: [id], onDelete: Cascade)
   reason     String?
   bannedById String?  @map("banned_by_id")
   bannedBy   User?    @relation("BanIssuer", fields: [bannedById], references: [id], onDelete: SetNull)
   createdAt  DateTime @default(now()) @map("created_at")
 
+  @@id([guildId, userId])
   @@map("bans")
 }
 
 /// Журнал аудита: кто что сделал (раздел 5.10 PRD)
 model AuditLog {
   id         BigInt   @id @default(autoincrement())
+  /// null — действие уровня инстанса (не привязано к серверу)
+  guildId    String?  @map("guild_id")
   actorId    String?  @map("actor_id")
   actor      User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
   /// user.kick / user.ban / channel.create / invite.revoke / message.delete.other ...
@@ -106,6 +146,8 @@ model AuditLog {
 model Invite {
   id           String    @id @default(uuid(7))
   code         String    @unique
+  guildId      String    @map("guild_id")
+  guild        Guild     @relation(fields: [guildId], references: [id], onDelete: Cascade)
   createdById  String?   @map("created_by_id")
   createdBy    User?     @relation("InviteCreator", fields: [createdById], references: [id], onDelete: SetNull)
   /// Роль, которая выдаётся при регистрации по этому инвайту (bootstrap Владельца)
@@ -153,7 +195,9 @@ model LoginAttempt {
 
 model Role {
   id          String   @id @default(uuid(7))
-  name        String   @unique
+  guildId     String   @map("guild_id")
+  guild       Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  name        String
   color       String?
   /// Битмаска прав (см. Permissions в @voxa/shared)
   permissions Int
@@ -170,6 +214,7 @@ model Role {
   channelAccess ChannelRoleAccess[]
   invites       Invite[]
 
+  @@unique([guildId, name])
   @@map("roles")
 }
 
@@ -185,11 +230,14 @@ model UserRole {
 
 model Category {
   id        String    @id @default(uuid(7))
+  guildId   String    @map("guild_id")
+  guild     Guild     @relation(fields: [guildId], references: [id], onDelete: Cascade)
   name      String
   position  Int
   createdAt DateTime  @default(now()) @map("created_at")
   channels  Channel[]
 
+  @@index([guildId])
   @@map("categories")
 }
 
@@ -200,6 +248,8 @@ enum ChannelType {
 
 model Channel {
   id         String      @id @default(uuid(7))
+  guildId    String      @map("guild_id")
+  guild      Guild       @relation(fields: [guildId], references: [id], onDelete: Cascade)
   name       String
   type       ChannelType
   topic      String?
@@ -214,6 +264,7 @@ model Channel {
   messages     Message[]
   readStates   ChannelReadState[]
 
+  @@index([guildId])
   @@map("channels")
 }
 

@@ -197,3 +197,9 @@ export type EditDmInput = z.infer<typeof editDmSchema>;
 /** Заявка в друзья по имени пользователя */
 export const sendFriendRequestSchema = z.object({ username: usernameSchema });
 export type SendFriendRequestInput = z.infer<typeof sendFriendRequestSchema>;
+
+/** Название сервера: 2–48 символов */
+export const createGuildSchema = z.object({
+  name: z.string().trim().min(2, 'Минимум 2 символа').max(48, 'Максимум 48 символов'),
+});
+export type CreateGuildInput = z.infer<typeof createGuildSchema>;

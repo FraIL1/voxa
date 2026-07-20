@@ -47,6 +47,10 @@ export const WsEvents = {
   FriendRequestNew: 'friend.request.new',
   /** Адресное: состав друзей/заявок/блокировок изменился — перечитать списки */
   FriendsUpdated: 'friends.updated',
+  /** Комнате сервера: состав участников изменился — перечитать список */
+  GuildMembersChanged: 'guild.members.changed',
+  /** Адресное: мой список серверов изменился (создал/вступил/кик/бан) */
+  MeGuildsChanged: 'me.guilds',
 } as const;
 
 export type WsEventName = (typeof WsEvents)[keyof typeof WsEvents];
@@ -113,6 +117,8 @@ export interface WsServerEvents {
   [WsEvents.DmConversationUpdated]: DmConversationDto;
   [WsEvents.FriendRequestNew]: FriendRequestDto;
   [WsEvents.FriendsUpdated]: { reason: FriendsUpdateReason };
+  [WsEvents.GuildMembersChanged]: { guildId: string };
+  [WsEvents.MeGuildsChanged]: Record<string, never>;
 }
 
 export type FriendsUpdateReason =

@@ -17,9 +17,6 @@ export interface RoleDto {
 }
 
 export interface MeDto extends UserPublicDto {
-  /** Итоговая маска прав (все роли через OR) */
-  permissions: number;
-  roles: RoleDto[];
   /** Активный таймаут: до этого момента нельзя писать и говорить */
   timedOutUntil: string | null;
   createdAt: string;
@@ -34,6 +31,7 @@ export type ChannelType = 'TEXT' | 'VOICE';
 
 export interface ChannelDto {
   id: string;
+  guildId: string;
   name: string;
   type: ChannelType;
   topic: string | null;
@@ -46,6 +44,7 @@ export interface ChannelDto {
 
 export interface CategoryDto {
   id: string;
+  guildId: string;
   name: string;
   position: number;
   channels: ChannelDto[];
@@ -56,6 +55,21 @@ export interface CommunityStructureDto {
   categories: CategoryDto[];
   /** Каналы вне категорий */
   uncategorized: ChannelDto[];
+}
+
+/** Сервер (guild) глазами запрашивающего участника */
+export interface GuildDto {
+  id: string;
+  name: string;
+  iconUrl: string | null;
+  ownerId: string | null;
+  /** Маска прав запрашивающего на этом сервере (владелец = все права) */
+  myPermissions: number;
+  createdAt: string;
+}
+
+export interface JoinGuildResultDto {
+  guildId: string;
 }
 
 export type AttachmentKind = 'image' | 'video' | 'audio' | 'file';
@@ -269,4 +283,10 @@ export interface SendFriendRequestResultDto {
 
 export interface BlockedUserDto extends UserPublicDto {
   blockedAt: string;
+}
+
+/** Публичная проверка инвайта: имя сервера для страницы приглашения */
+export interface InviteCheckDto {
+  valid: boolean;
+  guildName: string | null;
 }

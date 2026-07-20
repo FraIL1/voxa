@@ -37,53 +37,71 @@ export class ChannelsController {
     private readonly audit: AuditService,
   ) {}
 
-  @Get('channels')
-  async structure(@CurrentUser() user: RequestUser): Promise<CommunityStructureDto> {
-    return this.channelsService.getStructure(user.id);
+  @Get('guilds/:guildId/structure')
+  async structure(
+    @CurrentUser() user: RequestUser,
+    @Param('guildId') guildId: string,
+  ): Promise<CommunityStructureDto> {
+    return this.channelsService.getStructure(user.id, guildId);
   }
 
-  @Post('channels')
+  @Post('guilds/:guildId/channels')
   @RequirePermissions(Permissions.MANAGE_CHANNELS)
   async createChannel(
     @CurrentUser() user: RequestUser,
+    @Param('guildId') guildId: string,
     @Body(new ZodValidationPipe(createChannelSchema)) body: CreateChannelInput,
   ): Promise<ChannelDto> {
-    const dto = await this.channelsService.createChannel(body);
-    this.audit.log(user.id, 'channel.create', { type: 'channel', id: dto.id }, { name: dto.name });
+    const dto = await this.channelsService.createChannel(guildId, body);
+    this.audit.log(
+      guildId,
+      user.id,
+      'channel.create',
+      { type: 'channel', id: dto.id },
+      { name: dto.name },
+    );
     return dto;
   }
 
-  @Patch('channels/:id')
+  @Patch('channels/:channelId')
   @RequirePermissions(Permissions.MANAGE_CHANNELS)
   async updateChannel(
     @CurrentUser() user: RequestUser,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('channelId', ParseUUIDPipe) channelId: string,
     @Body(new ZodValidationPipe(updateChannelSchema)) body: UpdateChannelInput,
   ): Promise<ChannelDto> {
-    const dto = await this.channelsService.updateChannel(id, body);
-    this.audit.log(user.id, 'channel.update', { type: 'channel', id }, { name: dto.name });
+    const dto = await this.channelsService.updateChannel(channelId, body);
+    this.audit.log(
+      dto.guildId,
+      user.id,
+      'channel.update',
+      { type: 'channel', id: channelId },
+      { name: dto.name },
+    );
     return dto;
   }
 
-  @Delete('channels/:id')
+  @Delete('channels/:channelId')
   @RequirePermissions(Permissions.MANAGE_CHANNELS)
   @HttpCode(204)
   async deleteChannel(
     @CurrentUser() user: RequestUser,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('channelId', ParseUUIDPipe) channelId: string,
   ): Promise<void> {
-    await this.channelsService.deleteChannel(id);
-    this.audit.log(user.id, 'channel.delete', { type: 'channel', id });
+    const guildId = await this.channelsService.deleteChannel(channelId);
+    this.audit.log(guildId, user.id, 'channel.delete', { type: 'channel', id: channelId });
   }
 
-  @Post('categories')
+  @Post('guilds/:guildId/categories')
   @RequirePermissions(Permissions.MANAGE_CHANNELS)
   async createCategory(
     @CurrentUser() user: RequestUser,
+    @Param('guildId') guildId: string,
     @Body(new ZodValidationPipe(createCategorySchema)) body: CreateCategoryInput,
   ): Promise<CategoryDto> {
-    const dto = await this.channelsService.createCategory(body);
+    const dto = await this.channelsService.createCategory(guildId, body);
     this.audit.log(
+      guildId,
       user.id,
       'category.create',
       { type: 'category', id: dto.id },
@@ -92,26 +110,32 @@ export class ChannelsController {
     return dto;
   }
 
-  @Patch('categories/:id')
+  @Patch('categories/:categoryId')
   @RequirePermissions(Permissions.MANAGE_CHANNELS)
   async updateCategory(
     @CurrentUser() user: RequestUser,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('categoryId', ParseUUIDPipe) categoryId: string,
     @Body(new ZodValidationPipe(updateCategorySchema)) body: UpdateCategoryInput,
   ): Promise<CategoryDto> {
-    const dto = await this.channelsService.updateCategory(id, body);
-    this.audit.log(user.id, 'category.update', { type: 'category', id }, { name: dto.name });
+    const dto = await this.channelsService.updateCategory(categoryId, body);
+    this.audit.log(
+      dto.guildId,
+      user.id,
+      'category.update',
+      { type: 'category', id: categoryId },
+      { name: dto.name },
+    );
     return dto;
   }
 
-  @Delete('categories/:id')
+  @Delete('categories/:categoryId')
   @RequirePermissions(Permissions.MANAGE_CHANNELS)
   @HttpCode(204)
   async deleteCategory(
     @CurrentUser() user: RequestUser,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('categoryId', ParseUUIDPipe) categoryId: string,
   ): Promise<void> {
-    await this.channelsService.deleteCategory(id);
-    this.audit.log(user.id, 'category.delete', { type: 'category', id });
+    const guildId = await this.channelsService.deleteCategory(categoryId);
+    this.audit.log(guildId, user.id, 'category.delete', { type: 'category', id: categoryId });
   }
 }

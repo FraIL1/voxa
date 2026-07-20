@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   HttpException,
   HttpStatus,
   Injectable,
@@ -92,14 +91,31 @@ export class AuthService {
         },
       });
 
-      // Роли: базовая «Участник» + роль инвайта (например, «Владелец»)
-      const defaultRole = await tx.role.findFirst({ where: { isDefault: true } });
+      // Регистрация по инвайту = вступление на его сервер
+      await tx.guildMember.create({ data: { guildId: invite.guildId, userId: created.id } });
+
+      // Роли сервера: базовая «Участник» + роль инвайта (например, «Владелец»)
+      const defaultRole = await tx.role.findFirst({
+        where: { guildId: invite.guildId, isDefault: true },
+      });
       const roleIds = new Set<string>();
       if (defaultRole) roleIds.add(defaultRole.id);
       if (invite.grantsRoleId) roleIds.add(invite.grantsRoleId);
       await tx.userRole.createMany({
         data: [...roleIds].map((roleId) => ({ userId: created.id, roleId })),
       });
+
+      // Bootstrap владельца: первый вошедший с owner-ролью становится
+      // владельцем сервера (guild.ownerId)
+      if (invite.grantsRoleId) {
+        const grantsRole = await tx.role.findUnique({ where: { id: invite.grantsRoleId } });
+        if (grantsRole?.isOwnerRole) {
+          await tx.guild.updateMany({
+            where: { id: invite.guildId, ownerId: null },
+            data: { ownerId: created.id },
+          });
+        }
+      }
 
       // Одноразовый bootstrap-инвайт владельца гасим сразу
       if (invite.grantsRoleId && invite.maxUses !== null && invite.uses >= invite.maxUses) {
@@ -131,14 +147,7 @@ export class AuthService {
       throw new UnauthorizedException('Неверное имя пользователя или пароль');
     }
 
-    // Бан по аккаунту: вход запрещён до разбана (раздел 5.10 PRD)
-    const ban = await this.prisma.ban.findUnique({ where: { userId: user.id } });
-    if (ban) {
-      throw new ForbiddenException(
-        ban.reason ? `Аккаунт заблокирован: ${ban.reason}` : 'Аккаунт заблокирован',
-      );
-    }
-
+    // Баны теперь на уровне сервера и вход в аккаунт не блокируют
     await this.tokens.pruneExpired(user.id);
     const tokens = await this.tokens.issueSession(user.id, user.username, meta);
     return { tokens, user: await this.users.getMe(user.id) };

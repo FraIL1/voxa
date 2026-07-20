@@ -33,6 +33,10 @@ export function userRoom(userId: string): string {
   return `user:${userId}`;
 }
 
+export function guildRoom(guildId: string): string {
+  return `guild:${guildId}`;
+}
+
 interface SocketData {
   userId?: string;
   username?: string;
@@ -110,23 +114,27 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const payload = await this.jwtService.verifyAsync<AccessTokenPayload>(token);
 
       // Access-токен живёт 15 минут и сам по себе не отзываем; для сокетов
-      // проверяем живость refresh-сессии и отсутствие бана — иначе кикнутый
-      // клиент тихо переподключался бы до истечения токена
-      const [session, ban] = await Promise.all([
-        this.prisma.refreshSession.findFirst({
-          where: { id: payload.sid, revokedAt: null, expiresAt: { gt: new Date() } },
-          select: { id: true },
-        }),
-        this.prisma.ban.findUnique({ where: { userId: payload.sub }, select: { userId: true } }),
-      ]);
-      if (!session || ban) throw new Error('session revoked or banned');
+      // проверяем живость refresh-сессии (баны теперь на уровне сервера
+      // и вход в аккаунт не блокируют)
+      const session = await this.prisma.refreshSession.findFirst({
+        where: { id: payload.sid, revokedAt: null, expiresAt: { gt: new Date() } },
+        select: { id: true },
+      });
+      if (!session) throw new Error('session revoked');
 
       const data = socket.data as SocketData;
       data.userId = payload.sub;
       data.username = payload.username;
 
-      const channelIds = await this.usersService.visibleChannelIdsOf(payload.sub);
-      await socket.join([userRoom(payload.sub), ...channelIds.map(channelRoom)]);
+      const [guildIds, channelIds] = await Promise.all([
+        this.usersService.guildIdsOf(payload.sub),
+        this.usersService.visibleChannelIdsOf(payload.sub),
+      ]);
+      await socket.join([
+        userRoom(payload.sub),
+        ...guildIds.map(guildRoom),
+        ...channelIds.map(channelRoom),
+      ]);
 
       const ready: WsServerEvents[typeof WsEvents.Ready] = {
         userId: payload.sub,
@@ -251,9 +259,32 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to(userIds.map(userRoom)).emit(event, payload);
   }
 
-  /** Все подключённые сокеты вступают в комнату канала (новый публичный канал) */
-  joinAllToChannel(channelId: string): void {
-    this.server.socketsJoin(channelRoom(channelId));
+  emitToGuild<E extends WsEventName>(guildId: string, event: E, payload: WsServerEvents[E]): void {
+    this.server.to(guildRoom(guildId)).emit(event, payload);
+  }
+
+  /** Живые сокеты пользователя вступают в комнаты сервера (создание/вступление) */
+  async joinUserToGuild(userId: string, guildId: string): Promise<void> {
+    const channelIds = await this.usersService.visibleChannelIdsInGuild(userId, guildId);
+    this.server
+      .in(userRoom(userId))
+      .socketsJoin([guildRoom(guildId), ...channelIds.map(channelRoom)]);
+  }
+
+  /** Сокеты пользователя покидают комнаты сервера (выход/кик/бан) */
+  async removeUserFromGuild(userId: string, guildId: string): Promise<void> {
+    const channels = await this.prisma.channel.findMany({
+      where: { guildId },
+      select: { id: true },
+    });
+    this.server
+      .in(userRoom(userId))
+      .socketsLeave([guildRoom(guildId), ...channels.map((c) => channelRoom(c.id))]);
+  }
+
+  /** Сокеты участников сервера вступают в комнату канала (новый публичный канал) */
+  joinGuildToChannel(guildId: string, channelId: string): void {
+    this.server.in(guildRoom(guildId)).socketsJoin(channelRoom(channelId));
   }
 
   /** Комнату канала покидают все (канал удалён) */

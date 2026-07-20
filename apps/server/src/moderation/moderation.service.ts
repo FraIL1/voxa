@@ -7,6 +7,7 @@ import {
 import { WsEvents, type BanDto } from '@voxa/shared';
 
 import { AuditService } from '../audit/audit.service';
+import { GuildsService } from '../guilds/guilds.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { LiveKitAdminService } from '../voice/livekit-admin.service';
 import { VoiceStateService } from '../voice/voice-state.service';
@@ -18,51 +19,60 @@ export class ModerationService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly ws: WsGateway,
+    private readonly guilds: GuildsService,
     private readonly voiceStates: VoiceStateService,
     private readonly livekit: LiveKitAdminService,
   ) {}
 
-  /** Выбросить из голосового канала на всех уровнях (состояние + LiveKit) */
-  private async removeFromVoice(userId: string): Promise<void> {
-    const channelId = this.voiceStates.drop(userId);
+  /** Выбросить из голосового канала ЭТОГО сервера (состояние + LiveKit) */
+  private async removeFromVoice(guildId: string, userId: string): Promise<void> {
+    const channelId = this.voiceStates.channelOf(userId);
     if (!channelId) return;
+    const channel = await this.prisma.channel.findUnique({
+      where: { id: channelId },
+      select: { guildId: true },
+    });
+    if (channel?.guildId !== guildId) return;
+
+    this.voiceStates.drop(userId);
     this.ws.broadcastVoiceState(channelId);
     await this.livekit.removeFromRoom(channelId, userId);
   }
 
-  /** Владельца нельзя кикать/банить/таймаутить; себя — тоже */
-  private async assertModeratable(actorId: string, targetId: string): Promise<void> {
+  /** Владельца сервера нельзя кикать/банить/таймаутить; себя — тоже */
+  private async assertModeratable(
+    guildId: string,
+    actorId: string,
+    targetId: string,
+  ): Promise<void> {
     if (actorId === targetId) {
       throw new BadRequestException('Нельзя применить действие к самому себе');
     }
+    const guild = await this.prisma.guild.findUnique({
+      where: { id: guildId },
+      select: { ownerId: true },
+    });
+    if (!guild) throw new NotFoundException('Сервер не найден');
+    if (guild.ownerId === targetId) {
+      throw new ForbiddenException('Действие нельзя применить к владельцу сервера');
+    }
     const target = await this.prisma.user.findUnique({
       where: { id: targetId },
-      include: { roles: { include: { role: { select: { isOwnerRole: true } } } } },
+      select: { id: true },
     });
     if (!target) throw new NotFoundException('Пользователь не найден');
-    if (target.roles.some((r) => r.role.isOwnerRole)) {
-      throw new ForbiddenException('Действие нельзя применить к Владельцу');
-    }
   }
 
-  /** Завершение всех сессий: refresh-токены отзываются, сокеты отключаются */
-  private async terminateSessions(userId: string, reason: string): Promise<void> {
-    await this.prisma.refreshSession.updateMany({
-      where: { userId, revokedAt: null },
-      data: { revokedAt: new Date() },
-    });
-    await this.ws.forceLogout(userId, reason);
-  }
+  /** Кик: удаление с сервера (аккаунт и другие серверы не трогаем) */
+  async kick(guildId: string, actorId: string, targetId: string, reason?: string): Promise<void> {
+    await this.assertModeratable(guildId, actorId, targetId);
+    await this.removeFromVoice(guildId, targetId);
+    await this.guilds.removeMember(guildId, targetId);
 
-  /** Кик: принудительный выход со всех устройств (вход снова — можно) */
-  async kick(actorId: string, targetId: string, reason?: string): Promise<void> {
-    await this.assertModeratable(actorId, targetId);
-    await this.removeFromVoice(targetId);
-    await this.terminateSessions(
-      targetId,
-      reason ? `Вы были кикнуты: ${reason}` : 'Вы были кикнуты',
-    );
+    this.ws.emitToGuild(guildId, WsEvents.GuildMembersChanged, { guildId });
+    this.ws.emitToUsers([targetId], WsEvents.MeGuildsChanged, {});
     this.audit.log(
+      guildId,
       actorId,
       'user.kick',
       { type: 'user', id: targetId },
@@ -70,23 +80,27 @@ export class ModerationService {
     );
   }
 
-  /** Бан: кик + запрет входа до разбана */
-  async ban(actorId: string, targetId: string, reason?: string): Promise<void> {
-    await this.assertModeratable(actorId, targetId);
+  /** Бан: кик + запрет вступления по инвайтам до разбана */
+  async ban(guildId: string, actorId: string, targetId: string, reason?: string): Promise<void> {
+    await this.assertModeratable(guildId, actorId, targetId);
 
-    const existing = await this.prisma.ban.findUnique({ where: { userId: targetId } });
+    const existing = await this.prisma.ban.findUnique({
+      where: { guildId_userId: { guildId, userId: targetId } },
+    });
     if (existing) throw new BadRequestException('Пользователь уже забанен');
 
     await this.prisma.ban.create({
-      data: { userId: targetId, reason: reason ?? null, bannedById: actorId },
+      data: { guildId, userId: targetId, reason: reason ?? null, bannedById: actorId },
     });
 
-    await this.removeFromVoice(targetId);
-    await this.terminateSessions(
-      targetId,
-      reason ? `Вы заблокированы: ${reason}` : 'Вы заблокированы',
-    );
+    await this.removeFromVoice(guildId, targetId);
+    // Мог уже не быть участником (бан из списка банов после кика) — это ок
+    await this.guilds.removeMember(guildId, targetId).catch(() => undefined);
+
+    this.ws.emitToGuild(guildId, WsEvents.GuildMembersChanged, { guildId });
+    this.ws.emitToUsers([targetId], WsEvents.MeGuildsChanged, {});
     this.audit.log(
+      guildId,
       actorId,
       'user.ban',
       { type: 'user', id: targetId },
@@ -94,14 +108,15 @@ export class ModerationService {
     );
   }
 
-  async unban(actorId: string, targetId: string): Promise<void> {
-    const result = await this.prisma.ban.deleteMany({ where: { userId: targetId } });
+  async unban(guildId: string, actorId: string, targetId: string): Promise<void> {
+    const result = await this.prisma.ban.deleteMany({ where: { guildId, userId: targetId } });
     if (result.count === 0) throw new NotFoundException('Пользователь не забанен');
-    this.audit.log(actorId, 'user.unban', { type: 'user', id: targetId });
+    this.audit.log(guildId, actorId, 'user.unban', { type: 'user', id: targetId });
   }
 
-  async listBans(): Promise<BanDto[]> {
+  async listBans(guildId: string): Promise<BanDto[]> {
     const bans = await this.prisma.ban.findMany({
+      where: { guildId },
       orderBy: { createdAt: 'desc' },
       include: {
         user: { select: { username: true } },
@@ -117,14 +132,15 @@ export class ModerationService {
     }));
   }
 
-  /** Таймаут: не может писать и говорить до истечения срока */
+  /** Таймаут: не может писать и говорить до истечения срока (пока общий) */
   async timeout(
+    guildId: string,
     actorId: string,
     targetId: string,
     minutes: number,
     reason?: string,
   ): Promise<{ until: string }> {
-    await this.assertModeratable(actorId, targetId);
+    await this.assertModeratable(guildId, actorId, targetId);
 
     const until = new Date(Date.now() + minutes * 60_000);
     await this.prisma.user.update({
@@ -142,6 +158,7 @@ export class ModerationService {
 
     this.ws.emitToUsers([targetId], WsEvents.MeTimedOut, { until: until.toISOString() });
     this.audit.log(
+      guildId,
       actorId,
       'user.timeout',
       { type: 'user', id: targetId },
@@ -150,7 +167,7 @@ export class ModerationService {
     return { until: until.toISOString() };
   }
 
-  async clearTimeout(actorId: string, targetId: string): Promise<void> {
+  async clearTimeout(guildId: string, actorId: string, targetId: string): Promise<void> {
     await this.prisma.user.update({
       where: { id: targetId },
       data: { timedOutUntil: null },
@@ -163,6 +180,6 @@ export class ModerationService {
     }
 
     this.ws.emitToUsers([targetId], WsEvents.MeTimedOut, { until: null });
-    this.audit.log(actorId, 'user.timeout.clear', { type: 'user', id: targetId });
+    this.audit.log(guildId, actorId, 'user.timeout.clear', { type: 'user', id: targetId });
   }
 }

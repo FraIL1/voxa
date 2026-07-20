@@ -10,8 +10,9 @@ export class AuditService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Запись в журнал; сбой аудита не должен ронять само действие */
+  /** Запись в журнал сервера; сбой аудита не должен ронять само действие */
   log(
+    guildId: string | null,
     actorId: string | null,
     action: string,
     target?: { type: string; id: string },
@@ -20,6 +21,7 @@ export class AuditService {
     void this.prisma.auditLog
       .create({
         data: {
+          guildId,
           actorId,
           action,
           targetType: target?.type ?? null,
@@ -30,8 +32,9 @@ export class AuditService {
       .catch((error: Error) => this.logger.error(`Не удалось записать аудит: ${error.message}`));
   }
 
-  async list(query: AuditQueryInput): Promise<AuditPageDto> {
+  async list(guildId: string, query: AuditQueryInput): Promise<AuditPageDto> {
     const rows = await this.prisma.auditLog.findMany({
+      where: { guildId },
       orderBy: { id: 'desc' },
       take: query.limit + 1,
       ...(query.before ? { cursor: { id: BigInt(query.before) }, skip: 1 } : {}),

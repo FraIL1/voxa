@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { CreateInviteInput, InviteDto } from '@voxa/shared';
+import type { CreateInviteInput, InviteCheckDto, InviteDto } from '@voxa/shared';
 import type { Invite, Role, User } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
 
@@ -56,9 +56,10 @@ export class InvitesService {
     grantsRole: { select: { name: true } },
   } as const;
 
-  async create(creatorId: string, input: CreateInviteInput): Promise<InviteDto> {
+  async create(guildId: string, creatorId: string, input: CreateInviteInput): Promise<InviteDto> {
     const invite = await this.prisma.invite.create({
       data: {
+        guildId,
         code: generateInviteCode(),
         createdById: creatorId,
         maxUses: input.maxUses ?? null,
@@ -71,8 +72,9 @@ export class InvitesService {
     return this.toDto(invite);
   }
 
-  async list(): Promise<InviteDto[]> {
+  async list(guildId: string): Promise<InviteDto[]> {
     const invites = await this.prisma.invite.findMany({
+      where: { guildId },
       orderBy: { createdAt: 'desc' },
       include: this.includeRelations,
     });
@@ -90,14 +92,17 @@ export class InvitesService {
   }
 
   /** Публичная проверка кода перед регистрацией (страница инвайта) */
-  async check(code: string): Promise<{ valid: boolean }> {
-    const invite = await this.prisma.invite.findUnique({ where: { code } });
-    if (!invite) return { valid: false };
+  async check(code: string): Promise<InviteCheckDto> {
+    const invite = await this.prisma.invite.findUnique({
+      where: { code },
+      include: { guild: { select: { name: true } } },
+    });
+    if (!invite) return { valid: false, guildName: null };
     const now = new Date();
     const valid =
       invite.revokedAt === null &&
       (invite.expiresAt === null || invite.expiresAt > now) &&
       (invite.maxUses === null || invite.uses < invite.maxUses);
-    return { valid };
+    return { valid, guildName: valid ? invite.guild.name : null };
   }
 }

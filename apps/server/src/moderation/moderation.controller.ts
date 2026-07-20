@@ -23,37 +23,39 @@ import { RequirePermissions } from '../common/decorators/require-permissions.dec
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { ModerationService } from './moderation.service';
 
-@Controller('moderation')
+@Controller('guilds/:guildId')
 @Throttle({ default: { limit: 20, ttl: 60_000 } })
 export class ModerationController {
   constructor(private readonly moderation: ModerationService) {}
 
-  @Post('users/:id/kick')
+  @Post('members/:userId/kick')
   @HttpCode(204)
   @RequirePermissions(Permissions.KICK_MEMBERS)
   async kick(
     @CurrentUser() user: RequestUser,
-    @Param('id', ParseUUIDPipe) targetId: string,
+    @Param('guildId') guildId: string,
+    @Param('userId', ParseUUIDPipe) targetId: string,
     @Body(new ZodValidationPipe(moderationReasonSchema)) body: ModerationReasonInput,
   ): Promise<void> {
-    await this.moderation.kick(user.id, targetId, body.reason);
+    await this.moderation.kick(guildId, user.id, targetId, body.reason);
   }
 
-  @Post('users/:id/ban')
+  @Post('members/:userId/ban')
   @HttpCode(204)
   @RequirePermissions(Permissions.BAN_MEMBERS)
   async ban(
     @CurrentUser() user: RequestUser,
-    @Param('id', ParseUUIDPipe) targetId: string,
+    @Param('guildId') guildId: string,
+    @Param('userId', ParseUUIDPipe) targetId: string,
     @Body(new ZodValidationPipe(moderationReasonSchema)) body: ModerationReasonInput,
   ): Promise<void> {
-    await this.moderation.ban(user.id, targetId, body.reason);
+    await this.moderation.ban(guildId, user.id, targetId, body.reason);
   }
 
   @Get('bans')
   @RequirePermissions(Permissions.BAN_MEMBERS)
-  async bans(): Promise<BanDto[]> {
-    return this.moderation.listBans();
+  async bans(@Param('guildId') guildId: string): Promise<BanDto[]> {
+    return this.moderation.listBans(guildId);
   }
 
   @Delete('bans/:userId')
@@ -61,28 +63,31 @@ export class ModerationController {
   @RequirePermissions(Permissions.BAN_MEMBERS)
   async unban(
     @CurrentUser() user: RequestUser,
+    @Param('guildId') guildId: string,
     @Param('userId', ParseUUIDPipe) targetId: string,
   ): Promise<void> {
-    await this.moderation.unban(user.id, targetId);
+    await this.moderation.unban(guildId, user.id, targetId);
   }
 
-  @Post('users/:id/timeout')
+  @Post('members/:userId/timeout')
   @RequirePermissions(Permissions.MUTE_MEMBERS)
   async timeout(
     @CurrentUser() user: RequestUser,
-    @Param('id', ParseUUIDPipe) targetId: string,
+    @Param('guildId') guildId: string,
+    @Param('userId', ParseUUIDPipe) targetId: string,
     @Body(new ZodValidationPipe(timeoutSchema)) body: TimeoutInput,
   ): Promise<{ until: string }> {
-    return this.moderation.timeout(user.id, targetId, body.minutes, body.reason);
+    return this.moderation.timeout(guildId, user.id, targetId, body.minutes, body.reason);
   }
 
-  @Delete('users/:id/timeout')
+  @Delete('members/:userId/timeout')
   @HttpCode(204)
   @RequirePermissions(Permissions.MUTE_MEMBERS)
   async clearTimeout(
     @CurrentUser() user: RequestUser,
-    @Param('id', ParseUUIDPipe) targetId: string,
+    @Param('guildId') guildId: string,
+    @Param('userId', ParseUUIDPipe) targetId: string,
   ): Promise<void> {
-    await this.moderation.clearTimeout(user.id, targetId);
+    await this.moderation.clearTimeout(guildId, user.id, targetId);
   }
 }
