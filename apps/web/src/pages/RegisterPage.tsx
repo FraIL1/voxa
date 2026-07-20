@@ -1,11 +1,57 @@
-import { registerSchema } from '@voxa/shared';
+import { registerSchema, type InviteCheckDto } from '@voxa/shared';
+import { useQuery } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, Navigate, useParams } from 'react-router';
+import { Link, Navigate, useNavigate, useParams } from 'react-router';
 
 import { register } from '../api/auth';
-import { ApiError } from '../api/client';
+import { api, ApiError } from '../api/client';
+import { useJoinGuild } from '../hooks/useGuilds';
 import { useAuthStore } from '../stores/auth';
+
+/** Вошедший пользователь по ссылке-приглашению вступает на сервер */
+function JoinByInvite({ code }: { code: string }) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const joinGuild = useJoinGuild();
+  const [error, setError] = useState('');
+
+  const { data: check, isLoading } = useQuery({
+    queryKey: ['inviteCheck', code],
+    queryFn: () => api<InviteCheckDto>(`/invites/check/${code}`),
+  });
+
+  const join = (): void => {
+    joinGuild
+      .mutateAsync(code)
+      .then(({ guildId }) => navigate(`/guilds/${guildId}`, { replace: true }))
+      .catch((err: Error) => setError(err.message));
+  };
+
+  return (
+    <div className="auth-screen">
+      <div className="auth-card">
+        <h1>
+          <span className="brand">{t('app.name')}</span> — {t('guild.joinTitle')}
+        </h1>
+        {isLoading && <p>{t('app.loading')}</p>}
+        {check && !check.valid && <p className="auth-error">{t('guild.invalidInvite')}</p>}
+        {check?.valid && (
+          <>
+            <p>{t('guild.joinPrompt', { name: check.guildName })}</p>
+            <p className="auth-error">{error}</p>
+            <button className="btn-primary" disabled={joinGuild.isPending} onClick={join}>
+              {t('guild.joinButton')}
+            </button>
+          </>
+        )}
+        <p className="auth-switch">
+          <Link to="/home">{t('guild.backHome')}</Link>
+        </p>
+      </div>
+    </div>
+  );
+}
 
 export default function RegisterPage() {
   const { t } = useTranslation();
@@ -18,7 +64,11 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
-  if (status === 'authed') return <Navigate to="/" replace />;
+  if (status === 'authed') {
+    // Ссылка-приглашение для уже вошедшего — предложение вступить на сервер
+    if (code) return <JoinByInvite code={code} />;
+    return <Navigate to="/" replace />;
+  }
 
   const onSubmit = async (e: FormEvent): Promise<void> => {
     e.preventDefault();

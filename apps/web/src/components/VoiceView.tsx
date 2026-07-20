@@ -143,7 +143,7 @@ export default function VoiceView({ channel }: { channel: ChannelDto }) {
           <button
             className="btn-primary"
             disabled={voice.connecting}
-            onClick={() => void voice.join(channel.id)}
+            onClick={() => void voice.join(channel.id, channel.name)}
           >
             {voice.connecting ? t('voice.connecting') : t('voice.join')}
           </button>

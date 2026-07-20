@@ -8,10 +8,12 @@ import {
 import { LogOut, X } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useParams } from 'react-router';
 
 import { logout } from '../api/auth';
 import { api, ApiError } from '../api/client';
 import { getAutostart, isTauri, setAutostart } from '../lib/tauri';
+import { useMyGuildPermissions } from '../hooks/useGuilds';
 import { useAuthStore } from '../stores/auth';
 import AudioDeviceSelects from './AudioDeviceSelects';
 import CommunityTab from './CommunityTab';
@@ -62,7 +64,8 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const [passwordError, setPasswordError] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const mask = user?.permissions ?? 0;
+  const { guildId } = useParams<{ guildId: string }>();
+  const mask = useMyGuildPermissions(guildId);
   const showCommunity =
     hasPermission(mask, Permissions.CREATE_INVITES) ||
     hasPermission(mask, Permissions.BAN_MEMBERS) ||

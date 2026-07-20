@@ -37,9 +37,10 @@ const router = createBrowserRouter([
         ],
       },
       {
+        path: 'guilds/:guildId',
         Component: ServerLayout,
         children: [
-          { path: 'channels', Component: ChannelRedirect },
+          { index: true, Component: ChannelRedirect },
           { path: 'channels/:channelId', Component: ChannelView },
         ],
       },

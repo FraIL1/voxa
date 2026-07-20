@@ -3,11 +3,12 @@ import type { ChannelDto, CommunityStructureDto } from '@voxa/shared';
 
 import { api } from '../api/client';
 
-export function useStructure() {
+export function useStructure(guildId: string | undefined) {
   return useQuery({
-    queryKey: ['structure'],
-    queryFn: () => api<CommunityStructureDto>('/channels'),
+    queryKey: ['structure', guildId],
+    queryFn: () => api<CommunityStructureDto>(`/guilds/${guildId}/structure`),
     staleTime: 60_000,
+    enabled: Boolean(guildId),
   });
 }
 

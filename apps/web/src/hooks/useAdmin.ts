@@ -9,48 +9,49 @@ import type {
 
 import { api } from '../api/client';
 
-const INVITES_KEY = ['invites'] as const;
-const BANS_KEY = ['bans'] as const;
+const invitesKey = (guildId: string | undefined) => ['invites', guildId] as const;
+const bansKey = (guildId: string | undefined) => ['bans', guildId] as const;
 
-export function useInvites(enabled: boolean) {
+export function useInvites(guildId: string | undefined, enabled: boolean) {
   return useQuery({
-    queryKey: INVITES_KEY,
-    queryFn: () => api<InviteDto[]>('/invites'),
-    enabled,
+    queryKey: invitesKey(guildId),
+    queryFn: () => api<InviteDto[]>(`/guilds/${guildId}/invites`),
+    enabled: enabled && Boolean(guildId),
   });
 }
 
-export function useCreateInvite() {
+export function useCreateInvite(guildId: string | undefined) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateInviteInput) =>
-      api<InviteDto>('/invites', { method: 'POST', body: input }),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: INVITES_KEY }),
+      api<InviteDto>(`/guilds/${guildId}/invites`, { method: 'POST', body: input }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: invitesKey(guildId) }),
   });
 }
 
-export function useRevokeInvite() {
+export function useRevokeInvite(guildId: string | undefined) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api<void>(`/invites/${id}`, { method: 'DELETE' }),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: INVITES_KEY }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: invitesKey(guildId) }),
   });
 }
 
-export function useBans(enabled: boolean) {
+export function useBans(guildId: string | undefined, enabled: boolean) {
   return useQuery({
-    queryKey: BANS_KEY,
-    queryFn: () => api<BanDto[]>('/moderation/bans'),
-    enabled,
+    queryKey: bansKey(guildId),
+    queryFn: () => api<BanDto[]>(`/guilds/${guildId}/bans`),
+    enabled: enabled && Boolean(guildId),
   });
 }
 
-export function useUnban() {
+export function useUnban(guildId: string | undefined) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (userId: string) => api<void>(`/moderation/bans/${userId}`, { method: 'DELETE' }),
+    mutationFn: (userId: string) =>
+      api<void>(`/guilds/${guildId}/bans/${userId}`, { method: 'DELETE' }),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: BANS_KEY });
+      void queryClient.invalidateQueries({ queryKey: bansKey(guildId) });
       // Флаг banned в списке участников тоже должен обновиться
       void queryClient.invalidateQueries({ queryKey: ['members'] });
     },
@@ -66,14 +67,16 @@ export function useAdminOverview(enabled: boolean) {
   });
 }
 
-export function useAudit(enabled: boolean) {
+export function useAudit(guildId: string | undefined, enabled: boolean) {
   return useInfiniteQuery({
-    queryKey: ['audit'],
+    queryKey: ['audit', guildId],
     queryFn: ({ pageParam }) =>
-      api<AuditPageDto>(`/admin/audit?limit=50${pageParam ? `&before=${pageParam}` : ''}`),
+      api<AuditPageDto>(
+        `/guilds/${guildId}/audit?limit=50${pageParam ? `&before=${pageParam}` : ''}`,
+      ),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) =>
       lastPage.hasMore ? lastPage.items[lastPage.items.length - 1]?.id : undefined,
-    enabled,
+    enabled: enabled && Boolean(guildId),
   });
 }

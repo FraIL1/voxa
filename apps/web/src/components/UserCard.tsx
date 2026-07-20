@@ -2,7 +2,6 @@ import { Headphones, HeadphoneOff, Mic, MicOff, PhoneOff, Settings, Volume2 } fr
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { allChannelsOf, useStructure } from '../hooks/useStructure';
 import { useAuthStore } from '../stores/auth';
 import { useVoiceStore } from '../stores/voice';
 import SettingsModal from './SettingsModal';
@@ -13,12 +12,9 @@ export default function UserCard() {
   const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const voice = useVoiceStore();
-  const { data: structure } = useStructure();
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  const voiceChannelName = voice.channelId
-    ? (allChannelsOf(structure).find((c) => c.id === voice.channelId)?.name ?? '')
-    : null;
+  const voiceChannelName = voice.channelId ? (voice.channelName ?? '') : null;
 
   return (
     <>

@@ -2,8 +2,9 @@ import type { ChannelDto, ReadStateDto, VoiceParticipantDto } from '@voxa/shared
 import { Hash, HeadphoneOff, MicOff, Volume2 } from 'lucide-react';
 import { useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { NavLink, useNavigate } from 'react-router';
+import { NavLink, useNavigate, useParams } from 'react-router';
 
+import { useGuild } from '../hooks/useGuilds';
 import { useMembers } from '../hooks/useMembers';
 import { useReadStates } from '../hooks/useReadStates';
 import { useStructure } from '../hooks/useStructure';
@@ -66,8 +67,8 @@ function ChannelItem({
           className={`channel-link voice-link${myVoiceChannel === channel.id ? ' active' : ''}`}
           title={t('voice.join')}
           onClick={() => {
-            void navigate(`/channels/${channel.id}`);
-            void join(channel.id).catch(() => undefined);
+            void navigate(`/guilds/${channel.guildId}/channels/${channel.id}`);
+            void join(channel.id, channel.name).catch(() => undefined);
           }}
         >
           <Volume2 size={16} />
@@ -86,7 +87,7 @@ function ChannelItem({
 
   return (
     <NavLink
-      to={`/channels/${channel.id}`}
+      to={`/guilds/${channel.guildId}/channels/${channel.id}`}
       className={({ isActive }) =>
         `channel-link${isActive ? ' active' : ''}${unread ? ' unread' : ''}`
       }
@@ -104,11 +105,13 @@ function ChannelItem({
 
 export default function Sidebar() {
   const { t } = useTranslation();
-  const { data: structure } = useStructure();
+  const { guildId } = useParams<{ guildId: string }>();
+  const guild = useGuild(guildId);
+  const { data: structure } = useStructure(guildId);
   const { data: readStates } = useReadStates();
   const { data: voiceStates } = useVoiceStates();
   const user = useAuthStore((s) => s.user);
-  const { data: members } = useMembers();
+  const { data: members } = useMembers(guildId);
   const [memberMenu, setMemberMenu] = useState<MenuState | null>(null);
 
   const openVoiceMemberMenu = (e: ReactMouseEvent, userId: string, username: string): void => {
@@ -140,7 +143,7 @@ export default function Sidebar() {
 
   return (
     <nav className="sidebar">
-      <div className="sidebar-header">{t('app.communityName')}</div>
+      <div className="sidebar-header">{guild?.name ?? t('app.communityName')}</div>
 
       <div className="channel-tree">
         {structure?.categories.map((category) => (

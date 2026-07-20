@@ -2,10 +2,12 @@ import { hasPermission, Permissions } from '@voxa/shared';
 import { CornerUpLeft, Pencil, SmilePlus, Trash2 } from 'lucide-react';
 import { useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useParams } from 'react-router';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 import type { ChatMessage } from '../api/messages-cache';
+import { useMyGuildPermissions } from '../hooks/useGuilds';
 import { useDeleteMessage, useEditMessage, useToggleReaction } from '../hooks/useMessages';
 import { rehypeMentions } from '../lib/rehype-mentions';
 import { useAuthStore } from '../stores/auth';
@@ -48,6 +50,8 @@ function aggregateReactions(message: ChatMessage, myId: string | undefined): Agg
 export default function Message({ message }: { message: ChatMessage }) {
   const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
+  const { guildId } = useParams<{ guildId: string }>();
+  const guildMask = useMyGuildPermissions(guildId);
   const setReplyTo = useChatStore((s) => s.setReplyTo);
 
   const editMessage = useEditMessage(message.channelId);
@@ -61,8 +65,7 @@ export default function Message({ message }: { message: ChatMessage }) {
   const authorName = message.author?.username ?? t('chat.unknownUser');
   const isOwn = Boolean(user && message.author?.id === user.id);
   const canDelete =
-    !message.pending &&
-    (isOwn || Boolean(user && hasPermission(user.permissions, Permissions.DELETE_MESSAGES)));
+    !message.pending && (isOwn || hasPermission(guildMask, Permissions.DELETE_MESSAGES));
   const canAct = !message.pending;
   const reactions = aggregateReactions(message, user?.id);
 

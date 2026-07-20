@@ -1767,3 +1767,40 @@ a {
   font-size: 13px;
   margin-top: 8px;
 }
+
+/* ---------- Модалка «Добавить сервер» ---------- */
+
+.add-server-modal {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 22px;
+  width: min(420px, 92vw);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.add-server-modal h2 {
+  font-size: 18px;
+}
+
+.add-server-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.add-server-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

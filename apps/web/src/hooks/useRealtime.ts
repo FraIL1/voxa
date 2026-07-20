@@ -35,6 +35,7 @@ import { connectSocket, disconnectSocket, emitVoiceState } from '../api/socket';
 import { notify } from '../lib/notify';
 import { playJoinSound, playLeaveSound } from '../lib/sounds';
 import { BLOCKED_KEY, FRIEND_REQUESTS_KEY, FRIENDS_KEY } from './useFriends';
+import { GUILDS_KEY } from './useGuilds';
 import { MEMBERS_KEY } from './useMembers';
 import { VOICE_STATES_KEY } from './useVoiceStates';
 import { useAuthStore } from '../stores/auth';
@@ -136,7 +137,7 @@ export function useRealtime(): void {
 
     // Смена профиля: список участников, авторы сообщений, своя сессия в других вкладках
     socket.on(WsEvents.UserUpdated, (u: UserPublicDto) => {
-      queryClient.setQueryData<MemberDto[]>(MEMBERS_KEY, (members) =>
+      queryClient.setQueriesData<MemberDto[]>({ queryKey: MEMBERS_KEY }, (members) =>
         members?.map((m) =>
           m.id === u.id ? { ...m, username: u.username, avatarUrl: u.avatarUrl } : m,
         ),
@@ -166,6 +167,14 @@ export function useRealtime(): void {
     socket.on(WsEvents.CategoryCreated, invalidateStructure);
     socket.on(WsEvents.CategoryUpdated, invalidateStructure);
     socket.on(WsEvents.CategoryDeleted, invalidateStructure);
+
+    socket.on(WsEvents.GuildMembersChanged, ({ guildId }: { guildId: string }) => {
+      void queryClient.invalidateQueries({ queryKey: ['members', guildId] });
+    });
+    socket.on(WsEvents.MeGuildsChanged, () => {
+      void queryClient.invalidateQueries({ queryKey: GUILDS_KEY });
+      void queryClient.invalidateQueries({ queryKey: ['structure'] });
+    });
 
     socket.on('auth_error', () => {
       void refreshSession();

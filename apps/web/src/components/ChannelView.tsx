@@ -10,8 +10,8 @@ import VoiceView from './VoiceView';
 
 export default function ChannelView() {
   const { t } = useTranslation();
-  const { channelId } = useParams<{ channelId: string }>();
-  const { data: structure, isLoading } = useStructure();
+  const { guildId, channelId } = useParams<{ guildId: string; channelId: string }>();
+  const { data: structure, isLoading } = useStructure(guildId);
 
   if (!channelId) return <Navigate to="/" replace />;
   if (isLoading) return <div className="empty-state">{t('app.loading')}</div>;

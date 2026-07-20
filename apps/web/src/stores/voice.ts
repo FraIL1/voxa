@@ -43,6 +43,8 @@ function saveJson(key: string, value: unknown): void {
 
 interface VoiceState {
   channelId: string | null;
+  /** Имя канала на момент входа (для панели вне контекста сервера) */
+  channelName: string | null;
   connecting: boolean;
   muted: boolean;
   deafened: boolean;
@@ -62,7 +64,7 @@ interface VoiceState {
   /** Чей экран смотрим */
   watching: string | null;
 
-  join: (channelId: string) => Promise<void>;
+  join: (channelId: string, channelName?: string) => Promise<void>;
   /** Принудительный мут при таймауте */
   forceMuteLocal: () => Promise<void>;
   leave: () => Promise<void>;
@@ -114,6 +116,7 @@ const savedDevices = loadJson<SavedDevices>(DEVICES_KEY, { micId: null, outputId
 
 export const useVoiceStore = create<VoiceState>()((set, get) => ({
   channelId: null,
+  channelName: null,
   connecting: false,
   muted: false,
   deafened: false,
@@ -126,12 +129,12 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
   screenSharers: [],
   watching: null,
 
-  join: async (channelId) => {
+  join: async (channelId, channelName) => {
     const state = get();
     if (state.channelId === channelId || state.connecting) return;
     if (room) await get().leave();
 
-    set({ connecting: true, channelId, error: null });
+    set({ connecting: true, channelId, channelName: channelName ?? null, error: null });
     try {
       const grant = await api<VoiceTokenDto>(`/channels/${channelId}/voice-token`, {
         method: 'POST',
@@ -205,6 +208,7 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
           cleanupRoom();
           set({
             channelId: null,
+            channelName: null,
             connecting: false,
             speaking: {},
             sharing: false,
@@ -225,6 +229,7 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
       cleanupRoom();
       set({
         channelId: null,
+        channelName: null,
         connecting: false,
         error: error instanceof Error ? error.message : String(error),
       });
@@ -241,6 +246,7 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
     localScreenTrack = null;
     set({
       channelId: null,
+      channelName: null,
       connecting: false,
       speaking: {},
       muted: false,

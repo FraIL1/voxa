@@ -2,6 +2,7 @@ import { hasPermission, Permissions } from '@voxa/shared';
 import { Check, Copy, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useParams } from 'react-router';
 
 import {
   useAdminOverview,
@@ -12,7 +13,7 @@ import {
   useRevokeInvite,
   useUnban,
 } from '../hooks/useAdmin';
-import { useAuthStore } from '../stores/auth';
+import { useMyGuildPermissions } from '../hooks/useGuilds';
 
 const timeFormat = new Intl.DateTimeFormat('ru', {
   day: '2-digit',
@@ -49,9 +50,10 @@ function Overview() {
 
 function Invites() {
   const { t } = useTranslation();
-  const { data: invites } = useInvites(true);
-  const createInvite = useCreateInvite();
-  const revokeInvite = useRevokeInvite();
+  const { guildId } = useParams<{ guildId: string }>();
+  const { data: invites } = useInvites(guildId, true);
+  const createInvite = useCreateInvite(guildId);
+  const revokeInvite = useRevokeInvite(guildId);
   const [maxUses, setMaxUses] = useState('');
   const [expires, setExpires] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -125,8 +127,9 @@ function Invites() {
 
 function Bans() {
   const { t } = useTranslation();
-  const { data: bans } = useBans(true);
-  const unban = useUnban();
+  const { guildId } = useParams<{ guildId: string }>();
+  const { data: bans } = useBans(guildId, true);
+  const unban = useUnban(guildId);
 
   if (!bans || bans.length === 0) {
     return <p className="settings-hint">{t('community.noBans')}</p>;
@@ -151,7 +154,8 @@ function Bans() {
 
 function Audit() {
   const { t } = useTranslation();
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useAudit(true);
+  const { guildId } = useParams<{ guildId: string }>();
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useAudit(guildId, true);
   const items = data?.pages.flatMap((p) => p.items) ?? [];
 
   return (
@@ -177,10 +181,11 @@ function Audit() {
   );
 }
 
-/** Вкладка «Сообщество»: секции по правам текущего пользователя */
+/** Вкладка «Сервер»: секции по правам текущего пользователя на нём */
 export default function CommunityTab() {
   const { t } = useTranslation();
-  const mask = useAuthStore((s) => s.user?.permissions ?? 0);
+  const { guildId } = useParams<{ guildId: string }>();
+  const mask = useMyGuildPermissions(guildId);
 
   const isAdmin = hasPermission(mask, Permissions.ADMINISTRATOR);
   const canInvite = hasPermission(mask, Permissions.CREATE_INVITES);

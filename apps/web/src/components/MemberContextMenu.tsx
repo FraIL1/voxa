@@ -1,13 +1,13 @@
 import { hasPermission, Permissions, type MemberDto } from '@voxa/shared';
 import { Clock, MessageSquare, ShieldBan, ShieldCheck, UserX } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router';
+import { useNavigate, useParams } from 'react-router';
 
 import { ApiError } from '../api/client';
 import { useUnban } from '../hooks/useAdmin';
 import { useOpenDm } from '../hooks/useDm';
+import { useMyGuildPermissions } from '../hooks/useGuilds';
 import { useModeration } from '../hooks/useModeration';
-import { useAuthStore } from '../stores/auth';
 
 export interface MenuState {
   x: number;
@@ -25,12 +25,12 @@ export default function MemberContextMenu({
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const me = useAuthStore((s) => s.user);
+  const { guildId } = useParams<{ guildId: string }>();
   const { kick, ban, timeout, clearTimeout } = useModeration();
-  const unban = useUnban();
+  const unban = useUnban(guildId);
   const openDm = useOpenDm();
 
-  const mask = me?.permissions ?? 0;
+  const mask = useMyGuildPermissions(guildId);
   const canMute = hasPermission(mask, Permissions.MUTE_MEMBERS);
   const canKick = hasPermission(mask, Permissions.KICK_MEMBERS);
   const canBan = hasPermission(mask, Permissions.BAN_MEMBERS);
