@@ -865,4 +865,136 @@ describe('Voxa: критический поток (e2e)', () => {
 
     memberSocket.disconnect();
   });
+
+  it('друзья: заявка с доставкой по WS, принятие, блокировка закрывает ЛС', async () => {
+    const ownerMe = await request(httpServer)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${ownerAccess}`);
+    const memberMe = await request(httpServer)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${memberAccess}`);
+    const ownerId = (ownerMe.body as MeDto).id;
+    const memberId = (memberMe.body as MeDto).id;
+
+    // Участник слушает адресное событие о новой заявке
+    const memberSocket = io(baseUrl, { auth: { token: memberAccess }, transports: ['websocket'] });
+    await new Promise((resolve, reject) => {
+      memberSocket.once(WsEvents.Ready, resolve);
+      memberSocket.once('auth_error', () => reject(new Error('WS-авторизация не прошла')));
+    });
+    const requestArrived = new Promise<{ direction: string; user: { username: string } }>(
+      (resolve) => {
+        memberSocket.once(WsEvents.FriendRequestNew, resolve);
+      },
+    );
+
+    // Владелец отправляет заявку по имени (регистр не важен)
+    const sent = await request(httpServer)
+      .post('/api/friends/requests')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ username: MEMBER.username.toUpperCase() })
+      .expect(201);
+    expect(sent.body.autoAccepted).toBe(false);
+
+    const wsRequest = await requestArrived;
+    expect(wsRequest.direction).toBe('incoming');
+    expect(wsRequest.user.username).toBe(OWNER.username);
+    memberSocket.disconnect();
+
+    // Повторная заявка — 400; самому себе — 400
+    await request(httpServer)
+      .post('/api/friends/requests')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ username: MEMBER.username })
+      .expect(400);
+    await request(httpServer)
+      .post('/api/friends/requests')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ username: OWNER.username })
+      .expect(400);
+
+    // У участника входящая заявка — принимает
+    const requests = await request(httpServer)
+      .get('/api/friends/requests')
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(200);
+    const incoming = (
+      requests.body as { id: string; direction: string; user: { id: string } }[]
+    ).find((r) => r.direction === 'incoming' && r.user.id === ownerId);
+    expect(incoming).toBeDefined();
+    await request(httpServer)
+      .post(`/api/friends/requests/${incoming!.id}/accept`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(200);
+
+    // Оба видят друг друга в друзьях
+    const ownerFriends = await request(httpServer)
+      .get('/api/friends')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    expect((ownerFriends.body as { id: string }[]).some((f) => f.id === memberId)).toBe(true);
+
+    // Участник блокирует владельца: дружба исчезает, ЛС закрыты в обе стороны
+    const conversation = await request(httpServer)
+      .post('/api/dm/conversations')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ userId: memberId })
+      .expect(201);
+    await request(httpServer)
+      .put(`/api/friends/blocked/${ownerId}`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(204);
+
+    const afterBlock = await request(httpServer)
+      .get('/api/friends')
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(200);
+    expect((afterBlock.body as { id: string }[]).some((f) => f.id === ownerId)).toBe(false);
+
+    await request(httpServer)
+      .post(`/api/dm/conversations/${conversation.body.id}/messages`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ content: 'не дойдёт' })
+      .expect(403);
+    await request(httpServer)
+      .post('/api/friends/requests')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ username: MEMBER.username })
+      .expect(403);
+
+    // Разблокировка возвращает возможность писать
+    await request(httpServer)
+      .delete(`/api/friends/blocked/${ownerId}`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(204);
+    await request(httpServer)
+      .post(`/api/dm/conversations/${conversation.body.id}/messages`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ content: 'снова на связи' })
+      .expect(201);
+
+    // Встречная заявка сразу становится дружбой
+    await request(httpServer)
+      .post('/api/friends/requests')
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ username: OWNER.username })
+      .expect(201);
+    const counter = await request(httpServer)
+      .post('/api/friends/requests')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ username: MEMBER.username })
+      .expect(201);
+    expect(counter.body.autoAccepted).toBe(true);
+
+    // Удаление из друзей
+    await request(httpServer)
+      .delete(`/api/friends/${memberId}`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(204);
+    const finalFriends = await request(httpServer)
+      .get('/api/friends')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    expect((finalFriends.body as { id: string }[]).some((f) => f.id === memberId)).toBe(false);
+  });
 });
