@@ -3,6 +3,8 @@ import {
   WsEvents,
   type DmConversationDto,
   type DmMessageDto,
+  type FriendDto,
+  type FriendRequestDto,
   type MemberDto,
   type MessageDto,
   type PresenceUpdatePayload,
@@ -32,6 +34,7 @@ import { bumpUnread, setReadState } from '../api/read-states-cache';
 import { connectSocket, disconnectSocket, emitVoiceState } from '../api/socket';
 import { notify } from '../lib/notify';
 import { playJoinSound, playLeaveSound } from '../lib/sounds';
+import { BLOCKED_KEY, FRIEND_REQUESTS_KEY, FRIENDS_KEY } from './useFriends';
 import { MEMBERS_KEY } from './useMembers';
 import { VOICE_STATES_KEY } from './useVoiceStates';
 import { useAuthStore } from '../stores/auth';
@@ -126,6 +129,9 @@ export function useRealtime(): void {
       queryClient.setQueryData<MemberDto[]>(MEMBERS_KEY, (members) =>
         members?.map((m) => (m.id === p.userId ? { ...m, status: p.status } : m)),
       );
+      queryClient.setQueryData<FriendDto[]>(FRIENDS_KEY, (friends) =>
+        friends?.map((f) => (f.id === p.userId ? { ...f, status: p.status } : f)),
+      );
     });
 
     // Смена профиля: список участников, авторы сообщений, своя сессия в других вкладках
@@ -199,6 +205,18 @@ export function useRealtime(): void {
           (a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime(),
         );
       });
+    });
+
+    // Друзья: новая заявка — уведомление; любое изменение — перечитать списки
+    socket.on(WsEvents.FriendRequestNew, (request: FriendRequestDto) => {
+      if (document.hidden) {
+        void notify('Voxa', `${request.user.username}: заявка в друзья`);
+      }
+    });
+    socket.on(WsEvents.FriendsUpdated, () => {
+      void queryClient.invalidateQueries({ queryKey: FRIENDS_KEY });
+      void queryClient.invalidateQueries({ queryKey: FRIEND_REQUESTS_KEY });
+      void queryClient.invalidateQueries({ queryKey: BLOCKED_KEY });
     });
 
     // Таймаут выдан или снят

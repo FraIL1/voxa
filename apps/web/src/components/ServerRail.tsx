@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { NavLink, useLocation, useNavigate } from 'react-router';
 
 import { useDmConversations } from '../hooks/useDm';
+import { useFriendRequests } from '../hooks/useFriends';
 
 /** Левый столбец иконок (как в Discord): Дом (личка+друзья) + серверы.
  *  Пока сервер один — иконка сообщества. Создание серверов появится позже. */
@@ -11,9 +12,12 @@ export default function ServerRail() {
   const navigate = useNavigate();
   const location = useLocation();
   const { data: conversations } = useDmConversations();
+  const { data: requests } = useFriendRequests();
 
   const homeActive = location.pathname.startsWith('/home') || location.pathname.startsWith('/dm');
-  const totalUnread = (conversations ?? []).reduce((sum, c) => sum + c.unreadCount, 0);
+  const dmUnread = (conversations ?? []).reduce((sum, c) => sum + c.unreadCount, 0);
+  const incomingRequests = (requests ?? []).filter((r) => r.direction === 'incoming').length;
+  const totalUnread = dmUnread + incomingRequests;
 
   return (
     <nav className="server-rail">

@@ -11,6 +11,7 @@
   --accent-hover: #ff8f63;
   --accent-text: #1a1d24;
   --danger: #f0564f;
+  --success: #2fb36b;
   --radius: 8px;
   --transition: 150ms ease;
   --sidebar-width: 240px;
@@ -195,7 +196,7 @@ a {
 
 .rail-icon.add {
   background: var(--panel);
-  color: #43b581;
+  color: var(--success);
 }
 
 .rail-icon.add:disabled {
@@ -474,7 +475,7 @@ a {
 }
 
 .voice-participant.speaking .voice-participant-avatar {
-  border-color: #43b581;
+  border-color: var(--success);
 }
 
 .voice-participant-name {
@@ -491,7 +492,7 @@ a {
   gap: 8px;
   border-top: 1px solid var(--border);
   padding: 8px 12px;
-  color: #43b581;
+  color: var(--success);
   font-size: 13px;
   font-weight: 600;
 }
@@ -1137,8 +1138,8 @@ a {
 }
 
 .voice-tile.speaking {
-  border-color: #43b581;
-  box-shadow: 0 0 0 1px #43b581;
+  border-color: var(--success);
+  box-shadow: 0 0 0 1px var(--success);
 }
 
 .voice-avatar {
@@ -1178,7 +1179,7 @@ a {
 }
 
 .voice-control.sharing {
-  color: #43b581;
+  color: var(--success);
 }
 
 /* Область просмотра демонстрации экрана */
@@ -1214,7 +1215,7 @@ a {
 }
 
 .screen-tab.own {
-  color: #43b581;
+  color: var(--success);
   padding: 4px 10px;
   font-size: 13px;
 }
@@ -1624,7 +1625,7 @@ a {
 }
 
 .settings-ok {
-  color: #43b581;
+  color: var(--success);
   font-size: 13px;
   min-height: 18px;
   margin: 0;
@@ -1694,7 +1695,7 @@ a {
 }
 
 .status-dot.online {
-  background: #43b581;
+  background: var(--success);
 }
 
 .status-dot.offline {
@@ -1717,4 +1718,52 @@ a {
   color: var(--text-faint);
   text-align: center;
   padding: 24px;
+}
+
+/* Вкладки друзей: бейдж заявок и акцент «Добавить в друзья» */
+.friends-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.friends-tab.add-friend {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.friends-tab.add-friend.active {
+  background: var(--success);
+  color: #ffffff;
+}
+
+.icon-button.success:hover {
+  color: var(--success);
+}
+
+.friends-add {
+  max-width: 480px;
+  padding: 8px 4px;
+}
+
+.friends-add-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.friends-add-form input {
+  flex: 1;
+}
+
+.friends-add-ok {
+  color: var(--success);
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+.friends-add-error {
+  color: var(--danger);
+  font-size: 13px;
+  margin-top: 8px;
 }
