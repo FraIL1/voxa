@@ -9,6 +9,7 @@ import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { ChannelsModule } from './channels/channels.module';
 import { DmModule } from './dm/dm.module';
+import { FriendsModule } from './friends/friends.module';
 import { ModerationModule } from './moderation/moderation.module';
 import { FilesModule } from './files/files.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -54,6 +55,7 @@ import { WsModule } from './ws/ws.module';
     ModerationModule,
     AdminModule,
     DmModule,
+    FriendsModule,
     WsModule,
     SeedModule,
   ],

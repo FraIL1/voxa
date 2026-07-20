@@ -3,6 +3,7 @@ import type {
   ChannelDto,
   DmConversationDto,
   DmMessageDto,
+  FriendRequestDto,
   MessageDto,
   PresenceStatus,
   UserPublicDto,
@@ -42,6 +43,10 @@ export const WsEvents = {
   DmMessageDeleted: 'dm.message.delete',
   /** Диалог создан/поднялся в списке (обновить превью и порядок) */
   DmConversationUpdated: 'dm.conversation.updated',
+  /** Адресное: пришла новая заявка в друзья */
+  FriendRequestNew: 'friend.request.new',
+  /** Адресное: состав друзей/заявок/блокировок изменился — перечитать списки */
+  FriendsUpdated: 'friends.updated',
 } as const;
 
 export type WsEventName = (typeof WsEvents)[keyof typeof WsEvents];
@@ -106,4 +111,9 @@ export interface WsServerEvents {
   [WsEvents.DmMessageEdited]: DmMessageDto;
   [WsEvents.DmMessageDeleted]: { id: string; conversationId: string };
   [WsEvents.DmConversationUpdated]: DmConversationDto;
+  [WsEvents.FriendRequestNew]: FriendRequestDto;
+  [WsEvents.FriendsUpdated]: { reason: FriendsUpdateReason };
 }
+
+export type FriendsUpdateReason =
+  'request' | 'accepted' | 'declined' | 'removed' | 'blocked' | 'unblocked';

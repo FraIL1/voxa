@@ -16,6 +16,7 @@ import {
 } from '@voxa/shared';
 
 import { FilesService } from '../files/files.service';
+import { FriendsService } from '../friends/friends.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { WsGateway } from '../ws/ws.gateway';
 
@@ -45,6 +46,7 @@ export class DmService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly files: FilesService,
+    private readonly friends: FriendsService,
     private readonly ws: WsGateway,
   ) {}
 
@@ -104,6 +106,7 @@ export class DmService {
     if (meId === peerId) throw new BadRequestException('Нельзя написать самому себе');
     const peer = await this.prisma.user.findUnique({ where: { id: peerId }, select: { id: true } });
     if (!peer) throw new NotFoundException('Пользователь не найден');
+    await this.friends.assertNotBlocked(meId, peerId);
 
     const [userAId, userBId] = this.orderPair(meId, peerId);
     const conversation = await this.prisma.dmConversation.upsert({
@@ -221,6 +224,7 @@ export class DmService {
 
   async send(meId: string, conversationId: string, input: SendDmInput): Promise<DmMessageDto> {
     const conversation = await this.assertParticipant(conversationId, meId);
+    await this.friends.assertNotBlocked(meId, this.peerIdOf(conversation, meId));
 
     if (input.replyToId) {
       const target = await this.prisma.dmMessage.findFirst({

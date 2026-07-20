@@ -193,3 +193,7 @@ export const editDmSchema = z.object({
     .refine((s) => s.trim().length > 0, 'Сообщение не может быть пустым'),
 });
 export type EditDmInput = z.infer<typeof editDmSchema>;
+
+/** Заявка в друзья по имени пользователя */
+export const sendFriendRequestSchema = z.object({ username: usernameSchema });
+export type SendFriendRequestInput = z.infer<typeof sendFriendRequestSchema>;

@@ -247,3 +247,26 @@ export interface DmConversationDto {
   unreadCount: number;
   lastMessageAt: string;
 }
+
+/** Друг (принятая дружба) со статусом присутствия */
+export interface FriendDto extends UserPublicDto {
+  status: PresenceStatus;
+}
+
+/** Заявка в друзья глазами запрашивающего пользователя */
+export interface FriendRequestDto {
+  id: string;
+  direction: 'incoming' | 'outgoing';
+  user: UserPublicDto;
+  createdAt: string;
+}
+
+/** Результат отправки заявки: могла сразу стать дружбой (встречная заявка) */
+export interface SendFriendRequestResultDto {
+  requestId: string;
+  autoAccepted: boolean;
+}
+
+export interface BlockedUserDto extends UserPublicDto {
+  blockedAt: string;
+}
