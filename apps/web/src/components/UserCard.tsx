@@ -43,9 +43,9 @@ export default function UserCard() {
           onClick={() => setSettingsOpen(true)}
         >
           <div className="avatar" aria-hidden>
-            {user?.username.slice(0, 1).toUpperCase()}
+            {(user?.displayName ?? user?.username ?? '?').slice(0, 1).toUpperCase()}
           </div>
-          <span className="username">{user?.username}</span>
+          <span className="username">{user?.displayName ?? user?.username}</span>
         </button>
         <button
           className={`icon-button${voice.muted ? ' engaged' : ''}`}

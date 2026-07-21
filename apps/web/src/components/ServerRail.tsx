@@ -43,7 +43,11 @@ export default function ServerRail() {
           className={({ isActive }) => `rail-icon server${isActive ? ' active' : ''}`}
           title={guild.name}
         >
-          {guild.name.slice(0, 1).toUpperCase()}
+          {guild.iconUrl ? (
+            <img className="rail-icon-img" src={guild.iconUrl} alt="" />
+          ) : (
+            guild.name.slice(0, 1).toUpperCase()
+          )}
         </NavLink>
       ))}
 

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   ChannelType,
   CreateRoleInput,
+  GuildDto,
   RoleDto,
   UpdateGuildInput,
   UpdateRoleInput,
@@ -26,8 +27,12 @@ export function useUpdateGuild(guildId: string | undefined) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: UpdateGuildInput) =>
-      api(`/guilds/${guildId}`, { method: 'PATCH', body: input }),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: GUILDS_KEY }),
+      api<GuildDto>(`/guilds/${guildId}`, { method: 'PATCH', body: input }),
+    // Мгновенно обновляем кэш возвращённым сервером (иконка/имя видны сразу)
+    onSuccess: (updated) =>
+      queryClient.setQueryData<GuildDto[]>(GUILDS_KEY, (list) =>
+        list?.map((g) => (g.id === updated.id ? updated : g)),
+      ),
   });
 }
 
@@ -54,7 +59,13 @@ export function useUpdateRole(guildId: string | undefined) {
   return useMutation({
     mutationFn: ({ roleId, input }: { roleId: string; input: UpdateRoleInput }) =>
       api<RoleDto>(`/guilds/${guildId}/roles/${roleId}`, { method: 'PATCH', body: input }),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: rolesKey(guildId) }),
+    onSuccess: (updated) => {
+      queryClient.setQueryData<RoleDto[]>(rolesKey(guildId), (list) =>
+        list?.map((r) => (r.id === updated.id ? updated : r)),
+      );
+      // Цвет/имя роли влияют на отображение участников
+      void queryClient.invalidateQueries({ queryKey: ['members', guildId] });
+    },
   });
 }
 

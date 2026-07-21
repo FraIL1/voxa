@@ -24,6 +24,8 @@ function RoleEditor({ guildId, role }: { guildId: string; role: RoleDto }) {
   const updateRole = useUpdateRole(guildId);
   const deleteRole = useDeleteRole(guildId);
   const locked = role.isOwnerRole;
+  // Локальный цвет для живого превью; на сервер шлём только по завершении выбора
+  const [color, setColor] = useState(role.color ?? '#99aab5');
 
   const toggle = (bit: number): void => {
     if (locked) return;
@@ -33,6 +35,12 @@ function RoleEditor({ guildId, role }: { guildId: string; role: RoleDto }) {
     updateRole.mutate({ roleId: role.id, input: { permissions } });
   };
 
+  const commitColor = (): void => {
+    if (color !== (role.color ?? '#99aab5')) {
+      updateRole.mutate({ roleId: role.id, input: { color } });
+    }
+  };
+
   return (
     <div className="role-editor">
       <div className="role-editor-head">
@@ -40,7 +48,7 @@ function RoleEditor({ guildId, role }: { guildId: string; role: RoleDto }) {
           className="role-name-input"
           defaultValue={role.name}
           disabled={locked}
-          style={role.color ? { color: role.color } : undefined}
+          style={{ color }}
           onBlur={(e) => {
             const name = e.target.value.trim();
             if (name && name !== role.name) updateRole.mutate({ roleId: role.id, input: { name } });
@@ -49,9 +57,10 @@ function RoleEditor({ guildId, role }: { guildId: string; role: RoleDto }) {
         <input
           type="color"
           className="role-color-input"
-          value={role.color ?? '#99aab5'}
+          value={color}
           disabled={locked}
-          onChange={(e) => updateRole.mutate({ roleId: role.id, input: { color: e.target.value } })}
+          onChange={(e) => setColor(e.target.value)}
+          onBlur={commitColor}
         />
         {!locked && !role.isDefault && (
           <button
