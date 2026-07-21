@@ -24,14 +24,16 @@ const EXCERPT_LENGTH = 140;
 const PREVIEW_LENGTH = 100;
 
 type DmMessageWithRelations = DmMessage & {
-  author: Pick<User, 'id' | 'username' | 'avatarUrl'> | null;
+  author: Pick<User, 'id' | 'username' | 'displayName' | 'avatarUrl'> | null;
   attachments: Attachment[];
   replyTo:
     | (Pick<DmMessage, 'id' | 'content' | 'deletedAt'> & { author: Pick<User, 'username'> | null })
     | null;
 };
 
-const AUTHOR_SELECT = { select: { id: true, username: true, avatarUrl: true } } as const;
+const AUTHOR_SELECT = {
+  select: { id: true, username: true, displayName: true, avatarUrl: true },
+} as const;
 
 const DM_INCLUDE = {
   author: AUTHOR_SELECT,
@@ -81,6 +83,7 @@ export class DmService {
         ? {
             id: message.author.id,
             username: message.author.username,
+            displayName: message.author.displayName,
             avatarUrl: message.author.avatarUrl,
           }
         : null,
@@ -158,7 +161,12 @@ export class DmService {
         const last = c.messages[0];
         return {
           id: c.id,
-          peer: { id: peer.id, username: peer.username, avatarUrl: peer.avatarUrl },
+          peer: {
+            id: peer.id,
+            username: peer.username,
+            displayName: peer.displayName,
+            avatarUrl: peer.avatarUrl,
+          },
           lastMessage: last
             ? {
                 content: last.content.slice(0, PREVIEW_LENGTH),
@@ -179,7 +187,7 @@ export class DmService {
     const peerId = this.peerIdOf(conversation, meId);
     const peer = await this.prisma.user.findUniqueOrThrow({
       where: { id: peerId },
-      select: { id: true, username: true, avatarUrl: true },
+      select: { id: true, username: true, displayName: true, avatarUrl: true },
     });
     const state = await this.prisma.dmReadState.findUnique({
       where: { conversationId_userId: { conversationId, userId: meId } },

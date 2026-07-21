@@ -11,8 +11,11 @@ datasource db {
 
 model User {
   id            String    @id @default(uuid(7))
+  /// Неизменяемый уникальный логин (регистрация, вход, заявки в друзья)
   username      String
   usernameLower String    @unique @map("username_lower")
+  /// Отображаемое имя — можно менять свободно
+  displayName   String    @map("display_name")
   passwordHash  String    @map("password_hash")
   avatarUrl     String?   @map("avatar_url")
   /// Таймаут: до этого момента не может писать и говорить (раздел 5.10 PRD)
@@ -70,6 +73,8 @@ model GuildMember {
   guild    Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
   userId   String   @map("user_id")
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Ник на этом сервере; null — используется displayName
+  nickname String?
   joinedAt DateTime @default(now()) @map("joined_at")
 
   @@id([guildId, userId])

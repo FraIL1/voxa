@@ -76,7 +76,15 @@ export function renameMessageAuthor(queryClient: QueryClient, user: UserPublicDt
     mapPages(data, (items) =>
       items.map((m) =>
         m.author?.id === user.id
-          ? { ...m, author: { ...m.author, username: user.username, avatarUrl: user.avatarUrl } }
+          ? {
+              ...m,
+              author: {
+                ...m.author,
+                username: user.username,
+                displayName: user.displayName,
+                avatarUrl: user.avatarUrl,
+              },
+            }
           : m,
       ),
     ),

@@ -2,7 +2,10 @@
 
 export interface UserPublicDto {
   id: string;
+  /** Неизменяемый уникальный логин (@handle) */
   username: string;
+  /** Отображаемое имя (свободно меняется) */
+  displayName: string;
   avatarUrl: string | null;
 }
 
@@ -139,6 +142,8 @@ export interface MemberRoleDto {
 
 export interface MemberDto extends UserPublicDto {
   status: PresenceStatus;
+  /** Ник на сервере; null — показывается displayName */
+  nickname: string | null;
   /** По убыванию старшинства */
   roles: MemberRoleDto[];
   timedOutUntil: string | null;

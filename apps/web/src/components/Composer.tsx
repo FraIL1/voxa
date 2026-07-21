@@ -151,7 +151,7 @@ export default function Composer({
         <div className="composer-reply">
           <span>
             {t('chat.replyingTo', {
-              name: replyTo.author?.username ?? t('chat.unknownUser'),
+              name: replyTo.author?.displayName ?? t('chat.unknownUser'),
             })}
           </span>
           <button className="icon-button" title={t('chat.cancel')} onClick={() => setReplyTo(null)}>

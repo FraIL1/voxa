@@ -19,7 +19,7 @@ export class VoiceController {
     @CurrentUser() user: RequestUser,
     @Param('channelId', ParseUUIDPipe) channelId: string,
   ): Promise<VoiceTokenDto> {
-    return this.voice.issueToken(user.id, user.username, channelId);
+    return this.voice.issueToken(user.id, channelId);
   }
 
   /** Начальное состояние голосовых каналов (дальше — WS voice.update) */

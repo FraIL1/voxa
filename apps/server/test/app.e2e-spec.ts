@@ -614,34 +614,39 @@ describe('Voxa: критический поток (e2e)', () => {
       .expect(400);
   });
 
-  it('смена имени: PATCH /users/me, рассылка user.updated, занятое имя — 409', async () => {
-    const broadcast = new Promise<{ id: string; username: string }>((resolve) => {
-      socket?.once(WsEvents.UserUpdated, resolve);
-    });
+  it('смена отображаемого имени: PATCH /users/me, рассылка user.updated; логин неизменен', async () => {
+    const broadcast = new Promise<{ id: string; username: string; displayName: string }>(
+      (resolve) => {
+        socket?.once(WsEvents.UserUpdated, resolve);
+      },
+    );
 
     const renamed = await request(httpServer)
       .patch('/api/users/me')
       .set('Authorization', `Bearer ${ownerAccess}`)
-      .send({ username: 'Артемий' })
+      .send({ displayName: 'Тёмыч' })
       .expect(200);
-    expect((renamed.body as MeDto).username).toBe('Артемий');
+    expect((renamed.body as MeDto).displayName).toBe('Тёмыч');
+    // Логин (username) остаётся неизменным
+    expect((renamed.body as MeDto).username).toBe(OWNER.username);
 
     // Все клиенты получают событие для обновления кэшей
     const event = await broadcast;
-    expect(event.username).toBe('Артемий');
+    expect(event.displayName).toBe('Тёмыч');
+    expect(event.username).toBe(OWNER.username);
 
-    // Имя, занятое другим пользователем (без учёта регистра), не отдаём
+    // Отображаемые имена могут совпадать у разных людей — конфликта нет
     await request(httpServer)
       .patch('/api/users/me')
       .set('Authorization', `Bearer ${memberAccess}`)
-      .send({ username: 'артемий' })
-      .expect(409);
+      .send({ displayName: 'Тёмыч' })
+      .expect(200);
 
     // Возвращаем как было
     await request(httpServer)
       .patch('/api/users/me')
       .set('Authorization', `Bearer ${ownerAccess}`)
-      .send({ username: OWNER.username })
+      .send({ displayName: OWNER.username })
       .expect(200);
   });
 

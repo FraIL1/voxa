@@ -32,7 +32,7 @@ const EXCERPT_LENGTH = 140;
 const MAX_DISTINCT_REACTIONS = 20;
 
 type MessageWithRelations = Message & {
-  author: Pick<User, 'id' | 'username' | 'avatarUrl'> | null;
+  author: Pick<User, 'id' | 'username' | 'displayName' | 'avatarUrl'> | null;
   reactions: Pick<Reaction, 'emoji' | 'userId'>[];
   attachments: Attachment[];
   replyTo:
@@ -42,7 +42,9 @@ type MessageWithRelations = Message & {
     | null;
 };
 
-const AUTHOR_SELECT = { select: { id: true, username: true, avatarUrl: true } } as const;
+const AUTHOR_SELECT = {
+  select: { id: true, username: true, displayName: true, avatarUrl: true },
+} as const;
 
 const MESSAGE_INCLUDE = {
   author: AUTHOR_SELECT,
@@ -123,6 +125,7 @@ export class MessagesService {
         ? {
             id: message.author.id,
             username: message.author.username,
+            displayName: message.author.displayName,
             avatarUrl: message.author.avatarUrl,
           }
         : null,

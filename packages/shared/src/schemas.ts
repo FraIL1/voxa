@@ -138,9 +138,22 @@ export const voiceStateSchema = z.object({
 export type VoiceStateInput = z.infer<typeof voiceStateSchema>;
 
 /** Изменение профиля (пока только имя) */
+/** Отображаемое имя: 2–32 символа, без ограничений юзернейма */
+export const displayNameSchema = z
+  .string()
+  .trim()
+  .min(2, 'Минимум 2 символа')
+  .max(32, 'Максимум 32 символа');
+
 export const updateProfileSchema = z.object({
-  username: usernameSchema,
+  displayName: displayNameSchema,
 });
+
+/** Ник на сервере: пусто (null) — вернуть displayName */
+export const updateNicknameSchema = z.object({
+  nickname: z.string().trim().max(32, 'Максимум 32 символа').or(z.literal('')),
+});
+export type UpdateNicknameInput = z.infer<typeof updateNicknameSchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 
 /** Причина модерационного действия (кик/бан) */

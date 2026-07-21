@@ -46,13 +46,13 @@ function FriendRows({ online }: { online: boolean }) {
   };
 
   const remove = (friend: FriendDto): void => {
-    if (window.confirm(t('friends.removeConfirm', { name: friend.username }))) {
+    if (window.confirm(t('friends.removeConfirm', { name: friend.displayName }))) {
       removeFriend.mutate(friend.id);
     }
   };
 
   const block = (friend: FriendDto): void => {
-    if (window.confirm(t('friends.blockConfirm', { name: friend.username }))) {
+    if (window.confirm(t('friends.blockConfirm', { name: friend.displayName }))) {
       blockUser.mutate(friend.id);
     }
   };
@@ -65,8 +65,8 @@ function FriendRows({ online }: { online: boolean }) {
       {shown.length === 0 && <p className="empty-state">{t('friends.empty')}</p>}
       {shown.map((friend) => (
         <div key={friend.id} className="friend-row">
-          <Avatar username={friend.username} status={friend.status} />
-          <span className="friend-name">{friend.username}</span>
+          <Avatar username={friend.displayName} status={friend.status} />
+          <span className="friend-name">{friend.displayName}</span>
           <span className="friend-status">
             {friend.status === 'online' ? t('members.online') : t('members.offline')}
           </span>
@@ -115,9 +115,9 @@ function RequestRows() {
       )}
       {incoming.map((request) => (
         <div key={request.id} className="friend-row">
-          <Avatar username={request.user.username} />
-          <span className="friend-name">{request.user.username}</span>
-          <span className="friend-status">{t('friends.incomingHint')}</span>
+          <Avatar username={request.user.displayName} />
+          <span className="friend-name">{request.user.displayName}</span>
+          <span className="friend-status">@{request.user.username}</span>
           <button
             className="icon-button success"
             title={t('friends.accept')}
@@ -141,9 +141,9 @@ function RequestRows() {
       )}
       {outgoing.map((request) => (
         <div key={request.id} className="friend-row">
-          <Avatar username={request.user.username} />
-          <span className="friend-name">{request.user.username}</span>
-          <span className="friend-status">{t('friends.outgoingHint')}</span>
+          <Avatar username={request.user.displayName} />
+          <span className="friend-name">{request.user.displayName}</span>
+          <span className="friend-status">@{request.user.username}</span>
           <button
             className="icon-button danger"
             title={t('friends.cancelRequest')}
@@ -172,8 +172,8 @@ function BlockedRows() {
       </div>
       {blocked.map((user) => (
         <div key={user.id} className="friend-row">
-          <Avatar username={user.username} />
-          <span className="friend-name">{user.username}</span>
+          <Avatar username={user.displayName} />
+          <span className="friend-name">{user.displayName}</span>
           <span className="friend-status" />
           <button className="btn-secondary" onClick={() => unblock.mutate(user.id)}>
             {t('friends.unblock')}

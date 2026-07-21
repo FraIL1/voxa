@@ -1,9 +1,4 @@
-import {
-  ConflictException,
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { combineMasks, hasPermission, Permissions } from '@voxa/shared';
 import type { MeDto, MemberDto } from '@voxa/shared';
 
@@ -126,19 +121,32 @@ export class UsersService {
     });
 
     return members
-      .map(({ user }) => ({
-        id: user.id,
-        username: user.username,
-        avatarUrl: user.avatarUrl,
-        status: onlineUserIds.has(user.id) ? ('online' as const) : ('offline' as const),
-        roles: user.roles
+      .map((member) => ({
+        id: member.user.id,
+        username: member.user.username,
+        displayName: member.user.displayName,
+        nickname: member.nickname,
+        avatarUrl: member.user.avatarUrl,
+        status: onlineUserIds.has(member.user.id) ? ('online' as const) : ('offline' as const),
+        roles: member.user.roles
           .map((ur) => ur.role)
           .sort((a, b) => b.position - a.position)
           .map((r) => ({ id: r.id, name: r.name, color: r.color, position: r.position })),
-        timedOutUntil: user.timedOutUntil?.toISOString() ?? null,
-        banned: user.bansReceived.length > 0,
+        timedOutUntil: member.user.timedOutUntil?.toISOString() ?? null,
+        banned: member.user.bansReceived.length > 0,
       }))
-      .sort((a, b) => a.username.localeCompare(b.username, 'ru'));
+      .sort((a, b) =>
+        (a.nickname ?? a.displayName).localeCompare(b.nickname ?? b.displayName, 'ru'),
+      );
+  }
+
+  /** Ник на сервере: пустая строка снимает ник (возврат к displayName) */
+  async setNickname(guildId: string, userId: string, nickname: string): Promise<void> {
+    await this.assertMember(guildId, userId);
+    await this.prisma.guildMember.update({
+      where: { guildId_userId: { guildId, userId } },
+      data: { nickname: nickname.trim() === '' ? null : nickname.trim() },
+    });
   }
 
   /** Кому виден канал (адресаты упоминаний): участники сервера с доступом */
@@ -179,19 +187,9 @@ export class UsersService {
     return [...ids];
   }
 
-  /** Смена имени. Старые access-токены несут прежнее имя до refresh — это ок */
-  async updateProfile(userId: string, username: string): Promise<MeDto> {
-    const usernameLower = username.toLowerCase();
-    const clash = await this.prisma.user.findFirst({
-      where: { usernameLower, NOT: { id: userId } },
-      select: { id: true },
-    });
-    if (clash) throw new ConflictException('Это имя уже занято');
-
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { username, usernameLower },
-    });
+  /** Смена отображаемого имени (логин @username неизменяем) */
+  async updateProfile(userId: string, displayName: string): Promise<MeDto> {
+    await this.prisma.user.update({ where: { id: userId }, data: { displayName } });
     return this.getMe(userId);
   }
 
@@ -202,6 +200,7 @@ export class UsersService {
     return {
       id: user.id,
       username: user.username,
+      displayName: user.displayName,
       avatarUrl: user.avatarUrl,
       timedOutUntil: user.timedOutUntil?.toISOString() ?? null,
       createdAt: user.createdAt.toISOString(),

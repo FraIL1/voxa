@@ -54,7 +54,14 @@ export function useSendMessage(channelId: string) {
       const temp: ChatMessage = {
         id: `temp-${crypto.randomUUID()}`,
         channelId,
-        author: user ? { id: user.id, username: user.username, avatarUrl: user.avatarUrl } : null,
+        author: user
+          ? {
+              id: user.id,
+              username: user.username,
+              displayName: user.displayName,
+              avatarUrl: user.avatarUrl,
+            }
+          : null,
         content,
         replyToId: replyToId ?? null,
         replyTo: null,

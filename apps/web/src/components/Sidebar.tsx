@@ -120,6 +120,8 @@ export default function Sidebar() {
     const member = members?.find((m) => m.id === userId) ?? {
       id: userId,
       username,
+      displayName: username,
+      nickname: null,
       avatarUrl: null,
       status: 'online' as const,
       roles: [],

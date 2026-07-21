@@ -18,9 +18,11 @@ import { PresenceService } from '../presence/presence.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { WsGateway } from '../ws/ws.gateway';
 
-const USER_SELECT = { select: { id: true, username: true, avatarUrl: true } } as const;
+const USER_SELECT = {
+  select: { id: true, username: true, displayName: true, avatarUrl: true },
+} as const;
 
-type PublicUser = Pick<User, 'id' | 'username' | 'avatarUrl'>;
+type PublicUser = Pick<User, 'id' | 'username' | 'displayName' | 'avatarUrl'>;
 
 @Injectable()
 export class FriendsService {
@@ -61,11 +63,12 @@ export class FriendsService {
         return {
           id: peer.id,
           username: peer.username,
+          displayName: peer.displayName,
           avatarUrl: peer.avatarUrl,
           status: online.has(peer.id) ? ('online' as const) : ('offline' as const),
         };
       })
-      .sort((a, b) => a.username.localeCompare(b.username, 'ru'));
+      .sort((a, b) => a.displayName.localeCompare(b.displayName, 'ru'));
   }
 
   async listRequests(meId: string): Promise<FriendRequestDto[]> {
@@ -86,7 +89,12 @@ export class FriendsService {
     return {
       id: row.id,
       direction: incoming ? 'incoming' : 'outgoing',
-      user: { id: user.id, username: user.username, avatarUrl: user.avatarUrl },
+      user: {
+        id: user.id,
+        username: user.username,
+        displayName: user.displayName,
+        avatarUrl: user.avatarUrl,
+      },
       createdAt: row.createdAt.toISOString(),
     };
   }
@@ -165,6 +173,7 @@ export class FriendsService {
     return rows.map((row) => ({
       id: row.blocked.id,
       username: row.blocked.username,
+      displayName: row.blocked.displayName,
       avatarUrl: row.blocked.avatarUrl,
       blockedAt: row.createdAt.toISOString(),
     }));

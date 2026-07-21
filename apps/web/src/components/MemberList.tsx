@@ -63,11 +63,11 @@ export default function MemberList() {
                 }}
               >
                 <div className="avatar member-avatar" aria-hidden>
-                  {member.username.slice(0, 1).toUpperCase()}
+                  {(member.nickname ?? member.displayName).slice(0, 1).toUpperCase()}
                   <span className={`status-dot ${member.status}`} />
                 </div>
                 <span className="member-name" style={color ? { color } : undefined}>
-                  {member.username}
+                  {member.nickname ?? member.displayName}
                 </span>
               </div>
             );

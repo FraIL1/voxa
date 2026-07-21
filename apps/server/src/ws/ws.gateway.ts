@@ -89,19 +89,25 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * Пользователь сменил профиль: обновляем имя в живых сокетах (typing и
    * voice.state шлются с ним), в голосовом присутствии, и оповещаем всех.
    */
-  async handleUserRenamed(
-    userId: string,
-    username: string,
-    avatarUrl: string | null,
-  ): Promise<void> {
-    for (const socket of await this.server.in(userRoom(userId)).fetchSockets()) {
-      (socket.data as SocketData).username = username;
+  async handleUserRenamed(user: {
+    id: string;
+    username: string;
+    displayName: string;
+    avatarUrl: string | null;
+  }): Promise<void> {
+    for (const socket of await this.server.in(userRoom(user.id)).fetchSockets()) {
+      (socket.data as SocketData).username = user.displayName;
     }
 
-    const voiceChannelId = this.voiceStates.rename(userId, username);
+    const voiceChannelId = this.voiceStates.rename(user.id, user.displayName);
     if (voiceChannelId) this.broadcastVoiceState(voiceChannelId);
 
-    this.emitToAll(WsEvents.UserUpdated, { id: userId, username, avatarUrl });
+    this.emitToAll(WsEvents.UserUpdated, {
+      id: user.id,
+      username: user.username,
+      displayName: user.displayName,
+      avatarUrl: user.avatarUrl,
+    });
   }
 
   async handleConnection(socket: Socket): Promise<void> {
@@ -116,15 +122,22 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Access-токен живёт 15 минут и сам по себе не отзываем; для сокетов
       // проверяем живость refresh-сессии (баны теперь на уровне сервера
       // и вход в аккаунт не блокируют)
-      const session = await this.prisma.refreshSession.findFirst({
-        where: { id: payload.sid, revokedAt: null, expiresAt: { gt: new Date() } },
-        select: { id: true },
-      });
-      if (!session) throw new Error('session revoked');
+      const [session, user] = await Promise.all([
+        this.prisma.refreshSession.findFirst({
+          where: { id: payload.sid, revokedAt: null, expiresAt: { gt: new Date() } },
+          select: { id: true },
+        }),
+        this.prisma.user.findUnique({
+          where: { id: payload.sub },
+          select: { displayName: true },
+        }),
+      ]);
+      if (!session || !user) throw new Error('session revoked');
 
       const data = socket.data as SocketData;
       data.userId = payload.sub;
-      data.username = payload.username;
+      // Для отображения (typing, голос) используем displayName, не логин
+      data.username = user.displayName;
 
       const [guildIds, channelIds] = await Promise.all([
         this.usersService.guildIdsOf(payload.sub),

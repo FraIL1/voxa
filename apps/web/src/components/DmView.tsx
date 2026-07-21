@@ -84,7 +84,7 @@ function DmComposer({ conversationId, peerName }: { conversationId: string; peer
       {replyTo && (
         <div className="composer-reply">
           <span>
-            {t('chat.replyingTo', { name: replyTo.author?.username ?? t('chat.unknownUser') })}
+            {t('chat.replyingTo', { name: replyTo.author?.displayName ?? t('chat.unknownUser') })}
           </span>
           <button className="icon-button" title={t('chat.cancel')} onClick={() => setReplyTo(null)}>
             <X size={14} />
@@ -259,10 +259,10 @@ export default function DmView() {
     <div className="channel-view">
       <header className="channel-header">
         <AtSign size={18} />
-        {peer?.username ?? t('dm.title')}
+        {peer?.displayName ?? t('dm.title')}
       </header>
       <DmMessages conversationId={conversationId} />
-      <DmComposer conversationId={conversationId} peerName={peer?.username ?? ''} />
+      <DmComposer conversationId={conversationId} peerName={peer?.displayName ?? ''} />
     </div>
   );
 }

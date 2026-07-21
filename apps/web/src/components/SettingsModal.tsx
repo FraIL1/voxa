@@ -54,7 +54,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const setUser = useAuthStore((s) => s.setUser);
   const [tab, setTab] = useState<Tab>('profile');
 
-  const [username, setUsername] = useState(user?.username ?? '');
+  const [displayName, setDisplayName] = useState(user?.displayName ?? '');
   const [profileMessage, setProfileMessage] = useState('');
   const [profileError, setProfileError] = useState('');
 
@@ -82,12 +82,12 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const saveProfile = async (e: FormEvent): Promise<void> => {
     e.preventDefault();
     setProfileMessage('');
-    const parsed = updateProfileSchema.safeParse({ username });
+    const parsed = updateProfileSchema.safeParse({ displayName });
     if (!parsed.success) {
       setProfileError(parsed.error.issues[0]?.message ?? t('auth.genericError'));
       return;
     }
-    if (parsed.data.username === user?.username) return;
+    if (parsed.data.displayName === user?.displayName) return;
     setBusy(true);
     setProfileError('');
     try {
@@ -175,8 +175,13 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
               <h2>{t('settings.profile')}</h2>
               <form className="settings-form" onSubmit={(e) => void saveProfile(e)}>
                 <label>
-                  {t('settings.username')}
-                  <input value={username} onChange={(e) => setUsername(e.target.value)} />
+                  {t('settings.handle')}
+                  <input value={`@${user?.username ?? ''}`} disabled readOnly />
+                </label>
+                <p className="settings-hint">{t('settings.handleHint')}</p>
+                <label>
+                  {t('settings.displayName')}
+                  <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
                 </label>
                 <p className="auth-error">{profileError}</p>
                 <p className="settings-ok">{profileMessage}</p>

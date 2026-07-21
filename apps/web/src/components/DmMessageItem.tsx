@@ -37,7 +37,7 @@ export default function DmMessageItem({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
 
-  const authorName = message.author?.username ?? t('chat.unknownUser');
+  const authorName = message.author?.displayName ?? t('chat.unknownUser');
   const isOwn = Boolean(user && message.author?.id === user.id);
   const canAct = !message.pending;
 

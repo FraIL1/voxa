@@ -87,6 +87,7 @@ export class AuthService {
         data: {
           username: input.username,
           usernameLower: input.username.toLowerCase(),
+          displayName: input.username, // по умолчанию совпадает с логином
           passwordHash,
         },
       });

@@ -72,7 +72,7 @@ export default function MemberContextMenu({
         onContextMenu={(e) => e.preventDefault()}
       />
       <div className="context-menu" style={{ left: menu.x, top: menu.y }}>
-        <div className="menu-title">{menu.member.username}</div>
+        <div className="menu-title">{menu.member.nickname ?? menu.member.displayName}</div>
 
         <button
           className="menu-item"

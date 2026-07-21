@@ -20,8 +20,8 @@ export class UsersController {
     @CurrentUser() user: RequestUser,
     @Body(new ZodValidationPipe(updateProfileSchema)) body: UpdateProfileInput,
   ): Promise<MeDto> {
-    const me = await this.usersService.updateProfile(user.id, body.username);
-    await this.ws.handleUserRenamed(me.id, me.username, me.avatarUrl);
+    const me = await this.usersService.updateProfile(user.id, body.displayName);
+    await this.ws.handleUserRenamed(me);
     return me;
   }
 }

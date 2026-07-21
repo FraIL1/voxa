@@ -24,15 +24,16 @@ export class VoiceService {
   ) {}
 
   /** Комната LiveKit = голосовой канал; имя комнаты — id канала */
-  async issueToken(userId: string, username: string, channelId: string): Promise<VoiceTokenDto> {
+  async issueToken(userId: string, channelId: string): Promise<VoiceTokenDto> {
     // Таймаут запрещает и голос (раздел 5.10 PRD)
     const me = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { timedOutUntil: true },
+      select: { timedOutUntil: true, displayName: true },
     });
     if (me?.timedOutUntil && me.timedOutUntil > new Date()) {
       throw new ForbiddenException(`Вы в таймауте до ${me.timedOutUntil.toLocaleString('ru-RU')}`);
     }
+    const username = me?.displayName ?? '';
 
     const channel = await this.prisma.channel.findUnique({ where: { id: channelId } });
     if (!channel || !(await this.users.canSeeChannel(userId, channelId))) {

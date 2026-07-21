@@ -36,9 +36,9 @@ export default function DmSidebar() {
             }
           >
             <div className="dm-avatar" aria-hidden>
-              {c.peer.username.slice(0, 1).toUpperCase()}
+              {c.peer.displayName.slice(0, 1).toUpperCase()}
             </div>
-            <span className="channel-name">{c.peer.username}</span>
+            <span className="channel-name">{c.peer.displayName}</span>
             {c.unreadCount > 0 && <span className="mention-badge">{c.unreadCount}</span>}
           </NavLink>
         ))}

@@ -139,13 +139,18 @@ export function useRealtime(): void {
     socket.on(WsEvents.UserUpdated, (u: UserPublicDto) => {
       queryClient.setQueriesData<MemberDto[]>({ queryKey: MEMBERS_KEY }, (members) =>
         members?.map((m) =>
-          m.id === u.id ? { ...m, username: u.username, avatarUrl: u.avatarUrl } : m,
+          m.id === u.id ? { ...m, displayName: u.displayName, avatarUrl: u.avatarUrl } : m,
+        ),
+      );
+      queryClient.setQueryData<FriendDto[]>(FRIENDS_KEY, (friends) =>
+        friends?.map((f) =>
+          f.id === u.id ? { ...f, displayName: u.displayName, avatarUrl: u.avatarUrl } : f,
         ),
       );
       renameMessageAuthor(queryClient, u);
       const me = useAuthStore.getState().user;
-      if (me && me.id === u.id && me.username !== u.username) {
-        useAuthStore.getState().setUser({ ...me, username: u.username });
+      if (me && me.id === u.id && me.displayName !== u.displayName) {
+        useAuthStore.getState().setUser({ ...me, displayName: u.displayName });
       }
     });
 

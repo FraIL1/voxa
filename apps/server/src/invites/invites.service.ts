@@ -8,7 +8,7 @@ import type { Env } from '../config/env';
 import { PrismaService } from '../prisma/prisma.service';
 
 type InviteWithRelations = Invite & {
-  createdBy: Pick<User, 'id' | 'username' | 'avatarUrl'> | null;
+  createdBy: Pick<User, 'id' | 'username' | 'displayName' | 'avatarUrl'> | null;
   grantsRole: Pick<Role, 'name'> | null;
 };
 
@@ -38,6 +38,7 @@ export class InvitesService {
         ? {
             id: invite.createdBy.id,
             username: invite.createdBy.username,
+            displayName: invite.createdBy.displayName,
             avatarUrl: invite.createdBy.avatarUrl,
           }
         : null,
@@ -52,7 +53,7 @@ export class InvitesService {
   }
 
   private readonly includeRelations = {
-    createdBy: { select: { id: true, username: true, avatarUrl: true } },
+    createdBy: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
     grantsRole: { select: { name: true } },
   } as const;
 

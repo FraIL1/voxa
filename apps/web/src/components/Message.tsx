@@ -62,7 +62,7 @@ export default function Message({ message }: { message: ChatMessage }) {
   const [draft, setDraft] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
 
-  const authorName = message.author?.username ?? t('chat.unknownUser');
+  const authorName = message.author?.displayName ?? t('chat.unknownUser');
   const isOwn = Boolean(user && message.author?.id === user.id);
   const canDelete =
     !message.pending && (isOwn || hasPermission(guildMask, Permissions.DELETE_MESSAGES));
