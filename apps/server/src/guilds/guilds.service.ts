@@ -11,6 +11,7 @@ import {
   type CreateGuildInput,
   type GuildDto,
   type JoinGuildResultDto,
+  type UpdateGuildInput,
 } from '@voxa/shared';
 
 import { PrismaService } from '../prisma/prisma.service';
@@ -53,6 +54,19 @@ export class GuildsService {
   async guildDto(userId: string, guildId: string): Promise<GuildDto> {
     await this.users.assertMember(guildId, userId);
     const guild = await this.prisma.guild.findUniqueOrThrow({ where: { id: guildId } });
+    return this.toDto(guild, userId);
+  }
+
+  /** Профиль сервера: имя и/или иконка (право MANAGE_CHANNELS проверяет guard) */
+  async update(userId: string, guildId: string, input: UpdateGuildInput): Promise<GuildDto> {
+    const guild = await this.prisma.guild.update({
+      where: { id: guildId },
+      data: {
+        name: input.name,
+        iconUrl: input.iconUrl === undefined ? undefined : input.iconUrl,
+      },
+    });
+    this.ws.emitToGuild(guildId, WsEvents.GuildUpdated, { guildId });
     return this.toDto(guild, userId);
   }
 

@@ -1046,6 +1046,75 @@ describe('Voxa: критический поток (e2e)', () => {
     expect((finalFriends.body as { id: string }[]).some((f) => f.id === memberId)).toBe(false);
   });
 
+  it('роли сервера: создание, выдача участнику, права; чужой без MANAGE_ROLES — 403', async () => {
+    const memberMe = await request(httpServer)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${memberAccess}`);
+    const memberId = (memberMe.body as MeDto).id;
+
+    // Владелец создаёт роль
+    const created = await request(httpServer)
+      .post(`/api/guilds/${guildId}/roles`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ name: 'VIP', color: '#ff7a45', permissions: Permissions.MENTION_EVERYONE })
+      .expect(201);
+    const roleId = created.body.id as string;
+
+    const roles = await request(httpServer)
+      .get(`/api/guilds/${guildId}/roles`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    expect((roles.body as { name: string }[]).some((r) => r.name === 'VIP')).toBe(true);
+
+    // Участник без MANAGE_ROLES не может создавать роли
+    await request(httpServer)
+      .post(`/api/guilds/${guildId}/roles`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ name: 'Хакер', permissions: 0 })
+      .expect(403);
+
+    // Выдаём роль участнику — она появляется в его списке ролей на сервере
+    await request(httpServer)
+      .put(`/api/guilds/${guildId}/members/${memberId}/roles/${roleId}`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(204);
+    const members = await request(httpServer)
+      .get(`/api/guilds/${guildId}/members`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    const member = (members.body as MemberDto[]).find((m) => m.id === memberId);
+    expect(member?.roles.some((r) => r.name === 'VIP')).toBe(true);
+
+    // Снятие роли
+    await request(httpServer)
+      .delete(`/api/guilds/${guildId}/members/${memberId}/roles/${roleId}`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(204);
+
+    // Роль «Владелец» удалить нельзя
+    const ownerRole = (roles.body as { id: string; isOwnerRole: boolean }[]).find(
+      (r) => r.isOwnerRole,
+    );
+    await request(httpServer)
+      .delete(`/api/guilds/${guildId}/roles/${ownerRole!.id}`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(403);
+
+    // Профиль сервера: переименование владельцем
+    const renamed = await request(httpServer)
+      .patch(`/api/guilds/${guildId}`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ name: 'Voxa HQ' })
+      .expect(200);
+    expect(renamed.body.name).toBe('Voxa HQ');
+    // Возвращаем имя
+    await request(httpServer)
+      .patch(`/api/guilds/${guildId}`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ name: 'Voxa' })
+      .expect(200);
+  });
+
   it('мультисервер: создание сервера, инвайт, вступление и выход', async () => {
     // Участник создаёт собственный сервер и становится его владельцем
     const created = await request(httpServer)

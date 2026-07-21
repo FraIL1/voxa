@@ -1,17 +1,35 @@
-import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import {
   auditQuerySchema,
   createGuildSchema,
+  createRoleSchema,
   Permissions,
+  updateGuildSchema,
   updateNicknameSchema,
+  updateRoleSchema,
   WsEvents,
   type AuditPageDto,
   type AuditQueryInput,
   type CreateGuildInput,
+  type CreateRoleInput,
   type GuildDto,
   type MemberDto,
+  type RoleDto,
+  type UpdateGuildInput,
   type UpdateNicknameInput,
+  type UpdateRoleInput,
 } from '@voxa/shared';
 
 import { AuditService } from '../audit/audit.service';
@@ -22,11 +40,13 @@ import { PresenceService } from '../presence/presence.service';
 import { UsersService } from '../users/users.service';
 import { WsGateway } from '../ws/ws.gateway';
 import { GuildsService } from './guilds.service';
+import { RolesService } from './roles.service';
 
 @Controller('guilds')
 export class GuildsController {
   constructor(
     private readonly guilds: GuildsService,
+    private readonly roles: RolesService,
     private readonly users: UsersService,
     private readonly presence: PresenceService,
     private readonly audit: AuditService,
@@ -50,6 +70,80 @@ export class GuildsController {
   @Get(':guildId')
   get(@CurrentUser() user: RequestUser, @Param('guildId') guildId: string): Promise<GuildDto> {
     return this.guilds.guildDto(user.id, guildId);
+  }
+
+  @Patch(':guildId')
+  @RequirePermissions(Permissions.MANAGE_CHANNELS)
+  update(
+    @CurrentUser() user: RequestUser,
+    @Param('guildId') guildId: string,
+    @Body(new ZodValidationPipe(updateGuildSchema)) body: UpdateGuildInput,
+  ): Promise<GuildDto> {
+    return this.guilds.update(user.id, guildId, body);
+  }
+
+  // ---------- Роли ----------
+
+  @Get(':guildId/roles')
+  listRoles(
+    @CurrentUser() user: RequestUser,
+    @Param('guildId') guildId: string,
+  ): Promise<RoleDto[]> {
+    return this.users.assertMember(guildId, user.id).then(() => this.roles.list(guildId));
+  }
+
+  @Post(':guildId/roles')
+  @RequirePermissions(Permissions.MANAGE_ROLES)
+  createRole(
+    @CurrentUser() user: RequestUser,
+    @Param('guildId') guildId: string,
+    @Body(new ZodValidationPipe(createRoleSchema)) body: CreateRoleInput,
+  ): Promise<RoleDto> {
+    return this.roles.create(guildId, user.id, body);
+  }
+
+  @Patch(':guildId/roles/:roleId')
+  @RequirePermissions(Permissions.MANAGE_ROLES)
+  updateRole(
+    @CurrentUser() user: RequestUser,
+    @Param('guildId') guildId: string,
+    @Param('roleId') roleId: string,
+    @Body(new ZodValidationPipe(updateRoleSchema)) body: UpdateRoleInput,
+  ): Promise<RoleDto> {
+    return this.roles.update(guildId, user.id, roleId, body);
+  }
+
+  @Delete(':guildId/roles/:roleId')
+  @HttpCode(204)
+  @RequirePermissions(Permissions.MANAGE_ROLES)
+  async deleteRole(
+    @Param('guildId') guildId: string,
+    @Param('roleId') roleId: string,
+  ): Promise<void> {
+    await this.roles.remove(guildId, roleId);
+  }
+
+  @Put(':guildId/members/:userId/roles/:roleId')
+  @HttpCode(204)
+  @RequirePermissions(Permissions.MANAGE_ROLES)
+  async assignRole(
+    @CurrentUser() user: RequestUser,
+    @Param('guildId') guildId: string,
+    @Param('userId') userId: string,
+    @Param('roleId') roleId: string,
+  ): Promise<void> {
+    await this.roles.assign(guildId, user.id, userId, roleId);
+  }
+
+  @Delete(':guildId/members/:userId/roles/:roleId')
+  @HttpCode(204)
+  @RequirePermissions(Permissions.MANAGE_ROLES)
+  async unassignRole(
+    @Param('guildId') guildId: string,
+    @Param('userId') userId: string,
+    @Param('roleId') roleId: string,
+  ): Promise<void> {
+    await this.roles.unassign(guildId, roleId, userId);
   }
 
   @Get(':guildId/members')

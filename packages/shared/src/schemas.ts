@@ -216,3 +216,29 @@ export const createGuildSchema = z.object({
   name: z.string().trim().min(2, 'Минимум 2 символа').max(48, 'Максимум 48 символов'),
 });
 export type CreateGuildInput = z.infer<typeof createGuildSchema>;
+
+/** Обновление сервера: имя и/или иконка (data-URL/URL) */
+export const updateGuildSchema = z.object({
+  name: z.string().trim().min(2).max(48).optional(),
+  iconUrl: z.string().trim().max(500_000).nullish(),
+});
+export type UpdateGuildInput = z.infer<typeof updateGuildSchema>;
+
+const roleColor = z
+  .string()
+  .regex(/^#[0-9a-fA-F]{6}$/, 'Цвет в формате #RRGGBB')
+  .nullish();
+
+export const createRoleSchema = z.object({
+  name: z.string().trim().min(1, 'Введите название').max(32),
+  color: roleColor,
+  permissions: z.number().int().min(0),
+});
+export type CreateRoleInput = z.infer<typeof createRoleSchema>;
+
+export const updateRoleSchema = z.object({
+  name: z.string().trim().min(1).max(32).optional(),
+  color: roleColor,
+  permissions: z.number().int().min(0).optional(),
+});
+export type UpdateRoleInput = z.infer<typeof updateRoleSchema>;
