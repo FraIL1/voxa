@@ -176,6 +176,13 @@ export function useRealtime(): void {
     socket.on(WsEvents.GuildMembersChanged, ({ guildId }: { guildId: string }) => {
       void queryClient.invalidateQueries({ queryKey: ['members', guildId] });
     });
+    socket.on(WsEvents.GuildUpdated, () => {
+      void queryClient.invalidateQueries({ queryKey: GUILDS_KEY });
+    });
+    socket.on(WsEvents.GuildRolesChanged, ({ guildId }: { guildId: string }) => {
+      void queryClient.invalidateQueries({ queryKey: ['roles', guildId] });
+      void queryClient.invalidateQueries({ queryKey: GUILDS_KEY });
+    });
     socket.on(WsEvents.MeGuildsChanged, () => {
       void queryClient.invalidateQueries({ queryKey: GUILDS_KEY });
       void queryClient.invalidateQueries({ queryKey: ['structure'] });

@@ -22,7 +22,7 @@ const timeFormat = new Intl.DateTimeFormat('ru', {
   minute: '2-digit',
 });
 
-function Overview() {
+export function Overview() {
   const { t } = useTranslation();
   const { data } = useAdminOverview(true);
   if (!data) return null;
@@ -48,7 +48,7 @@ function Overview() {
   );
 }
 
-function Invites() {
+export function Invites() {
   const { t } = useTranslation();
   const { guildId } = useParams<{ guildId: string }>();
   const { data: invites } = useInvites(guildId, true);
@@ -125,7 +125,7 @@ function Invites() {
   );
 }
 
-function Bans() {
+export function Bans() {
   const { t } = useTranslation();
   const { guildId } = useParams<{ guildId: string }>();
   const { data: bans } = useBans(guildId, true);
@@ -152,7 +152,7 @@ function Bans() {
   );
 }
 
-function Audit() {
+export function Audit() {
   const { t } = useTranslation();
   const { guildId } = useParams<{ guildId: string }>();
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useAudit(guildId, true);

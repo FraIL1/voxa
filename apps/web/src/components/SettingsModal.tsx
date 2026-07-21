@@ -1,24 +1,15 @@
-import {
-  changePasswordSchema,
-  hasPermission,
-  Permissions,
-  updateProfileSchema,
-  type MeDto,
-} from '@voxa/shared';
+import { changePasswordSchema, updateProfileSchema, type MeDto } from '@voxa/shared';
 import { LogOut, X } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams } from 'react-router';
 
 import { logout } from '../api/auth';
 import { api, ApiError } from '../api/client';
 import { getAutostart, isTauri, setAutostart } from '../lib/tauri';
-import { useMyGuildPermissions } from '../hooks/useGuilds';
 import { useAuthStore } from '../stores/auth';
 import AudioDeviceSelects from './AudioDeviceSelects';
-import CommunityTab from './CommunityTab';
 
-type Tab = 'profile' | 'voice' | 'community' | 'app';
+type Tab = 'profile' | 'voice' | 'app';
 
 /** Вкладка «Приложение» (только в десктоп-клиенте): автозапуск */
 function AppTab() {
@@ -63,13 +54,6 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const [passwordMessage, setPasswordMessage] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [busy, setBusy] = useState(false);
-
-  const { guildId } = useParams<{ guildId: string }>();
-  const mask = useMyGuildPermissions(guildId);
-  const showCommunity =
-    hasPermission(mask, Permissions.CREATE_INVITES) ||
-    hasPermission(mask, Permissions.BAN_MEMBERS) ||
-    hasPermission(mask, Permissions.ADMINISTRATOR);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
@@ -139,14 +123,6 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           >
             {t('settings.voiceTab')}
           </button>
-          {showCommunity && (
-            <button
-              className={`settings-tab${tab === 'community' ? ' active' : ''}`}
-              onClick={() => setTab('community')}
-            >
-              {t('community.title')}
-            </button>
-          )}
           {isTauri() && (
             <button
               className={`settings-tab${tab === 'app' ? ' active' : ''}`}
@@ -228,8 +204,6 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
               </div>
             </>
           )}
-
-          {tab === 'community' && <CommunityTab />}
 
           {tab === 'app' && <AppTab />}
         </div>

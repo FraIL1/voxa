@@ -1804,3 +1804,220 @@ a {
   justify-content: flex-end;
   gap: 8px;
 }
+
+/* ---------- Меню сервера + настройки сервера ---------- */
+
+.server-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 14px 16px;
+  font-weight: 700;
+  color: var(--text);
+  background: transparent;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+}
+
+.server-header:hover {
+  background: var(--panel-raised);
+}
+
+.server-header-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.server-dropdown {
+  position: absolute;
+  top: 52px;
+  left: 8px;
+  right: 8px;
+  z-index: 30;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.server-dropdown .menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font-size: 14px;
+}
+
+.server-dropdown .menu-item:hover {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.server-dropdown .menu-item.danger {
+  color: var(--danger);
+}
+
+.server-dropdown .menu-item.danger:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
+.settings-nav-title {
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* Иконка сервера */
+.server-icon-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.server-icon-preview {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--panel-raised);
+  display: grid;
+  place-items: center;
+  font-size: 28px;
+  font-weight: 700;
+  overflow: hidden;
+}
+
+.server-icon-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.icon-upload {
+  cursor: pointer;
+}
+
+/* Роли */
+.role-editor {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.role-editor-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.role-name-input {
+  flex: 1;
+  font-weight: 600;
+}
+
+.role-color-input {
+  width: 40px;
+  height: 34px;
+  padding: 2px;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.role-perms {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.role-perm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Участники: выдача ролей */
+.member-manage-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+
+.member-manage-name {
+  display: flex;
+  flex-direction: column;
+}
+
+.member-handle {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.member-role-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.role-chip {
+  padding: 3px 10px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text-muted);
+}
+
+.role-chip.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Выбор типа канала */
+.channel-type-choice {
+  display: flex;
+  gap: 8px;
+}
+
+.channel-type-option {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  background: var(--panel-raised);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+.channel-type-option.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.danger-text {
+  color: var(--danger);
+  margin-top: 16px;
+}

@@ -4,7 +4,6 @@ import { useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink, useNavigate, useParams } from 'react-router';
 
-import { useGuild } from '../hooks/useGuilds';
 import { useMembers } from '../hooks/useMembers';
 import { useReadStates } from '../hooks/useReadStates';
 import { useStructure } from '../hooks/useStructure';
@@ -12,6 +11,7 @@ import { participantsOf, useVoiceStates } from '../hooks/useVoiceStates';
 import { useAuthStore } from '../stores/auth';
 import { useVoiceStore } from '../stores/voice';
 import MemberContextMenu, { type MenuState } from './MemberContextMenu';
+import ServerMenu from './ServerMenu';
 import UserCard from './UserCard';
 
 function VoiceParticipants({
@@ -106,7 +106,6 @@ function ChannelItem({
 export default function Sidebar() {
   const { t } = useTranslation();
   const { guildId } = useParams<{ guildId: string }>();
-  const guild = useGuild(guildId);
   const { data: structure } = useStructure(guildId);
   const { data: readStates } = useReadStates();
   const { data: voiceStates } = useVoiceStates();
@@ -145,7 +144,7 @@ export default function Sidebar() {
 
   return (
     <nav className="sidebar">
-      <div className="sidebar-header">{guild?.name ?? t('app.communityName')}</div>
+      {guildId && <ServerMenu guildId={guildId} />}
 
       <div className="channel-tree">
         {structure?.categories.map((category) => (
