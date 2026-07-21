@@ -25,7 +25,16 @@
     "uncategorized": "Без категории",
     "voiceComingSoon": "Голосовые каналы появятся на этапе 3",
     "selectChannel": "Выберите канал слева, чтобы начать общение",
-    "mentions": "Упоминания"
+    "mentions": "Упоминания",
+    "createTitle": "Создать канал",
+    "text": "Текстовый",
+    "voice": "Голосовой",
+    "nameLabel": "Название канала",
+    "topicLabel": "Тема канала",
+    "createButton": "Создать",
+    "settingsTitle": "Настройки канала",
+    "delete": "Удалить канал",
+    "deleteConfirm": "Удалить канал «{{name}}»? Это действие необратимо."
   },
   "chat": {
     "placeholder": "Написать в #{{channel}}",

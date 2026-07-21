@@ -2021,3 +2021,75 @@ a {
   color: var(--danger);
   margin-top: 16px;
 }
+
+/* ---------- Категории: сворачивание, «+», шестерёнка канала ---------- */
+
+.category-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: 4px;
+}
+
+.category-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text-faint);
+  padding: 8px 4px;
+}
+
+.category-toggle:hover {
+  color: var(--text-muted);
+}
+
+.category-toggle .chevron-collapsed {
+  transform: rotate(-90deg);
+}
+
+.category-add {
+  background: transparent;
+  color: var(--text-faint);
+  padding: 2px;
+  display: grid;
+  place-items: center;
+}
+
+.category-add:hover {
+  color: var(--text);
+}
+
+.channel-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.channel-row .channel-link {
+  flex: 1;
+  min-width: 0;
+}
+
+.channel-gear {
+  position: absolute;
+  right: 6px;
+  background: transparent;
+  color: var(--text-faint);
+  padding: 2px;
+  opacity: 0;
+  display: grid;
+  place-items: center;
+}
+
+.channel-row:hover .channel-gear {
+  opacity: 1;
+}
+
+.channel-gear:hover {
+  color: var(--text);
+}
