@@ -72,10 +72,21 @@ export default function ServerProfileTab({
           )}
         </div>
         {canManage && (
-          <label className="btn-secondary icon-upload">
-            {t('serverSettings.changeIcon')}
-            <input type="file" accept="image/*" hidden onChange={pickIcon} />
-          </label>
+          <div className="server-icon-actions">
+            <label className="btn-secondary icon-upload">
+              {t('serverSettings.changeIcon')}
+              <input type="file" accept="image/*" hidden onChange={pickIcon} />
+            </label>
+            {guild?.iconUrl && (
+              <button
+                type="button"
+                className="btn-secondary danger-text"
+                onClick={() => updateGuild.mutate({ iconUrl: null })}
+              >
+                {t('serverSettings.removeIcon')}
+              </button>
+            )}
+          </div>
         )}
       </div>
 

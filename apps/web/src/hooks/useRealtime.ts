@@ -28,6 +28,7 @@ import {
   addDmMessage,
   DM_CONVERSATIONS_KEY,
   removeDmMessage,
+  renameDmAuthor,
   updateDmMessage,
 } from '../api/dm-cache';
 import { bumpUnread, setReadState } from '../api/read-states-cache';
@@ -148,6 +149,7 @@ export function useRealtime(): void {
         ),
       );
       renameMessageAuthor(queryClient, u);
+      renameDmAuthor(queryClient, u);
       const me = useAuthStore.getState().user;
       if (me && me.id === u.id && me.displayName !== u.displayName) {
         useAuthStore.getState().setUser({ ...me, displayName: u.displayName });

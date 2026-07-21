@@ -50,8 +50,8 @@ export default function MemberList() {
             {group.label} — {group.members.length}
           </div>
           {group.members.map((member) => {
-            const color =
-              member.status === 'online' ? (member.roles[0]?.color ?? undefined) : undefined;
+            // Цвет роли показываем всегда — и у офлайн-участников (как у владельца)
+            const color = member.roles[0]?.color ?? undefined;
             return (
               <div
                 key={member.id}

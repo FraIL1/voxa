@@ -1,5 +1,10 @@
 import type { InfiniteData, QueryClient } from '@tanstack/react-query';
-import type { DmMessageDto, DmMessagesPageDto } from '@voxa/shared';
+import type {
+  DmConversationDto,
+  DmMessageDto,
+  DmMessagesPageDto,
+  UserPublicDto,
+} from '@voxa/shared';
 
 export type DmChatMessage = DmMessageDto & { pending?: boolean };
 
@@ -64,5 +69,33 @@ export function removeDmMessage(
 ): void {
   queryClient.setQueryData<DmData>(dmMessagesKey(conversationId), (data) =>
     mapPages(data, (items) => items.filter((m) => m.id !== id)),
+  );
+}
+
+/** Смена профиля: обновляем автора во всех открытых диалогах и превью собеседника */
+export function renameDmAuthor(queryClient: QueryClient, user: UserPublicDto): void {
+  queryClient.setQueriesData<DmData>({ queryKey: ['dmMessages'] }, (data) =>
+    mapPages(data, (items) =>
+      items.map((m) =>
+        m.author?.id === user.id
+          ? {
+              ...m,
+              author: {
+                ...m.author,
+                displayName: user.displayName,
+                avatarUrl: user.avatarUrl,
+              },
+            }
+          : m,
+      ),
+    ),
+  );
+  // Собеседник в списке диалогов
+  queryClient.setQueryData<DmConversationDto[]>(DM_CONVERSATIONS_KEY, (list) =>
+    list?.map((c) =>
+      c.peer.id === user.id
+        ? { ...c, peer: { ...c.peer, displayName: user.displayName, avatarUrl: user.avatarUrl } }
+        : c,
+    ),
   );
 }

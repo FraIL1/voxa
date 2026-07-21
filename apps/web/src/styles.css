@@ -2100,3 +2100,9 @@ a {
   object-fit: cover;
   border-radius: inherit;
 }
+
+.server-icon-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
