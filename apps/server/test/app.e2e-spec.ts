@@ -1428,4 +1428,87 @@ describe('Voxa: критический поток (e2e)', () => {
 
     memberSocket.disconnect();
   });
+
+  it('владелец сервера: передача владения и удаление сервера', async () => {
+    const memberMe = await request(httpServer)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${memberAccess}`);
+    const memberId = (memberMe.body as MeDto).id;
+    const ownerMe = await request(httpServer)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${ownerAccess}`);
+    const ownerId = (ownerMe.body as MeDto).id;
+
+    // Свой сервер под опыты
+    const created = await request(httpServer)
+      .post('/api/guilds')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ name: 'Проверочный' })
+      .expect(201);
+    const testGuildId = created.body.id as string;
+
+    // Передать можно только участнику сервера
+    await request(httpServer)
+      .post(`/api/guilds/${testGuildId}/transfer`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ userId: memberId })
+      .expect(400);
+
+    const invite = await request(httpServer)
+      .post(`/api/guilds/${testGuildId}/invites`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ maxUses: 5 })
+      .expect(201);
+    await request(httpServer)
+      .post(`/api/invites/${invite.body.code}/join`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(200);
+
+    // Чужой передать не может
+    await request(httpServer)
+      .post(`/api/guilds/${testGuildId}/transfer`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ userId: memberId })
+      .expect(403);
+
+    // Передача: владение и права переезжают
+    await request(httpServer)
+      .post(`/api/guilds/${testGuildId}/transfer`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ userId: memberId })
+      .expect(201);
+
+    const afterTransfer = await request(httpServer)
+      .get(`/api/guilds/${testGuildId}`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(200);
+    expect(afterTransfer.body.ownerId).toBe(memberId);
+    expect(afterTransfer.body.myPermissions & Permissions.ADMINISTRATOR).toBe(
+      Permissions.ADMINISTRATOR,
+    );
+
+    // Бывший владелец стал обычным участником и теперь может выйти
+    await request(httpServer)
+      .post(`/api/guilds/${testGuildId}/leave`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(204);
+
+    // Удалить сервер может только владелец
+    await request(httpServer)
+      .delete(`/api/guilds/${testGuildId}`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(403);
+    await request(httpServer)
+      .delete(`/api/guilds/${testGuildId}`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(204);
+
+    // Сервер исчез у всех
+    const guilds = await request(httpServer)
+      .get('/api/guilds')
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(200);
+    expect((guilds.body as { id: string }[]).some((g) => g.id === testGuildId)).toBe(false);
+    expect(ownerId).toBeTruthy();
+  });
 });

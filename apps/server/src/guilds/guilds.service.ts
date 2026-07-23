@@ -184,6 +184,68 @@ export class GuildsService {
     this.ws.emitToUsers([userId], WsEvents.MeGuildsChanged, {});
   }
 
+  /** Передача владения другому участнику: владелец становится обычным */
+  async transferOwnership(ownerId: string, guildId: string, newOwnerId: string): Promise<GuildDto> {
+    const guild = await this.prisma.guild.findUnique({ where: { id: guildId } });
+    if (!guild) throw new NotFoundException('Сервер не найден');
+    if (guild.ownerId !== ownerId) {
+      throw new ForbiddenException('Передать сервер может только его владелец');
+    }
+    if (newOwnerId === ownerId) {
+      throw new BadRequestException('Вы уже владелец этого сервера');
+    }
+    if (!(await this.users.isMember(guildId, newOwnerId))) {
+      throw new BadRequestException('Новый владелец должен быть участником сервера');
+    }
+
+    const ownerRole = await this.prisma.role.findFirst({ where: { guildId, isOwnerRole: true } });
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const next = await tx.guild.update({
+        where: { id: guildId },
+        data: { ownerId: newOwnerId },
+      });
+      // Роль «Владелец» переезжает вместе с владением
+      if (ownerRole) {
+        await tx.userRole.deleteMany({ where: { roleId: ownerRole.id } });
+        await tx.userRole.create({ data: { userId: newOwnerId, roleId: ownerRole.id } });
+      }
+      return next;
+    });
+
+    this.ws.emitToGuild(guildId, WsEvents.GuildUpdated, { guildId });
+    this.ws.emitToGuild(guildId, WsEvents.GuildRolesChanged, { guildId });
+    this.ws.emitToGuild(guildId, WsEvents.GuildMembersChanged, { guildId });
+    this.ws.emitToUsers([ownerId, newOwnerId], WsEvents.MeGuildsChanged, {});
+    return this.toDto(updated, ownerId);
+  }
+
+  /** Удаление сервера владельцем: каналы, роли и сообщения уходят каскадом */
+  async remove(ownerId: string, guildId: string): Promise<void> {
+    const guild = await this.prisma.guild.findUnique({
+      where: { id: guildId },
+      select: { ownerId: true },
+    });
+    if (!guild) throw new NotFoundException('Сервер не найден');
+    if (guild.ownerId !== ownerId) {
+      throw new ForbiddenException('Удалить сервер может только его владелец');
+    }
+
+    const members = await this.prisma.guildMember.findMany({
+      where: { guildId },
+      select: { userId: true },
+    });
+    await this.prisma.guild.delete({ where: { id: guildId } });
+
+    for (const { userId } of members) {
+      await this.ws.removeUserFromGuild(userId, guildId);
+    }
+    this.ws.emitToUsers(
+      members.map((m) => m.userId),
+      WsEvents.MeGuildsChanged,
+      {},
+    );
+  }
+
   /** Снятие членства и ролей сервера (выход/кик/бан) */
   async removeMember(guildId: string, userId: string): Promise<void> {
     const deleted = await this.prisma.guildMember.deleteMany({ where: { guildId, userId } });

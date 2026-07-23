@@ -48,3 +48,22 @@ export function useLeaveGuild() {
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: GUILDS_KEY }),
   });
 }
+
+/** Передача владения сервером другому участнику */
+export function useTransferGuild(guildId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) =>
+      api<GuildDto>(`/guilds/${guildId}/transfer`, { method: 'POST', body: { userId } }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: GUILDS_KEY }),
+  });
+}
+
+/** Удаление сервера владельцем */
+export function useDeleteGuild() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (guildId: string) => api<void>(`/guilds/${guildId}`, { method: 'DELETE' }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: GUILDS_KEY }),
+  });
+}

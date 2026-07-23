@@ -14,6 +14,7 @@ import { Throttle } from '@nestjs/throttler';
 import {
   auditQuerySchema,
   createGuildSchema,
+  transferGuildSchema,
   createRoleSchema,
   Permissions,
   updateGuildSchema,
@@ -25,6 +26,7 @@ import {
   type CreateGuildInput,
   type CreateRoleInput,
   type GuildDto,
+  type TransferGuildInput,
   type MemberDto,
   type RoleDto,
   type UpdateGuildInput,
@@ -170,6 +172,21 @@ export class GuildsController {
   @HttpCode(204)
   async leave(@CurrentUser() user: RequestUser, @Param('guildId') guildId: string): Promise<void> {
     await this.guilds.leave(user.id, guildId);
+  }
+
+  @Post(':guildId/transfer')
+  transfer(
+    @CurrentUser() user: RequestUser,
+    @Param('guildId') guildId: string,
+    @Body(new ZodValidationPipe(transferGuildSchema)) body: TransferGuildInput,
+  ): Promise<GuildDto> {
+    return this.guilds.transferOwnership(user.id, guildId, body.userId);
+  }
+
+  @Delete(':guildId')
+  @HttpCode(204)
+  async remove(@CurrentUser() user: RequestUser, @Param('guildId') guildId: string): Promise<void> {
+    await this.guilds.remove(user.id, guildId);
   }
 
   @Get(':guildId/audit')

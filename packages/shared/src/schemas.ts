@@ -252,3 +252,7 @@ export type DmSearchInput = z.infer<typeof dmSearchSchema>;
 /** Старт звонка в личке: с камерой или только голос */
 export const startDmCallSchema = z.object({ video: z.boolean().default(false) });
 export type StartDmCallInput = z.infer<typeof startDmCallSchema>;
+
+/** Передача владения сервером другому участнику */
+export const transferGuildSchema = z.object({ userId: z.string().uuid() });
+export type TransferGuildInput = z.infer<typeof transferGuildSchema>;

@@ -1,10 +1,12 @@
 import { hasPermission, Permissions } from '@voxa/shared';
 import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router';
 
 import { ApiError } from '../api/client';
-import { useGuild, useLeaveGuild } from '../hooks/useGuilds';
+import { useDeleteGuild, useGuild, useLeaveGuild, useTransferGuild } from '../hooks/useGuilds';
 import { useUpdateGuild } from '../hooks/useGuildAdmin';
+import { useMembers } from '../hooks/useMembers';
 import { useAuthStore } from '../stores/auth';
 
 const MAX_ICON_BYTES = 256 * 1024;
@@ -18,6 +20,11 @@ export default function ServerProfileTab({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const { data: members } = useMembers(guildId);
+  const transferGuild = useTransferGuild(guildId);
+  const deleteGuild = useDeleteGuild();
+  const [heir, setHeir] = useState('');
   const guild = useGuild(guildId);
   const updateGuild = useUpdateGuild(guildId);
   const leaveGuild = useLeaveGuild();
@@ -114,6 +121,52 @@ export default function ServerProfileTab({
         >
           {t('serverSettings.leave')}
         </button>
+      )}
+
+      {isOwner && (
+        <>
+          <h2>{t('serverSettings.ownerZone')}</h2>
+          <p className="settings-hint">{t('serverSettings.transferHint')}</p>
+          <div className="invite-form">
+            <select value={heir} onChange={(e) => setHeir(e.target.value)}>
+              <option value="">{t('serverSettings.pickHeir')}</option>
+              {(members ?? [])
+                .filter((m) => m.id !== guild?.ownerId)
+                .map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.nickname ?? m.displayName}
+                  </option>
+                ))}
+            </select>
+            <button
+              className="btn-secondary"
+              disabled={!heir || transferGuild.isPending}
+              onClick={() => {
+                const name = members?.find((m) => m.id === heir)?.displayName ?? '';
+                if (!window.confirm(t('serverSettings.transferConfirm', { name }))) return;
+                transferGuild.mutate(heir, { onSuccess: () => setHeir('') });
+              }}
+            >
+              {t('serverSettings.transfer')}
+            </button>
+          </div>
+
+          <button
+            className="btn-secondary danger-text"
+            onClick={() => {
+              if (!window.confirm(t('serverSettings.deleteConfirm', { name: guild?.name ?? '' })))
+                return;
+              deleteGuild.mutate(guildId, {
+                onSuccess: () => {
+                  onClose();
+                  navigate('/home', { replace: true });
+                },
+              });
+            }}
+          >
+            {t('serverSettings.delete')}
+          </button>
+        </>
       )}
     </>
   );
