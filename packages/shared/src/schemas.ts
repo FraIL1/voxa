@@ -248,3 +248,7 @@ export const dmSearchSchema = z.object({
   q: z.string().trim().min(1, 'Введите запрос').max(100),
 });
 export type DmSearchInput = z.infer<typeof dmSearchSchema>;
+
+/** Старт звонка в личке: с камерой или только голос */
+export const startDmCallSchema = z.object({ video: z.boolean().default(false) });
+export type StartDmCallInput = z.infer<typeof startDmCallSchema>;

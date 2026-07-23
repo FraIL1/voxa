@@ -15,6 +15,7 @@ import { Throttle } from '@nestjs/throttler';
 import {
   ackSchema,
   dmSearchSchema,
+  startDmCallSchema,
   editDmSchema,
   messagesQuerySchema,
   openDmSchema,
@@ -25,6 +26,8 @@ import {
   type DmMessagesPageDto,
   type DmSearchInput,
   type EditDmInput,
+  type StartDmCallInput,
+  type VoiceTokenDto,
   type MessagesQueryInput,
   type OpenDmInput,
   type SendDmInput,
@@ -32,11 +35,15 @@ import {
 
 import { CurrentUser, type RequestUser } from '../common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { DmCallsService } from './dm-calls.service';
 import { DmService } from './dm.service';
 
 @Controller('dm')
 export class DmController {
-  constructor(private readonly dm: DmService) {}
+  constructor(
+    private readonly dm: DmService,
+    private readonly calls: DmCallsService,
+  ) {}
 
   @Get('conversations')
   async list(@CurrentUser() user: RequestUser): Promise<DmConversationDto[]> {
@@ -182,5 +189,47 @@ export class DmController {
     @Query(new ZodValidationPipe(dmSearchSchema)) query: DmSearchInput,
   ): Promise<DmMessageDto[]> {
     return this.dm.search(user.id, id, query.q);
+  }
+
+  // ---------- Звонки 1-на-1 ----------
+
+  @Post('conversations/:id/call')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  async startCall(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(startDmCallSchema)) body: StartDmCallInput,
+  ): Promise<VoiceTokenDto> {
+    const peerId = await this.dm.peerOf(user.id, id);
+    return this.calls.start(user.id, peerId, id, body.video);
+  }
+
+  @Post('conversations/:id/call/accept')
+  async acceptCall(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<VoiceTokenDto> {
+    await this.dm.peerOf(user.id, id);
+    return this.calls.accept(user.id, id);
+  }
+
+  @Post('conversations/:id/call/decline')
+  @HttpCode(204)
+  async declineCall(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<void> {
+    await this.dm.peerOf(user.id, id);
+    this.calls.end(id, 'declined');
+  }
+
+  @Post('conversations/:id/call/end')
+  @HttpCode(204)
+  async endCall(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<void> {
+    await this.dm.peerOf(user.id, id);
+    this.calls.end(id, 'ended');
   }
 }

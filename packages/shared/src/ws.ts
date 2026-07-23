@@ -46,6 +46,12 @@ export const WsEvents = {
   /** Реакции в личке (обоим участникам) */
   DmReactionAdded: 'dm.reaction.add',
   DmReactionRemoved: 'dm.reaction.remove',
+  /** Звонок 1-на-1: входящий вызов (адресно вызываемому) */
+  DmCallIncoming: 'dm.call.incoming',
+  /** Вызов принят (адресно звонящему) */
+  DmCallAccepted: 'dm.call.accepted',
+  /** Звонок завершён/отклонён/не отвечен (обоим) */
+  DmCallEnded: 'dm.call.ended',
   /** Адресное: пришла новая заявка в друзья */
   FriendRequestNew: 'friend.request.new',
   /** Адресное: состав друзей/заявок/блокировок изменился — перечитать списки */
@@ -81,6 +87,15 @@ export interface DmReactionEventPayload {
   emoji: string;
   userId: string;
 }
+
+/** Кто звонит и с камерой ли */
+export interface DmCallIncomingPayload {
+  conversationId: string;
+  from: UserPublicDto;
+  video: boolean;
+}
+
+export type DmCallEndReason = 'declined' | 'ended' | 'timeout' | 'busy';
 
 export interface ReactionEventPayload {
   channelId: string;
@@ -131,6 +146,9 @@ export interface WsServerEvents {
   [WsEvents.DmConversationUpdated]: DmConversationDto;
   [WsEvents.DmReactionAdded]: DmReactionEventPayload;
   [WsEvents.DmReactionRemoved]: DmReactionEventPayload;
+  [WsEvents.DmCallIncoming]: DmCallIncomingPayload;
+  [WsEvents.DmCallAccepted]: { conversationId: string };
+  [WsEvents.DmCallEnded]: { conversationId: string; reason: DmCallEndReason };
   [WsEvents.FriendRequestNew]: FriendRequestDto;
   [WsEvents.FriendsUpdated]: { reason: FriendsUpdateReason };
   [WsEvents.GuildMembersChanged]: { guildId: string };

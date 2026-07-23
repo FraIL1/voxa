@@ -1323,4 +1323,93 @@ describe('Voxa: критический поток (e2e)', () => {
       .set('Authorization', `Bearer ${(outsider.body as AuthResponseDto).accessToken}`)
       .expect(403);
   });
+
+  it('звонок 1-на-1: входящий вызов по WS, принятие и завершение', async () => {
+    const memberMe = await request(httpServer)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${memberAccess}`);
+    const memberId = (memberMe.body as MeDto).id;
+
+    const opened = await request(httpServer)
+      .post('/api/dm/conversations')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ userId: memberId })
+      .expect(201);
+    const conversationId = opened.body.id as string;
+
+    // Вызываемый слушает входящий звонок
+    const memberSocket = io(baseUrl, { auth: { token: memberAccess }, transports: ['websocket'] });
+    await new Promise((resolve, reject) => {
+      memberSocket.once(WsEvents.Ready, resolve);
+      memberSocket.once('auth_error', () => reject(new Error('WS-авторизация не прошла')));
+    });
+    const incoming = new Promise<{
+      conversationId: string;
+      video: boolean;
+      from: { id: string };
+    }>((resolve) => {
+      memberSocket.once(WsEvents.DmCallIncoming, resolve);
+    });
+
+    // Звонящий получает токен LiveKit на комнату dm:<id>
+    const started = await request(httpServer)
+      .post(`/api/dm/conversations/${conversationId}/call`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ video: true })
+      .expect(201);
+    expect(started.body.channelId).toBe(`dm:${conversationId}`);
+    expect(started.body.token).toBeTruthy();
+
+    const claims = JSON.parse(
+      Buffer.from((started.body.token as string).split('.')[1] as string, 'base64url').toString(),
+    ) as { video: { room: string; canPublish: boolean } };
+    expect(claims.video.room).toBe(`dm:${conversationId}`);
+    expect(claims.video.canPublish).toBe(true);
+
+    const call = await incoming;
+    expect(call.conversationId).toBe(conversationId);
+    expect(call.video).toBe(true);
+
+    // Второй звонок в тот же диалог от другого участника — 400 (занято)
+    await request(httpServer)
+      .post(`/api/dm/conversations/${conversationId}/call`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ video: false })
+      .expect(400);
+
+    // Принятие: звонящему приходит подтверждение, отвечающему — свой токен
+    const accepted = new Promise<{ conversationId: string }>((resolve) => {
+      socket?.once(WsEvents.DmCallAccepted, resolve);
+    });
+    const answer = await request(httpServer)
+      .post(`/api/dm/conversations/${conversationId}/call/accept`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(403); // вызов адресован участнику, а не звонящему
+    expect(answer.body.message).toBeTruthy();
+
+    const answered = await request(httpServer)
+      .post(`/api/dm/conversations/${conversationId}/call/accept`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(201);
+    expect(answered.body.channelId).toBe(`dm:${conversationId}`);
+    expect((await accepted).conversationId).toBe(conversationId);
+
+    // Завершение: обоим приходит dm.call.ended
+    const ended = new Promise<{ reason: string }>((resolve) => {
+      memberSocket.once(WsEvents.DmCallEnded, resolve);
+    });
+    await request(httpServer)
+      .post(`/api/dm/conversations/${conversationId}/call/end`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(204);
+    expect((await ended).reason).toBe('ended');
+
+    // Принять уже завершённый звонок нельзя
+    await request(httpServer)
+      .post(`/api/dm/conversations/${conversationId}/call/accept`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(400);
+
+    memberSocket.disconnect();
+  });
 });

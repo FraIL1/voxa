@@ -87,6 +87,14 @@ export class DmService {
     return conversation;
   }
 
+  /** id собеседника; заодно проверяет участие и отсутствие блокировки */
+  async peerOf(meId: string, conversationId: string): Promise<string> {
+    const conversation = await this.assertParticipant(conversationId, meId);
+    const peerId = this.peerIdOf(conversation, meId);
+    await this.friends.assertNotBlocked(meId, peerId);
+    return peerId;
+  }
+
   private toMessageDto(message: DmMessageWithRelations): Promise<DmMessageDto> {
     return (async () => ({
       id: message.id,
