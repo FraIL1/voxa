@@ -242,3 +242,9 @@ export const updateRoleSchema = z.object({
   permissions: z.number().int().min(0).optional(),
 });
 export type UpdateRoleInput = z.infer<typeof updateRoleSchema>;
+
+/** Поиск по переписке в личке */
+export const dmSearchSchema = z.object({
+  q: z.string().trim().min(1, 'Введите запрос').max(100),
+});
+export type DmSearchInput = z.infer<typeof dmSearchSchema>;

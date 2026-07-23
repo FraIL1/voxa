@@ -240,6 +240,9 @@ export interface AdminOverviewDto {
 export interface DmMessageDto {
   id: string;
   conversationId: string;
+  reactions: ReactionDto[];
+  /** Закреплено в диалоге (видно обоим) */
+  pinnedAt: string | null;
   author: UserPublicDto | null;
   content: string;
   replyToId: string | null;
@@ -265,6 +268,8 @@ export interface DmConversationDto {
   } | null;
   unreadCount: number;
   lastMessageAt: string;
+  /** Закреплён ли диалог лично у меня (такие идут сверху списка) */
+  pinned: boolean;
 }
 
 /** Друг (принятая дружба) со статусом присутствия */

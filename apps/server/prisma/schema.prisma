@@ -38,6 +38,7 @@ model User {
   dmAsUserA        DmConversation[]   @relation("DmUserA")
   dmAsUserB        DmConversation[]   @relation("DmUserB")
   dmMessages       DmMessage[]
+  dmReactions      DmReaction[]
   dmReadStates     DmReadState[]
   friendsSent      Friendship[]       @relation("FriendRequester")
   friendsReceived  Friendship[]       @relation("FriendAddressee")
@@ -371,12 +372,32 @@ model DmMessage {
   replies        DmMessage[]    @relation("DmReplies")
   editedAt       DateTime?      @map("edited_at")
   deletedAt      DateTime?      @map("deleted_at")
+  /// Закреплено в диалоге (видно обоим участникам)
+  pinnedAt       DateTime?      @map("pinned_at")
+  pinnedById     String?        @map("pinned_by_id")
   createdAt      DateTime       @default(now()) @map("created_at")
 
   attachments Attachment[]
+  reactions   DmReaction[]
 
   @@index([conversationId, id])
   @@map("dm_messages")
+}
+
+/// Реакция-эмодзи на сообщение в личке
+model DmReaction {
+  id          String    @id @default(uuid(7))
+  dmMessageId String    @map("dm_message_id")
+  dmMessage   DmMessage @relation(fields: [dmMessageId], references: [id], onDelete: Cascade)
+  userId      String    @map("user_id")
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Эмодзи как есть (может быть несколько кодпоинтов)
+  emoji       String
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@unique([dmMessageId, userId, emoji])
+  @@index([dmMessageId])
+  @@map("dm_reactions")
 }
 
 /// Прочитанность диалога участником
@@ -386,6 +407,8 @@ model DmReadState {
   userId            String         @map("user_id")
   user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   lastReadMessageId String?        @map("last_read_message_id")
+  /// Закреплён ли диалог в моём списке (у каждого участника своё)
+  pinned            Boolean        @default(false)
   updatedAt         DateTime       @updatedAt @map("updated_at")
 
   @@id([conversationId, userId])

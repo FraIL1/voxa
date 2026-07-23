@@ -8,11 +8,13 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import {
   ackSchema,
+  dmSearchSchema,
   editDmSchema,
   messagesQuerySchema,
   openDmSchema,
@@ -21,6 +23,7 @@ import {
   type DmConversationDto,
   type DmMessageDto,
   type DmMessagesPageDto,
+  type DmSearchInput,
   type EditDmInput,
   type MessagesQueryInput,
   type OpenDmInput,
@@ -98,5 +101,86 @@ export class DmController {
     @Body(new ZodValidationPipe(ackSchema)) body: AckInput,
   ): Promise<void> {
     await this.dm.ack(user.id, id, body.messageId);
+  }
+
+  // ---------- Реакции ----------
+
+  @Put('conversations/:id/messages/:messageId/reactions/:emoji')
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @HttpCode(204)
+  async addReaction(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('messageId', ParseUUIDPipe) messageId: string,
+    @Param('emoji') emoji: string,
+  ): Promise<void> {
+    await this.dm.addReaction(user.id, id, messageId, decodeURIComponent(emoji));
+  }
+
+  @Delete('conversations/:id/messages/:messageId/reactions/:emoji')
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @HttpCode(204)
+  async removeReaction(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('messageId', ParseUUIDPipe) messageId: string,
+    @Param('emoji') emoji: string,
+  ): Promise<void> {
+    await this.dm.removeReaction(user.id, id, messageId, decodeURIComponent(emoji));
+  }
+
+  // ---------- Закреплённые сообщения ----------
+
+  @Get('conversations/:id/pins')
+  listPinned(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<DmMessageDto[]> {
+    return this.dm.listPinned(user.id, id);
+  }
+
+  @Put('conversations/:id/messages/:messageId/pin')
+  pinMessage(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('messageId', ParseUUIDPipe) messageId: string,
+  ): Promise<DmMessageDto> {
+    return this.dm.setMessagePinned(user.id, id, messageId, true);
+  }
+
+  @Delete('conversations/:id/messages/:messageId/pin')
+  unpinMessage(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('messageId', ParseUUIDPipe) messageId: string,
+  ): Promise<DmMessageDto> {
+    return this.dm.setMessagePinned(user.id, id, messageId, false);
+  }
+
+  // ---------- Закрепление диалога и поиск ----------
+
+  @Put('conversations/:id/pin')
+  pinConversation(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<DmConversationDto> {
+    return this.dm.setConversationPinned(user.id, id, true);
+  }
+
+  @Delete('conversations/:id/pin')
+  unpinConversation(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<DmConversationDto> {
+    return this.dm.setConversationPinned(user.id, id, false);
+  }
+
+  @Get('conversations/:id/search')
+  search(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query(new ZodValidationPipe(dmSearchSchema)) query: DmSearchInput,
+  ): Promise<DmMessageDto[]> {
+    return this.dm.search(user.id, id, query.q);
   }
 }

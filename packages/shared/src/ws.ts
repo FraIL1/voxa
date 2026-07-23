@@ -43,6 +43,9 @@ export const WsEvents = {
   DmMessageDeleted: 'dm.message.delete',
   /** Диалог создан/поднялся в списке (обновить превью и порядок) */
   DmConversationUpdated: 'dm.conversation.updated',
+  /** Реакции в личке (обоим участникам) */
+  DmReactionAdded: 'dm.reaction.add',
+  DmReactionRemoved: 'dm.reaction.remove',
   /** Адресное: пришла новая заявка в друзья */
   FriendRequestNew: 'friend.request.new',
   /** Адресное: состав друзей/заявок/блокировок изменился — перечитать списки */
@@ -70,6 +73,13 @@ export interface WsReadyPayload {
   userId: string;
   /** Каналы, на события которых подписан сокет */
   channelIds: string[];
+}
+
+export interface DmReactionEventPayload {
+  conversationId: string;
+  messageId: string;
+  emoji: string;
+  userId: string;
 }
 
 export interface ReactionEventPayload {
@@ -119,6 +129,8 @@ export interface WsServerEvents {
   [WsEvents.DmMessageEdited]: DmMessageDto;
   [WsEvents.DmMessageDeleted]: { id: string; conversationId: string };
   [WsEvents.DmConversationUpdated]: DmConversationDto;
+  [WsEvents.DmReactionAdded]: DmReactionEventPayload;
+  [WsEvents.DmReactionRemoved]: DmReactionEventPayload;
   [WsEvents.FriendRequestNew]: FriendRequestDto;
   [WsEvents.FriendsUpdated]: { reason: FriendsUpdateReason };
   [WsEvents.GuildMembersChanged]: { guildId: string };

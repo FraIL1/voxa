@@ -1181,4 +1181,146 @@ describe('Voxa: критический поток (e2e)', () => {
     // Родной сервер «Voxa» при этом остаётся на месте
     expect((afterLeave.body as { name: string }[]).some((g) => g.name === 'Voxa')).toBe(true);
   });
+
+  it('ЛС: реакции, закрепление сообщения и диалога, поиск по переписке', async () => {
+    const memberMe = await request(httpServer)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${memberAccess}`);
+    const memberId = (memberMe.body as MeDto).id;
+
+    const opened = await request(httpServer)
+      .post('/api/dm/conversations')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ userId: memberId })
+      .expect(201);
+    const conversationId = opened.body.id as string;
+
+    const sent = await request(httpServer)
+      .post(`/api/dm/conversations/${conversationId}/messages`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ content: 'Обсудим уникальное-слово завтра' })
+      .expect(201);
+    const messageId = sent.body.id as string;
+
+    // Собеседник слушает событие реакции
+    const memberSocket = io(baseUrl, { auth: { token: memberAccess }, transports: ['websocket'] });
+    await new Promise((resolve, reject) => {
+      memberSocket.once(WsEvents.Ready, resolve);
+      memberSocket.once('auth_error', () => reject(new Error('WS-авторизация не прошла')));
+    });
+    const reacted = new Promise<{ messageId: string; emoji: string }>((resolve) => {
+      memberSocket.once(WsEvents.DmReactionAdded, resolve);
+    });
+
+    // Реакция ставится и доставляется обоим; повтор идемпотентен
+    const emoji = encodeURIComponent('👍');
+    await request(httpServer)
+      .put(`/api/dm/conversations/${conversationId}/messages/${messageId}/reactions/${emoji}`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(204);
+    const event = await reacted;
+    expect(event.messageId).toBe(messageId);
+    expect(event.emoji).toBe('👍');
+    memberSocket.disconnect();
+
+    await request(httpServer)
+      .put(`/api/dm/conversations/${conversationId}/messages/${messageId}/reactions/${emoji}`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(204);
+
+    const withReaction = await request(httpServer)
+      .get(`/api/dm/conversations/${conversationId}/messages`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    const reactions = (
+      withReaction.body.items as { id: string; reactions: { emoji: string; userId: string }[] }[]
+    ).find((m) => m.id === messageId)?.reactions;
+    expect(reactions).toHaveLength(1);
+    expect(reactions?.[0]?.userId).toBe(memberId);
+
+    // Снятие реакции
+    await request(httpServer)
+      .delete(`/api/dm/conversations/${conversationId}/messages/${messageId}/reactions/${emoji}`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(204);
+
+    // Закрепление сообщения видно обоим
+    await request(httpServer)
+      .put(`/api/dm/conversations/${conversationId}/messages/${messageId}/pin`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    const pins = await request(httpServer)
+      .get(`/api/dm/conversations/${conversationId}/pins`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(200);
+    expect((pins.body as { id: string }[]).map((m) => m.id)).toContain(messageId);
+
+    await request(httpServer)
+      .delete(`/api/dm/conversations/${conversationId}/messages/${messageId}/pin`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    const noPins = await request(httpServer)
+      .get(`/api/dm/conversations/${conversationId}/pins`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    expect(noPins.body).toHaveLength(0);
+
+    // Закрепление диалога — личное: у владельца да, у собеседника нет
+    await request(httpServer)
+      .put(`/api/dm/conversations/${conversationId}/pin`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    const ownerList = await request(httpServer)
+      .get('/api/dm/conversations')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    expect(
+      (ownerList.body as { id: string; pinned: boolean }[]).find((c) => c.id === conversationId)
+        ?.pinned,
+    ).toBe(true);
+    const memberList = await request(httpServer)
+      .get('/api/dm/conversations')
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(200);
+    expect(
+      (memberList.body as { id: string; pinned: boolean }[]).find((c) => c.id === conversationId)
+        ?.pinned,
+    ).toBe(false);
+
+    // Поиск по переписке
+    const found = await request(httpServer)
+      .get(
+        `/api/dm/conversations/${conversationId}/search?q=${encodeURIComponent('УНИКАЛЬНОЕ-слово')}`,
+      )
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(200);
+    expect((found.body as { id: string }[]).map((m) => m.id)).toContain(messageId);
+
+    const empty = await request(httpServer)
+      .get(
+        `/api/dm/conversations/${conversationId}/search?q=${encodeURIComponent('такого-точно-нет')}`,
+      )
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(200);
+    expect(empty.body).toHaveLength(0);
+
+    // Чужак не лезет в чужой диалог
+    const outsiderInvite = await request(httpServer)
+      .post(`/api/guilds/${guildId}/invites`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ maxUses: 1 })
+      .expect(201);
+    const outsider = await request(httpServer)
+      .post('/api/auth/register')
+      .send({
+        inviteCode: outsiderInvite.body.code,
+        username: 'Чужак2',
+        password: 'пароль-чужака-456',
+      })
+      .expect(201);
+    await request(httpServer)
+      .get(`/api/dm/conversations/${conversationId}/pins`)
+      .set('Authorization', `Bearer ${(outsider.body as AuthResponseDto).accessToken}`)
+      .expect(403);
+  });
 });
