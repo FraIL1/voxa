@@ -1,4 +1,4 @@
-import { MessageCircle, Plus } from 'lucide-react';
+import { MessageCircle, Plus, Shield } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink, useLocation, useNavigate } from 'react-router';
@@ -6,7 +6,9 @@ import { NavLink, useLocation, useNavigate } from 'react-router';
 import { useDmConversations } from '../hooks/useDm';
 import { useFriendRequests } from '../hooks/useFriends';
 import { useGuilds } from '../hooks/useGuilds';
+import { useAuthStore } from '../stores/auth';
 import AddServerModal from './AddServerModal';
+import InstancePanel from './InstancePanel';
 
 /** Левый столбец иконок (как в Discord): Дом (личка+друзья) + серверы + «+» */
 export default function ServerRail() {
@@ -17,6 +19,8 @@ export default function ServerRail() {
   const { data: requests } = useFriendRequests();
   const { data: guilds } = useGuilds();
   const [addOpen, setAddOpen] = useState(false);
+  const [instanceOpen, setInstanceOpen] = useState(false);
+  const isInstanceOwner = useAuthStore((s) => s.user?.isInstanceOwner ?? false);
 
   const homeActive = location.pathname.startsWith('/home') || location.pathname.startsWith('/dm');
   const dmUnread = (conversations ?? []).reduce((sum, c) => sum + c.unreadCount, 0);
@@ -55,7 +59,18 @@ export default function ServerRail() {
         <Plus size={22} />
       </button>
 
+      {isInstanceOwner && (
+        <button
+          className="rail-icon owner"
+          title={t('instance.title')}
+          onClick={() => setInstanceOpen(true)}
+        >
+          <Shield size={22} />
+        </button>
+      )}
+
       {addOpen && <AddServerModal onClose={() => setAddOpen(false)} />}
+      {instanceOpen && <InstancePanel onClose={() => setInstanceOpen(false)} />}
     </nav>
   );
 }

@@ -2343,3 +2343,15 @@ a {
   font-size: 13px;
   color: var(--danger);
 }
+
+/* Иконка владельца приложения в рейле */
+.rail-icon.owner {
+  margin-top: auto;
+  background: var(--panel);
+  color: var(--accent);
+}
+
+.rail-icon.owner:hover {
+  background: var(--accent);
+  color: var(--accent-text);
+}
