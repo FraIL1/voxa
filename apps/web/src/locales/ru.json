@@ -158,7 +158,19 @@
     "write": "Написать",
     "placeholder": "Сообщение для {{name}}",
     "empty": "Начните переписку — напишите первое сообщение",
-    "noConversations": "Диалогов пока нет"
+    "noConversations": "Диалогов пока нет",
+    "pinned": "Закреплено",
+    "pinMessage": "Закрепить сообщение",
+    "unpinMessage": "Открепить сообщение",
+    "pinnedTitle": "Закреплённые сообщения",
+    "noPinned": "Закреплённых сообщений нет",
+    "pinChat": "Закрепить чат",
+    "unpinChat": "Открепить чат",
+    "pinnedChats": "Закреплённые",
+    "searchTitle": "Поиск по переписке",
+    "searchPlaceholder": "Что ищем?",
+    "searchEmpty": "Ничего не найдено",
+    "profileTitle": "Профиль"
   },
   "moderation": {
     "timeout10m": "Таймаут на 10 минут",

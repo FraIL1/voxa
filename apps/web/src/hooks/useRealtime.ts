@@ -3,6 +3,7 @@ import {
   WsEvents,
   type DmConversationDto,
   type DmMessageDto,
+  type DmReactionEventPayload,
   type FriendDto,
   type FriendRequestDto,
   type MemberDto,
@@ -26,6 +27,7 @@ import {
 } from '../api/messages-cache';
 import {
   addDmMessage,
+  applyDmReaction,
   DM_CONVERSATIONS_KEY,
   removeDmMessage,
   renameDmAuthor,
@@ -221,6 +223,13 @@ export function useRealtime(): void {
         removeDmMessage(queryClient, conversationId, id);
       },
     );
+    socket.on(WsEvents.DmReactionAdded, (p: DmReactionEventPayload) => {
+      applyDmReaction(queryClient, p.conversationId, p.messageId, p.emoji, p.userId, 'add');
+    });
+    socket.on(WsEvents.DmReactionRemoved, (p: DmReactionEventPayload) => {
+      applyDmReaction(queryClient, p.conversationId, p.messageId, p.emoji, p.userId, 'remove');
+    });
+
     socket.on(WsEvents.DmConversationUpdated, (conv: DmConversationDto) => {
       queryClient.setQueryData<DmConversationDto[]>(DM_CONVERSATIONS_KEY, (list) => {
         const rest = (list ?? []).filter((c) => c.id !== conv.id);

@@ -1,6 +1,15 @@
 import type { AttachmentDto, DmConversationDto } from '@voxa/shared';
 import { MAX_ATTACHMENTS_PER_MESSAGE } from '@voxa/shared';
-import { AtSign, Loader2, Paperclip, SendHorizontal, X } from 'lucide-react';
+import {
+  AtSign,
+  Loader2,
+  Paperclip,
+  Pin,
+  Search,
+  SendHorizontal,
+  UserRound,
+  X,
+} from 'lucide-react';
 import {
   useEffect,
   useLayoutEffect,
@@ -17,6 +26,7 @@ import { api } from '../api/client';
 import type { DmChatMessage } from '../api/dm-cache';
 import { uploadFile } from '../api/uploads';
 import { useDmAck, useDmConversations, useDmMessages, useSendDm } from '../hooks/useDm';
+import { PeerProfilePanel, PinnedPanel, SearchPanel } from './DmHeaderPanels';
 import DmMessageItem from './DmMessageItem';
 
 interface PendingFile {
@@ -237,6 +247,7 @@ export default function DmView() {
   const { conversationId } = useParams<{ conversationId: string }>();
   const { data: conversations } = useDmConversations();
   const [peer, setPeer] = useState<DmConversationDto['peer'] | null>(null);
+  const [panel, setPanel] = useState<'pins' | 'search' | 'profile' | null>(null);
 
   // Собеседника берём из списка, а если диалог только что открыт — догружаем
   const fromList = conversations?.find((c) => c.id === conversationId)?.peer ?? null;
@@ -260,7 +271,43 @@ export default function DmView() {
       <header className="channel-header">
         <AtSign size={18} />
         {peer?.displayName ?? t('dm.title')}
+
+        <div className="dm-header-actions">
+          <button
+            className={`icon-button${panel === 'pins' ? ' engaged' : ''}`}
+            title={t('dm.pinnedTitle')}
+            onClick={() => setPanel((p) => (p === 'pins' ? null : 'pins'))}
+          >
+            <Pin size={17} />
+          </button>
+          <button
+            className={`icon-button${panel === 'profile' ? ' engaged' : ''}`}
+            title={t('dm.profileTitle')}
+            disabled={!peer}
+            onClick={() => setPanel((p) => (p === 'profile' ? null : 'profile'))}
+          >
+            <UserRound size={17} />
+          </button>
+          <button
+            className={`icon-button${panel === 'search' ? ' engaged' : ''}`}
+            title={t('dm.searchTitle')}
+            onClick={() => setPanel((p) => (p === 'search' ? null : 'search'))}
+          >
+            <Search size={17} />
+          </button>
+        </div>
       </header>
+
+      {panel === 'pins' && (
+        <PinnedPanel conversationId={conversationId} onClose={() => setPanel(null)} />
+      )}
+      {panel === 'search' && (
+        <SearchPanel conversationId={conversationId} onClose={() => setPanel(null)} />
+      )}
+      {panel === 'profile' && peer && (
+        <PeerProfilePanel peer={peer} onClose={() => setPanel(null)} />
+      )}
+
       <DmMessages conversationId={conversationId} />
       <DmComposer conversationId={conversationId} peerName={peer?.displayName ?? ''} />
     </div>

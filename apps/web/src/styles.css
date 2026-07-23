@@ -2106,3 +2106,119 @@ a {
   flex-direction: column;
   gap: 8px;
 }
+
+/* ---------- Личные сообщения: шапка, панели, закрепление ---------- */
+
+.dm-header-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+}
+
+.dm-panel {
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 8px 12px 12px;
+}
+
+.dm-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 4px 0 8px;
+  position: sticky;
+  top: 0;
+  background: var(--panel);
+}
+
+.dm-panel-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0 10px;
+  margin-bottom: 8px;
+  color: var(--text-muted);
+}
+
+.dm-panel-search input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  padding: 8px 0;
+}
+
+.dm-panel-search input:focus {
+  border: none;
+}
+
+.dm-panel-row {
+  padding: 8px;
+  border-radius: var(--radius);
+}
+
+.dm-panel-row:hover {
+  background: var(--panel-raised);
+}
+
+.dm-panel-row-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.dm-panel-row-text {
+  font-size: 14px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.dm-profile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 0 4px;
+}
+
+.dm-profile-avatar {
+  width: 64px;
+  height: 64px;
+  font-size: 26px;
+}
+
+.dm-profile-name {
+  font-weight: 700;
+  font-size: 17px;
+}
+
+.dm-profile-username {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Метка закреплённого сообщения */
+.pinned-mark {
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Кнопка закрепления чата — только при наведении на строку */
+.dm-pin-button {
+  opacity: 0;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.dm-link:hover .dm-pin-button,
+.dm-link.active .dm-pin-button {
+  opacity: 1;
+}

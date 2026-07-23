@@ -4,6 +4,7 @@ import type { DmConversationDto, DmMessageDto, DmMessagesPageDto } from '@voxa/s
 import { api } from '../api/client';
 import {
   addDmMessage,
+  applyDmReaction,
   confirmDmMessage,
   DM_CONVERSATIONS_KEY,
   dmMessagesKey,
@@ -79,6 +80,8 @@ export function useSendDm(conversationId: string) {
         replyToId: replyToId ?? null,
         replyTo: null,
         attachments: [],
+        reactions: [],
+        pinnedAt: null,
         editedAt: null,
         createdAt: new Date().toISOString(),
         pending: true,
@@ -118,5 +121,82 @@ export function useDmAck() {
   return useMutation({
     mutationFn: ({ conversationId, messageId }: { conversationId: string; messageId: string }) =>
       api<void>(`/dm/conversations/${conversationId}/ack`, { method: 'POST', body: { messageId } }),
+  });
+}
+
+export function dmPinsKey(conversationId: string): readonly unknown[] {
+  return ['dmPins', conversationId];
+}
+
+/** Поставить/снять реакцию (оптимистично, WS подтвердит обоим) */
+export function useToggleDmReaction(conversationId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ messageId, emoji, mine }: { messageId: string; emoji: string; mine: boolean }) =>
+      api<void>(
+        `/dm/conversations/${conversationId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`,
+        { method: mine ? 'DELETE' : 'PUT' },
+      ),
+    onMutate: ({ messageId, emoji, mine }) => {
+      const myId = useAuthStore.getState().user?.id;
+      if (myId) {
+        applyDmReaction(
+          queryClient,
+          conversationId,
+          messageId,
+          emoji,
+          myId,
+          mine ? 'remove' : 'add',
+        );
+      }
+    },
+  });
+}
+
+/** Закреплённые сообщения диалога */
+export function useDmPins(conversationId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: dmPinsKey(conversationId),
+    queryFn: () => api<DmMessageDto[]>(`/dm/conversations/${conversationId}/pins`),
+    enabled,
+  });
+}
+
+/** Закрепить/открепить сообщение (видно обоим) */
+export function useToggleDmPin(conversationId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ messageId, pinned }: { messageId: string; pinned: boolean }) =>
+      api<DmMessageDto>(`/dm/conversations/${conversationId}/messages/${messageId}/pin`, {
+        method: pinned ? 'DELETE' : 'PUT',
+      }),
+    onSuccess: (message) => {
+      updateDmMessage(queryClient, message);
+      void queryClient.invalidateQueries({ queryKey: dmPinsKey(conversationId) });
+    },
+  });
+}
+
+/** Закрепить/открепить сам диалог в своём списке */
+export function useToggleConversationPin() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ conversationId, pinned }: { conversationId: string; pinned: boolean }) =>
+      api<DmConversationDto>(`/dm/conversations/${conversationId}/pin`, {
+        method: pinned ? 'DELETE' : 'PUT',
+      }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: DM_CONVERSATIONS_KEY }),
+  });
+}
+
+/** Поиск по переписке (запускается только при непустом запросе) */
+export function useDmSearch(conversationId: string, query: string) {
+  return useQuery({
+    queryKey: ['dmSearch', conversationId, query],
+    queryFn: () =>
+      api<DmMessageDto[]>(
+        `/dm/conversations/${conversationId}/search?q=${encodeURIComponent(query)}`,
+      ),
+    enabled: query.trim().length > 0,
   });
 }

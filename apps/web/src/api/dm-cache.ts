@@ -99,3 +99,31 @@ export function renameDmAuthor(queryClient: QueryClient, user: UserPublicDto): v
     ),
   );
 }
+
+/** Реакция пришла по WS: правим сообщение в открытом диалоге */
+export function applyDmReaction(
+  queryClient: QueryClient,
+  conversationId: string,
+  messageId: string,
+  emoji: string,
+  userId: string,
+  action: 'add' | 'remove',
+): void {
+  queryClient.setQueryData<DmData>(dmMessagesKey(conversationId), (data) =>
+    mapPages(data, (items) =>
+      items.map((m) => {
+        if (m.id !== messageId) return m;
+        const has = m.reactions.some((r) => r.emoji === emoji && r.userId === userId);
+        if (action === 'add') {
+          if (has) return m;
+          return { ...m, reactions: [...m.reactions, { emoji, userId }] };
+        }
+        if (!has) return m;
+        return {
+          ...m,
+          reactions: m.reactions.filter((r) => !(r.emoji === emoji && r.userId === userId)),
+        };
+      }),
+    ),
+  );
+}

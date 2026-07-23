@@ -1,15 +1,54 @@
-import { Users } from 'lucide-react';
+import type { DmConversationDto } from '@voxa/shared';
+import { Pin, PinOff, Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { NavLink } from 'react-router';
 
-import { useDmConversations } from '../hooks/useDm';
+import { useDmConversations, useToggleConversationPin } from '../hooks/useDm';
 import UserCard from './UserCard';
+
+function DmLink({ conversation }: { conversation: DmConversationDto }) {
+  const { t } = useTranslation();
+  const togglePin = useToggleConversationPin();
+
+  return (
+    <NavLink
+      to={`/dm/${conversation.id}`}
+      className={({ isActive }) =>
+        `channel-link dm-link${isActive ? ' active' : ''}${
+          conversation.unreadCount > 0 ? ' unread' : ''
+        }`
+      }
+    >
+      <div className="dm-avatar" aria-hidden>
+        {conversation.peer.displayName.slice(0, 1).toUpperCase()}
+      </div>
+      <span className="channel-name">{conversation.peer.displayName}</span>
+      {conversation.unreadCount > 0 && (
+        <span className="mention-badge">{conversation.unreadCount}</span>
+      )}
+      <button
+        className="icon-button dm-pin-button"
+        title={conversation.pinned ? t('dm.unpinChat') : t('dm.pinChat')}
+        onClick={(e) => {
+          // Клик по кнопке не должен открывать диалог
+          e.preventDefault();
+          e.stopPropagation();
+          togglePin.mutate({ conversationId: conversation.id, pinned: conversation.pinned });
+        }}
+      >
+        {conversation.pinned ? <PinOff size={14} /> : <Pin size={14} />}
+      </button>
+    </NavLink>
+  );
+}
 
 /** Вторая колонка в «домашнем» контексте: друзья + список личных диалогов. */
 export default function DmSidebar() {
   const { t } = useTranslation();
   const { data: conversations } = useDmConversations();
   const list = conversations ?? [];
+  const pinned = list.filter((c) => c.pinned);
+  const rest = list.filter((c) => !c.pinned);
 
   return (
     <nav className="sidebar">
@@ -25,22 +64,19 @@ export default function DmSidebar() {
           <span className="channel-name">{t('nav.friends')}</span>
         </NavLink>
 
+        {pinned.length > 0 && (
+          <>
+            <div className="category-name">{t('dm.pinnedChats')}</div>
+            {pinned.map((c) => (
+              <DmLink key={c.id} conversation={c} />
+            ))}
+          </>
+        )}
+
         <div className="category-name">{t('dm.section')}</div>
         {list.length === 0 && <p className="sidebar-empty">{t('dm.noConversations')}</p>}
-        {list.map((c) => (
-          <NavLink
-            key={c.id}
-            to={`/dm/${c.id}`}
-            className={({ isActive }) =>
-              `channel-link${isActive ? ' active' : ''}${c.unreadCount > 0 ? ' unread' : ''}`
-            }
-          >
-            <div className="dm-avatar" aria-hidden>
-              {c.peer.displayName.slice(0, 1).toUpperCase()}
-            </div>
-            <span className="channel-name">{c.peer.displayName}</span>
-            {c.unreadCount > 0 && <span className="mention-badge">{c.unreadCount}</span>}
-          </NavLink>
+        {rest.map((c) => (
+          <DmLink key={c.id} conversation={c} />
         ))}
       </div>
 
