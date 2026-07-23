@@ -3,6 +3,8 @@ import {
   WsEvents,
   type DmConversationDto,
   type DmMessageDto,
+  type DmCallEndReason,
+  type DmCallIncomingPayload,
   type DmReactionEventPayload,
   type FriendDto,
   type FriendRequestDto,
@@ -42,6 +44,7 @@ import { GUILDS_KEY } from './useGuilds';
 import { MEMBERS_KEY } from './useMembers';
 import { VOICE_STATES_KEY } from './useVoiceStates';
 import { useAuthStore } from '../stores/auth';
+import { useCallStore } from '../stores/call';
 import { useChatStore } from '../stores/chat';
 import { currentVoiceState, useVoiceStore } from '../stores/voice';
 
@@ -229,6 +232,19 @@ export function useRealtime(): void {
     socket.on(WsEvents.DmReactionRemoved, (p: DmReactionEventPayload) => {
       applyDmReaction(queryClient, p.conversationId, p.messageId, p.emoji, p.userId, 'remove');
     });
+
+    socket.on(WsEvents.DmCallIncoming, (payload: DmCallIncomingPayload) => {
+      useCallStore.getState().onIncoming(payload);
+    });
+    socket.on(WsEvents.DmCallAccepted, () => {
+      useCallStore.getState().onAccepted();
+    });
+    socket.on(
+      WsEvents.DmCallEnded,
+      ({ conversationId, reason }: { conversationId: string; reason: DmCallEndReason }) => {
+        useCallStore.getState().onEnded(conversationId, reason);
+      },
+    );
 
     socket.on(WsEvents.DmConversationUpdated, (conv: DmConversationDto) => {
       queryClient.setQueryData<DmConversationDto[]>(DM_CONVERSATIONS_KEY, (list) => {

@@ -4,10 +4,12 @@ import {
   AtSign,
   Loader2,
   Paperclip,
+  Phone,
   Pin,
   Search,
   SendHorizontal,
   UserRound,
+  Video,
   X,
 } from 'lucide-react';
 import {
@@ -26,6 +28,8 @@ import { api } from '../api/client';
 import type { DmChatMessage } from '../api/dm-cache';
 import { uploadFile } from '../api/uploads';
 import { useDmAck, useDmConversations, useDmMessages, useSendDm } from '../hooks/useDm';
+import { useCallStore } from '../stores/call';
+import CallPanel from './CallPanel';
 import { PeerProfilePanel, PinnedPanel, SearchPanel } from './DmHeaderPanels';
 import DmMessageItem from './DmMessageItem';
 
@@ -248,6 +252,8 @@ export default function DmView() {
   const { data: conversations } = useDmConversations();
   const [peer, setPeer] = useState<DmConversationDto['peer'] | null>(null);
   const [panel, setPanel] = useState<'pins' | 'search' | 'profile' | null>(null);
+  const callStatus = useCallStore((s) => s.status);
+  const startCall = useCallStore((s) => s.startCall);
 
   // Собеседника берём из списка, а если диалог только что открыт — догружаем
   const fromList = conversations?.find((c) => c.id === conversationId)?.peer ?? null;
@@ -274,6 +280,22 @@ export default function DmView() {
 
         <div className="dm-header-actions">
           <button
+            className="icon-button"
+            title={t('call.startVoice')}
+            disabled={!peer || callStatus !== 'idle'}
+            onClick={() => void startCall(conversationId, peer?.displayName ?? '', false)}
+          >
+            <Phone size={17} />
+          </button>
+          <button
+            className="icon-button"
+            title={t('call.startVideo')}
+            disabled={!peer || callStatus !== 'idle'}
+            onClick={() => void startCall(conversationId, peer?.displayName ?? '', true)}
+          >
+            <Video size={17} />
+          </button>
+          <button
             className={`icon-button${panel === 'pins' ? ' engaged' : ''}`}
             title={t('dm.pinnedTitle')}
             onClick={() => setPanel((p) => (p === 'pins' ? null : 'pins'))}
@@ -297,6 +319,8 @@ export default function DmView() {
           </button>
         </div>
       </header>
+
+      <CallPanel conversationId={conversationId} />
 
       {panel === 'pins' && (
         <PinnedPanel conversationId={conversationId} onClose={() => setPanel(null)} />

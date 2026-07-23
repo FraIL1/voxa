@@ -6,6 +6,7 @@ import { useRealtime } from '../hooks/useRealtime';
 import { registerGlobalShortcuts } from '../lib/tauri';
 import { useAuthStore } from '../stores/auth';
 import { useVoiceStore } from '../stores/voice';
+import IncomingCallModal from './IncomingCallModal';
 import ServerRail from './ServerRail';
 import TimeoutNotice from './TimeoutNotice';
 
@@ -53,6 +54,7 @@ export default function AppShell() {
       <ServerRail />
       <Outlet />
       <TimeoutNotice />
+      <IncomingCallModal />
     </div>
   );
 }

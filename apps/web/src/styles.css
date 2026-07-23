@@ -2222,3 +2222,124 @@ a {
 .dm-link.active .dm-pin-button {
   opacity: 1;
 }
+
+/* ---------- Звонки 1-на-1 ---------- */
+
+.incoming-call {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 28px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: 280px;
+}
+
+.incoming-call-avatar {
+  width: 72px;
+  height: 72px;
+  font-size: 28px;
+}
+
+.incoming-call-name {
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.incoming-call-hint {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.incoming-call-actions {
+  display: flex;
+  gap: 24px;
+  margin-top: 14px;
+}
+
+.call-button {
+  width: 52px;
+  height: 52px;
+  border-radius: 26px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+}
+
+.call-button.accept {
+  background: var(--success);
+}
+
+.call-button.decline {
+  background: var(--danger);
+}
+
+.call-button:hover {
+  filter: brightness(1.1);
+}
+
+.call-panel {
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  padding: 10px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.call-status {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.call-tiles {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.call-tile {
+  position: relative;
+  width: 220px;
+  aspect-ratio: 16 / 9;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.call-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.call-tile-label {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  font-size: 12px;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.call-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.call-controls .call-button {
+  width: 36px;
+  height: 36px;
+  border-radius: 18px;
+}
+
+.call-error {
+  font-size: 13px;
+  color: var(--danger);
+}

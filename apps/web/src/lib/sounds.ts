@@ -44,3 +44,31 @@ export function playLeaveSound(): void {
     // без звука — не критично
   }
 }
+
+/** Повторяющийся сигнал входящего звонка; вызов останавливает возвращённая функция */
+export function startRingtone(): () => void {
+  let stopped = false;
+  let timer: ReturnType<typeof setInterval> | undefined;
+
+  const ring = (): void => {
+    if (stopped) return;
+    try {
+      tone(660, 0, 0.35);
+      tone(880, 0.4, 0.35);
+    } catch {
+      // без звука — не критично
+    }
+  };
+
+  try {
+    ring();
+    timer = setInterval(ring, 2000);
+  } catch {
+    // без звука — не критично
+  }
+
+  return () => {
+    stopped = true;
+    if (timer) clearInterval(timer);
+  };
+}

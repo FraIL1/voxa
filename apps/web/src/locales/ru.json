@@ -172,6 +172,20 @@
     "searchEmpty": "Ничего не найдено",
     "profileTitle": "Профиль"
   },
+  "call": {
+    "startVoice": "Голосовой звонок",
+    "startVideo": "Видеозвонок",
+    "incomingVoice": "Входящий звонок",
+    "incomingVideo": "Входящий видеозвонок",
+    "accept": "Принять",
+    "decline": "Отклонить",
+    "hangUp": "Завершить звонок",
+    "calling": "Звоним {{name}}…",
+    "inCall": "Звонок идёт",
+    "you": "Ты",
+    "cameraOn": "Включить камеру",
+    "cameraOff": "Выключить камеру"
+  },
   "moderation": {
     "timeout10m": "Таймаут на 10 минут",
     "timeout1h": "Таймаут на 1 час",
