@@ -256,3 +256,16 @@ export type StartDmCallInput = z.infer<typeof startDmCallSchema>;
 /** Передача владения сервером другому участнику */
 export const transferGuildSchema = z.object({ userId: z.string().uuid() });
 export type TransferGuildInput = z.infer<typeof transferGuildSchema>;
+
+/** Глобальный бан аккаунта владельцем приложения */
+export const instanceBanSchema = z.object({
+  reason: z.string().trim().max(200).optional(),
+});
+export type InstanceBanInput = z.infer<typeof instanceBanSchema>;
+
+/** Настройки инстанса */
+export const instanceSettingsSchema = z.object({
+  registrationOpen: z.boolean().optional(),
+  maxGuildsPerUser: z.number().int().min(1).max(500).optional(),
+});
+export type InstanceSettingsInput = z.infer<typeof instanceSettingsSchema>;

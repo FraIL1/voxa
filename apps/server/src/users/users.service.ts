@@ -229,6 +229,7 @@ export class UsersService {
       username: user.username,
       displayName: user.displayName,
       avatarUrl: user.avatarUrl,
+      isInstanceOwner: user.isInstanceOwner,
       createdAt: user.createdAt.toISOString(),
     };
   }

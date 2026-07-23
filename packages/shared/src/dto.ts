@@ -20,6 +20,8 @@ export interface RoleDto {
 }
 
 export interface MeDto extends UserPublicDto {
+  /** Владелец всего приложения — видит глобальную панель */
+  isInstanceOwner: boolean;
   createdAt: string;
 }
 
@@ -297,4 +299,63 @@ export interface BlockedUserDto extends UserPublicDto {
 export interface InviteCheckDto {
   valid: boolean;
   guildName: string | null;
+}
+
+// ---------- Панель владельца приложения ----------
+
+/** Пользователь глазами владельца инстанса */
+export interface InstanceUserDto extends UserPublicDto {
+  status: PresenceStatus;
+  /** Сколько серверов создал и в скольких состоит */
+  guildsOwned: number;
+  guildsJoined: number;
+  activeSessions: number;
+  bannedReason: string | null;
+  isInstanceOwner: boolean;
+  createdAt: string;
+}
+
+export interface InstanceBanDto extends UserPublicDto {
+  reason: string | null;
+  bannedByUsername: string | null;
+  createdAt: string;
+}
+
+/** Сервер глазами владельца инстанса */
+export interface InstanceGuildDto {
+  id: string;
+  name: string;
+  iconUrl: string | null;
+  ownerUsername: string | null;
+  members: number;
+  channels: number;
+  createdAt: string;
+}
+
+export interface InstanceOverviewDto {
+  usersTotal: number;
+  onlineNow: number;
+  guildsTotal: number;
+  messagesTotal: number;
+  dmMessagesTotal: number;
+  activeSessions: number;
+  bannedTotal: number;
+  storageMb: number;
+  serverVersion: string;
+  uptimeSeconds: number;
+}
+
+/** Настройки инстанса (лимиты и доступ) */
+export interface InstanceSettingsDto {
+  registrationOpen: boolean;
+  maxGuildsPerUser: number;
+}
+
+export interface StorageStatsDto {
+  totalMb: number;
+  filesTotal: number;
+  /** Вложения без сообщения (загрузили и не отправили) */
+  orphanFiles: number;
+  orphanMb: number;
+  top: { username: string; mb: number; files: number }[];
 }

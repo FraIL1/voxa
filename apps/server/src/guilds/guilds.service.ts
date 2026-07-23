@@ -14,6 +14,7 @@ import {
   type UpdateGuildInput,
 } from '@voxa/shared';
 
+import { InstanceService } from '../instance/instance.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { WsGateway } from '../ws/ws.gateway';
@@ -21,14 +22,13 @@ import { WsGateway } from '../ws/ws.gateway';
 export const OWNER_ROLE_NAME = 'Владелец';
 export const MEMBER_ROLE_NAME = 'Участник';
 export const MEMBER_MASK = Permissions.SEND_MESSAGES | Permissions.UPLOAD_FILES;
-/** Сколько серверов может создать один аккаунт */
-export const MAX_GUILDS_PER_USER = 20;
 
 @Injectable()
 export class GuildsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly users: UsersService,
+    private readonly instance: InstanceService,
     private readonly ws: WsGateway,
   ) {}
 
@@ -74,11 +74,10 @@ export class GuildsService {
 
   /** Создание сервера: роли Владелец/Участник + стартовые каналы */
   async create(userId: string, input: CreateGuildInput): Promise<GuildDto> {
+    const limit = await this.instance.maxGuildsPerUser();
     const owned = await this.prisma.guild.count({ where: { ownerId: userId } });
-    if (owned >= MAX_GUILDS_PER_USER) {
-      throw new BadRequestException(
-        `Нельзя создать больше ${MAX_GUILDS_PER_USER} серверов на один аккаунт`,
-      );
+    if (owned >= limit) {
+      throw new BadRequestException(`Нельзя создать больше ${limit} серверов на один аккаунт`);
     }
 
     const guild = await this.prisma.$transaction(async (tx) => {

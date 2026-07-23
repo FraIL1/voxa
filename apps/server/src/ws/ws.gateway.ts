@@ -129,10 +129,10 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         }),
         this.prisma.user.findUnique({
           where: { id: payload.sub },
-          select: { displayName: true },
+          select: { displayName: true, instanceBan: { select: { userId: true } } },
         }),
       ]);
-      if (!session || !user) throw new Error('session revoked');
+      if (!session || !user || user.instanceBan) throw new Error('session revoked or banned');
 
       const data = socket.data as SocketData;
       data.userId = payload.sub;

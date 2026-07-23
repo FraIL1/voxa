@@ -1573,4 +1573,131 @@ describe('Voxa: критический поток (e2e)', () => {
       .send({ userId: strangerId })
       .expect(403);
   });
+
+  it('панель владельца приложения: глобальный бан, серверы, лимиты, хранилище', async () => {
+    // Панель доступна только владельцу приложения (первому аккаунту)
+    await request(httpServer)
+      .get('/api/instance/overview')
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(403);
+
+    const overview = await request(httpServer)
+      .get('/api/instance/overview')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    expect(overview.body.usersTotal).toBeGreaterThanOrEqual(2);
+    expect(overview.body.guildsTotal).toBeGreaterThanOrEqual(1);
+    expect(overview.body.serverVersion).toBeTruthy();
+
+    // Жертва для глобального бана
+    const invite = await request(httpServer)
+      .post(`/api/guilds/${guildId}/invites`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ maxUses: 5 })
+      .expect(201);
+    const victim = { username: 'Незваный', password: 'пароль-незваного-99' };
+    const registered = await request(httpServer)
+      .post('/api/auth/register')
+      .send({ inviteCode: invite.body.code, ...victim })
+      .expect(201);
+    const victimId = (registered.body as AuthResponseDto).user.id;
+
+    // Поиск по логину находит его
+    const found = await request(httpServer)
+      .get(`/api/instance/users?q=${encodeURIComponent('Незваный')}`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    expect((found.body as { id: string }[]).some((u) => u.id === victimId)).toBe(true);
+
+    // Глобальный бан: вход закрыт совсем, со всех серверов выкинут
+    await request(httpServer)
+      .post(`/api/instance/users/${victimId}/ban`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ reason: 'нежелательный гость' })
+      .expect(204);
+
+    const denied = await request(httpServer).post('/api/auth/login').send(victim).expect(403);
+    expect(denied.body.message).toContain('нежелательный гость');
+
+    const bans = await request(httpServer)
+      .get('/api/instance/bans')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    expect((bans.body as { id: string }[]).some((b) => b.id === victimId)).toBe(true);
+
+    // Владельца приложения забанить нельзя, себя — тоже
+    const ownerMe = await request(httpServer)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${ownerAccess}`);
+    expect((ownerMe.body as MeDto).isInstanceOwner).toBe(true);
+    await request(httpServer)
+      .post(`/api/instance/users/${(ownerMe.body as MeDto).id}/ban`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({})
+      .expect(400);
+
+    // Разбан возвращает вход
+    await request(httpServer)
+      .delete(`/api/instance/users/${victimId}/ban`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(204);
+    await request(httpServer).post('/api/auth/login').send(victim).expect(200);
+
+    // Закрытая регистрация не пускает новых, лимит серверов настраивается
+    await request(httpServer)
+      .patch('/api/instance/settings')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ registrationOpen: false, maxGuildsPerUser: 1 })
+      .expect(200);
+    const closedInvite = await request(httpServer)
+      .post(`/api/guilds/${guildId}/invites`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ maxUses: 5 })
+      .expect(201);
+    await request(httpServer)
+      .post('/api/auth/register')
+      .send({
+        inviteCode: closedInvite.body.code,
+        username: 'Поздний',
+        password: 'пароль-позднего-123',
+      })
+      .expect(403);
+    await request(httpServer)
+      .patch('/api/instance/settings')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ registrationOpen: true, maxGuildsPerUser: 20 })
+      .expect(200);
+
+    // Список серверов и хранилище доступны владельцу приложения
+    const guilds = await request(httpServer)
+      .get('/api/instance/guilds')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    expect((guilds.body as { id: string }[]).some((g) => g.id === guildId)).toBe(true);
+
+    const storage = await request(httpServer)
+      .get('/api/instance/storage')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    expect(storage.body.filesTotal).toBeGreaterThanOrEqual(0);
+
+    // Очистка неприкреплённых файлов
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      'base64',
+    );
+    await request(httpServer)
+      .post('/api/uploads')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .attach('file', png, 'orphan.png')
+      .expect(201);
+    const cleaned = await request(httpServer)
+      .post('/api/instance/storage/cleanup')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(201);
+    expect(cleaned.body.removed).toBeGreaterThanOrEqual(1);
+    expect(await prisma.attachment.count({ where: { messageId: null, dmMessageId: null } })).toBe(
+      0,
+    );
+  });
 });

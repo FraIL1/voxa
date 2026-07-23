@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   HttpException,
   HttpStatus,
   Injectable,
@@ -9,6 +10,7 @@ import {
 import type { LoginInput, MeDto, RegisterInput } from '@voxa/shared';
 import * as argon2 from 'argon2';
 
+import { InstanceService } from '../instance/instance.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { HibpService } from './hibp.service';
@@ -45,9 +47,15 @@ export class AuthService {
     private readonly tokens: TokensService,
     private readonly users: UsersService,
     private readonly hibp: HibpService,
+    private readonly instance: InstanceService,
   ) {}
 
   async register(input: RegisterInput, meta: ClientMeta): Promise<AuthResult> {
+    // Первый аккаунт создаётся всегда — он и станет владельцем приложения
+    const isFirstUser = (await this.prisma.user.count()) === 0;
+    if (!isFirstUser && !(await this.instance.registrationOpen())) {
+      throw new ForbiddenException('Регистрация в приложении закрыта');
+    }
     if (await this.hibp.isPwned(input.password)) {
       throw new BadRequestException('Этот пароль встречается в утёкших базах — выберите другой');
     }
@@ -89,6 +97,7 @@ export class AuthService {
           usernameLower: input.username.toLowerCase(),
           displayName: input.username, // по умолчанию совпадает с логином
           passwordHash,
+          isInstanceOwner: isFirstUser,
         },
       });
 
@@ -148,7 +157,14 @@ export class AuthService {
       throw new UnauthorizedException('Неверное имя пользователя или пароль');
     }
 
-    // Баны теперь на уровне сервера и вход в аккаунт не блокируют
+    // Глобальный бан закрывает вход в приложение целиком
+    const banned = await this.instance.banOf(user.id);
+    if (banned) {
+      throw new ForbiddenException(
+        banned.reason ? `Доступ закрыт: ${banned.reason}` : 'Доступ к приложению закрыт',
+      );
+    }
+
     await this.tokens.pruneExpired(user.id);
     const tokens = await this.tokens.issueSession(user.id, user.username, meta);
     return { tokens, user: await this.users.getMe(user.id) };

@@ -202,7 +202,10 @@ export class FilesService implements OnModuleInit {
    * Удаление вложений сообщения: файлы уходят из хранилища и из БД, чтобы
    * не занимать квоту автора после удаления сообщения.
    */
-  async removeForMessage(where: { messageId?: string; dmMessageId?: string }): Promise<void> {
+  async removeForMessage(where: {
+    messageId?: string | null;
+    dmMessageId?: string | null;
+  }): Promise<void> {
     const attachments = await this.prisma.attachment.findMany({
       where,
       select: { id: true, key: true, thumbKey: true },
@@ -224,6 +227,11 @@ export class FilesService implements OnModuleInit {
     await this.prisma.attachment.deleteMany({
       where: { id: { in: attachments.map((a) => a.id) } },
     });
+  }
+
+  /** Удаление вложений, которые загрузили, но так и не отправили */
+  async removeOrphans(): Promise<void> {
+    await this.removeForMessage({ messageId: null, dmMessageId: null });
   }
 
   /** Привязка загруженных вложений к личному сообщению */
