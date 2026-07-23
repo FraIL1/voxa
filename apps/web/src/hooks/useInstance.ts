@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
+  CreateRegistrationInviteInput,
   InstanceBanDto,
   InstanceGuildDto,
   InstanceOverviewDto,
   InstanceSettingsDto,
   InstanceSettingsInput,
   InstanceUserDto,
+  RegistrationInviteDto,
   StorageStatsDto,
 } from '@voxa/shared';
 
@@ -130,5 +132,35 @@ export function useCleanupStorage() {
   return useMutation({
     mutationFn: () => api<{ removed: number }>('/instance/storage/cleanup', { method: 'POST' }),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: STORAGE_KEY }),
+  });
+}
+
+// ---------- Коды регистрации в приложении ----------
+
+const REG_INVITES_KEY = ['instanceRegInvites'] as const;
+
+export function useRegistrationInvites(enabled: boolean) {
+  return useQuery({
+    queryKey: REG_INVITES_KEY,
+    queryFn: () => api<RegistrationInviteDto[]>('/instance/registration-invites'),
+    enabled,
+  });
+}
+
+export function useCreateRegistrationInvite() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateRegistrationInviteInput) =>
+      api<RegistrationInviteDto>('/instance/registration-invites', { method: 'POST', body: input }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: REG_INVITES_KEY }),
+  });
+}
+
+export function useRevokeRegistrationInvite() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api<void>(`/instance/registration-invites/${id}`, { method: 'DELETE' }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: REG_INVITES_KEY }),
   });
 }

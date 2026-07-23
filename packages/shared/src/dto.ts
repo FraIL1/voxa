@@ -359,3 +359,19 @@ export interface StorageStatsDto {
   orphanMb: number;
   top: { username: string; mb: number; files: number }[];
 }
+
+/** Код регистрации в приложении (панель владельца приложения) */
+export interface RegistrationInviteDto {
+  id: string;
+  code: string;
+  url: string;
+  uses: number;
+  maxUses: number | null;
+  expiresAt: string | null;
+  createdAt: string;
+  isActive: boolean;
+}
+
+export interface RegistrationInviteCheckDto {
+  valid: boolean;
+}

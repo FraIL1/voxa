@@ -11,6 +11,7 @@ import HomeLayout from './components/HomeLayout';
 import ServerLayout from './components/ServerLayout';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import ServerInvitePage from './pages/ServerInvitePage';
 import { useAuthStore } from './stores/auth';
 
 const queryClient = new QueryClient({
@@ -22,7 +23,8 @@ const queryClient = new QueryClient({
 const router = createBrowserRouter([
   { path: '/login', Component: LoginPage },
   { path: '/register', Component: RegisterPage },
-  { path: '/invite/:code', Component: RegisterPage },
+  { path: '/register/:code', Component: RegisterPage },
+  { path: '/invite/:code', Component: ServerInvitePage },
   {
     path: '/',
     Component: AppShell,

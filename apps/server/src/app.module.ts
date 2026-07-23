@@ -12,6 +12,7 @@ import { DmModule } from './dm/dm.module';
 import { FriendsModule } from './friends/friends.module';
 import { GuildsModule } from './guilds/guilds.module';
 import { InstanceModule } from './instance/instance.module';
+import { RegistrationModule } from './registration/registration.module';
 import { ModerationModule } from './moderation/moderation.module';
 import { FilesModule } from './files/files.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -60,6 +61,7 @@ import { WsModule } from './ws/ws.module';
     FriendsModule,
     GuildsModule,
     InstanceModule,
+    RegistrationModule,
     WsModule,
     SeedModule,
   ],

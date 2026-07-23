@@ -1,58 +1,14 @@
-import { registerSchema, type InviteCheckDto } from '@voxa/shared';
+import { registerSchema, type RegistrationInviteCheckDto } from '@voxa/shared';
 import { useQuery } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, Navigate, useNavigate, useParams } from 'react-router';
+import { Link, Navigate, useParams } from 'react-router';
 
 import { register } from '../api/auth';
 import { api, ApiError } from '../api/client';
-import { useJoinGuild } from '../hooks/useGuilds';
 import { useAuthStore } from '../stores/auth';
 
-/** Вошедший пользователь по ссылке-приглашению вступает на сервер */
-function JoinByInvite({ code }: { code: string }) {
-  const { t } = useTranslation();
-  const navigate = useNavigate();
-  const joinGuild = useJoinGuild();
-  const [error, setError] = useState('');
-
-  const { data: check, isLoading } = useQuery({
-    queryKey: ['inviteCheck', code],
-    queryFn: () => api<InviteCheckDto>(`/invites/check/${code}`),
-  });
-
-  const join = (): void => {
-    joinGuild
-      .mutateAsync(code)
-      .then(({ guildId }) => navigate(`/guilds/${guildId}`, { replace: true }))
-      .catch((err: Error) => setError(err.message));
-  };
-
-  return (
-    <div className="auth-screen">
-      <div className="auth-card">
-        <h1>
-          <span className="brand">{t('app.name')}</span> — {t('guild.joinTitle')}
-        </h1>
-        {isLoading && <p>{t('app.loading')}</p>}
-        {check && !check.valid && <p className="auth-error">{t('guild.invalidInvite')}</p>}
-        {check?.valid && (
-          <>
-            <p>{t('guild.joinPrompt', { name: check.guildName })}</p>
-            <p className="auth-error">{error}</p>
-            <button className="btn-primary" disabled={joinGuild.isPending} onClick={join}>
-              {t('guild.joinButton')}
-            </button>
-          </>
-        )}
-        <p className="auth-switch">
-          <Link to="/home">{t('guild.backHome')}</Link>
-        </p>
-      </div>
-    </div>
-  );
-}
-
+/** Регистрация в приложении по коду, который выдал владелец приложения. */
 export default function RegisterPage() {
   const { t } = useTranslation();
   const status = useAuthStore((s) => s.status);
@@ -64,11 +20,14 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
-  if (status === 'authed') {
-    // Ссылка-приглашение для уже вошедшего — предложение вступить на сервер
-    if (code) return <JoinByInvite code={code} />;
-    return <Navigate to="/" replace />;
-  }
+  // Код из ссылки проверяем сразу — сообщаем, если он недействителен
+  const { data: codeCheck } = useQuery({
+    queryKey: ['registrationCheck', code],
+    queryFn: () => api<RegistrationInviteCheckDto>(`/auth/registration-invites/check/${code}`),
+    enabled: Boolean(code) && status !== 'authed',
+  });
+
+  if (status === 'authed') return <Navigate to="/" replace />;
 
   const onSubmit = async (e: FormEvent): Promise<void> => {
     e.preventDefault();
@@ -95,13 +54,16 @@ export default function RegisterPage() {
           <span className="brand">{t('app.name')}</span> — {t('auth.registerTitle')}
         </h1>
         <label>
-          {t('auth.inviteCode')}
+          {t('auth.registrationCode')}
           <input
             value={inviteCode}
             onChange={(e) => setInviteCode(e.target.value)}
             autoFocus={!code}
           />
         </label>
+        {code && codeCheck && !codeCheck.valid && (
+          <p className="auth-error">{t('auth.codeInvalid')}</p>
+        )}
         <label>
           {t('auth.username')}
           <input

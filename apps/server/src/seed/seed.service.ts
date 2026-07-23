@@ -1,9 +1,7 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { Permissions } from '@voxa/shared';
 
-import type { Env } from '../config/env';
-import { generateInviteCode } from '../invites/invites.service';
+import { RegistrationInvitesService } from '../registration/registration-invites.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 const SEED_KEY = 'seed:v1';
@@ -31,12 +29,12 @@ export class SeedService implements OnApplicationBootstrap {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly config: ConfigService<Env, true>,
+    private readonly registrationInvites: RegistrationInvitesService,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
     await this.seedOnce();
-    await this.ensureOwnerBootstrapInvite();
+    await this.registrationInvites.ensureBootstrap();
   }
 
   private async seedOnce(): Promise<void> {
@@ -132,38 +130,5 @@ export class SeedService implements OnApplicationBootstrap {
     });
 
     this.logger.log('Создан стартовый сервер «Voxa» (роли, категории, каналы)');
-  }
-
-  private async ensureOwnerBootstrapInvite(): Promise<void> {
-    const ownerRole = await this.prisma.role.findFirst({
-      where: { isOwnerRole: true },
-      orderBy: { createdAt: 'asc' },
-    });
-    if (!ownerRole) return;
-
-    const ownerExists = await this.prisma.userRole.findFirst({
-      where: { roleId: ownerRole.id },
-    });
-    if (ownerExists) return;
-
-    let invite = await this.prisma.invite.findFirst({
-      where: { grantsRoleId: ownerRole.id, revokedAt: null, uses: 0 },
-    });
-    invite ??= await this.prisma.invite.create({
-      data: {
-        code: generateInviteCode(),
-        guildId: ownerRole.guildId,
-        grantsRoleId: ownerRole.id,
-        maxUses: 1,
-      },
-    });
-
-    const publicUrl = this.config.get('PUBLIC_URL', { infer: true });
-    this.logger.warn('==========================================================');
-    this.logger.warn('Владелец ещё не зарегистрирован. Одноразовый инвайт Владельца:');
-    this.logger.warn(`  Код инвайта: ${invite.code}`);
-    this.logger.warn(`  Ссылка: ${publicUrl}/invite/${invite.code}`);
-    this.logger.warn('Первый зарегистрировавшийся по нему получит роль «Владелец».');
-    this.logger.warn('==========================================================');
   }
 }

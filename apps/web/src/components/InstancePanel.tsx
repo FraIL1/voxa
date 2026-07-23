@@ -1,5 +1,5 @@
 import type { InstanceUserDto } from '@voxa/shared';
-import { Ban, LogOut, Search, Trash2, X } from 'lucide-react';
+import { Ban, Check, Copy, LogOut, Search, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -16,9 +16,12 @@ import {
   useInstanceUnban,
   useInstanceUsers,
   useUpdateInstanceSettings,
+  useRegistrationInvites,
+  useCreateRegistrationInvite,
+  useRevokeRegistrationInvite,
 } from '../hooks/useInstance';
 
-type Tab = 'overview' | 'users' | 'bans' | 'guilds' | 'settings' | 'storage';
+type Tab = 'overview' | 'users' | 'regInvites' | 'bans' | 'guilds' | 'settings' | 'storage';
 
 const dateFormat = new Intl.DateTimeFormat('ru', {
   day: '2-digit',
@@ -226,6 +229,80 @@ function Settings() {
   );
 }
 
+function RegistrationInvites() {
+  const { t } = useTranslation();
+  const { data: invites } = useRegistrationInvites(true);
+  const create = useCreateRegistrationInvite();
+  const revoke = useRevokeRegistrationInvite();
+  const [maxUses, setMaxUses] = useState('');
+  const [expires, setExpires] = useState('');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const doCreate = (): void => {
+    create.mutate({
+      maxUses: maxUses ? Number(maxUses) : null,
+      expiresInHours: expires ? Number(expires) : null,
+    });
+  };
+
+  const copy = (id: string, code: string): void => {
+    void navigator.clipboard.writeText(`${window.location.origin}/register/${code}`).then(() => {
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 1500);
+    });
+  };
+
+  const active = (invites ?? []).filter((i) => i.isActive);
+
+  return (
+    <>
+      <p className="settings-hint">{t('instance.regHint')}</p>
+      <div className="invite-form">
+        <input
+          type="number"
+          min={1}
+          placeholder={t('community.maxUsesPlaceholder')}
+          value={maxUses}
+          onChange={(e) => setMaxUses(e.target.value)}
+        />
+        <select value={expires} onChange={(e) => setExpires(e.target.value)}>
+          <option value="">{t('community.expiresNever')}</option>
+          <option value="24">24 {t('community.hour')}</option>
+          <option value="168">7 {t('community.days')}</option>
+          <option value="720">30 {t('community.days')}</option>
+        </select>
+        <button className="btn-primary" disabled={create.isPending} onClick={doCreate}>
+          {t('instance.regCreate')}
+        </button>
+      </div>
+
+      {active.length === 0 && <p className="settings-hint">{t('instance.noRegInvites')}</p>}
+      {active.map((invite) => (
+        <div key={invite.id} className="admin-row">
+          <code className="invite-code">{invite.code}</code>
+          <span className="admin-row-info">
+            {invite.uses}/{invite.maxUses ?? '∞'}
+          </span>
+          <button
+            className="icon-button"
+            title={t('community.copyLink')}
+            onClick={() => copy(invite.id, invite.code)}
+          >
+            {copiedId === invite.id ? <Check size={15} /> : <Copy size={15} />}
+          </button>
+          <button
+            className="icon-button danger"
+            title={t('community.revoke')}
+            onClick={() => revoke.mutate(invite.id)}
+          >
+            <Trash2 size={15} />
+          </button>
+        </div>
+      ))}
+    </>
+  );
+}
+
 function Storage() {
   const { t } = useTranslation();
   const { data: storage } = useInstanceStorage(true);
@@ -278,6 +355,7 @@ export default function InstancePanel({ onClose }: { onClose: () => void }) {
   const tabs: [Tab, string][] = [
     ['overview', t('instance.tabOverview')],
     ['users', t('instance.tabUsers')],
+    ['regInvites', t('instance.tabReg')],
     ['bans', t('instance.tabBans')],
     ['guilds', t('instance.tabGuilds')],
     ['settings', t('instance.tabSettings')],
@@ -311,6 +389,7 @@ export default function InstancePanel({ onClose }: { onClose: () => void }) {
 
           {tab === 'overview' && <Overview />}
           {tab === 'users' && <Users />}
+          {tab === 'regInvites' && <RegistrationInvites />}
           {tab === 'bans' && <Bans />}
           {tab === 'guilds' && <Guilds />}
           {tab === 'settings' && <Settings />}

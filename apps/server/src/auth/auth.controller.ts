@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   HttpCode,
+  Param,
   Post,
   Req,
   Res,
@@ -10,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
+import type { RegistrationInviteCheckDto } from '@voxa/shared';
 import {
   changePasswordSchema,
   loginSchema,
@@ -26,6 +28,7 @@ import { CurrentUser, type RequestUser } from '../common/decorators/current-user
 import { Public } from '../common/decorators/public.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import type { Env } from '../config/env';
+import { RegistrationInvitesService } from '../registration/registration-invites.service';
 import { UsersService } from '../users/users.service';
 import { AuthService } from './auth.service';
 import { TokensService } from './tokens.service';
@@ -39,6 +42,7 @@ export class AuthController {
     private readonly tokensService: TokensService,
     private readonly usersService: UsersService,
     private readonly config: ConfigService<Env, true>,
+    private readonly registrationInvites: RegistrationInvitesService,
   ) {}
 
   private clientMeta(req: Request): { ip?: string; userAgent?: string } {
@@ -63,6 +67,13 @@ export class AuthController {
     const token = (req.cookies as Record<string, string | undefined>)[REFRESH_COOKIE];
     if (!token) throw new UnauthorizedException('Refresh-токен отсутствует');
     return token;
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Get('registration-invites/check/:code')
+  checkRegistrationCode(@Param('code') code: string): Promise<RegistrationInviteCheckDto> {
+    return this.registrationInvites.check(code);
   }
 
   @Public()

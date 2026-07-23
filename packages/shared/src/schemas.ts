@@ -257,6 +257,18 @@ export type StartDmCallInput = z.infer<typeof startDmCallSchema>;
 export const transferGuildSchema = z.object({ userId: z.string().uuid() });
 export type TransferGuildInput = z.infer<typeof transferGuildSchema>;
 
+/** Создание кода регистрации в приложении (владелец приложения) */
+export const createRegistrationInviteSchema = z.object({
+  maxUses: z.number().int().min(1).max(10000).nullish(),
+  expiresInHours: z
+    .number()
+    .int()
+    .min(1)
+    .max(24 * 365)
+    .nullish(),
+});
+export type CreateRegistrationInviteInput = z.infer<typeof createRegistrationInviteSchema>;
+
 /** Глобальный бан аккаунта владельцем приложения */
 export const instanceBanSchema = z.object({
   reason: z.string().trim().max(200).optional(),

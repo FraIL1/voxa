@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import {
+  createRegistrationInviteSchema,
   instanceBanSchema,
   instanceSettingsSchema,
   type InstanceBanDto,
@@ -22,6 +23,8 @@ import {
   type InstanceSettingsDto,
   type InstanceSettingsInput,
   type InstanceUserDto,
+  type CreateRegistrationInviteInput,
+  type RegistrationInviteDto,
   type StorageStatsDto,
 } from '@voxa/shared';
 
@@ -29,6 +32,7 @@ import { AuditService } from '../audit/audit.service';
 import { CurrentUser, type RequestUser } from '../common/decorators/current-user.decorator';
 import { InstanceOwnerGuard } from '../common/guards/instance-owner.guard';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { RegistrationInvitesService } from '../registration/registration-invites.service';
 import { InstanceService } from './instance.service';
 
 /** Панель владельца приложения — доступна только ему */
@@ -38,6 +42,7 @@ import { InstanceService } from './instance.service';
 export class InstanceController {
   constructor(
     private readonly instance: InstanceService,
+    private readonly registrationInvites: RegistrationInvitesService,
     private readonly audit: AuditService,
   ) {}
 
@@ -127,6 +132,34 @@ export class InstanceController {
     const settings = await this.instance.updateSettings(body);
     this.audit.log(null, user.id, 'instance.settings.update', undefined, { ...body });
     return settings;
+  }
+
+  // ---------- Коды регистрации в приложении ----------
+
+  @Get('registration-invites')
+  registrationInvitesList(): Promise<RegistrationInviteDto[]> {
+    return this.registrationInvites.list();
+  }
+
+  @Post('registration-invites')
+  async createRegistrationInvite(
+    @CurrentUser() user: RequestUser,
+    @Body(new ZodValidationPipe(createRegistrationInviteSchema))
+    body: CreateRegistrationInviteInput,
+  ): Promise<RegistrationInviteDto> {
+    const dto = await this.registrationInvites.create(user.id, body);
+    this.audit.log(null, user.id, 'instance.registration.create', { type: 'invite', id: dto.id });
+    return dto;
+  }
+
+  @Delete('registration-invites/:id')
+  @HttpCode(204)
+  async revokeRegistrationInvite(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<void> {
+    await this.registrationInvites.revoke(id);
+    this.audit.log(null, user.id, 'instance.registration.revoke', { type: 'invite', id });
   }
 
   // ---------- Хранилище ----------

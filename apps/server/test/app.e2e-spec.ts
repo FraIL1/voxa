@@ -27,6 +27,19 @@ import { RedisIoAdapter } from '../src/ws/redis-io.adapter';
 const OWNER = { username: 'Артём', password: 'корректный-длинный-пароль-1' };
 const MEMBER = { username: 'Мария', password: 'другой-длинный-пароль-22' };
 
+async function createRegCode(
+  server: Parameters<typeof request>[0],
+  ownerAccess: string,
+  maxUses = 5,
+): Promise<string> {
+  const res = await request(server)
+    .post('/api/instance/registration-invites')
+    .set('Authorization', `Bearer ${ownerAccess}`)
+    .send({ maxUses })
+    .expect(201);
+  return res.body.code as string;
+}
+
 function refreshCookieOf(res: request.Response): string {
   const setCookie = res.headers['set-cookie'];
   const cookies: string[] = Array.isArray(setCookie) ? setCookie : [setCookie ?? ''];
@@ -81,8 +94,8 @@ describe('Voxa: критический поток (e2e)', () => {
     expect(await prisma.role.count()).toBe(3);
     expect(await prisma.channel.count()).toBe(6);
 
-    const invite = await prisma.invite.findFirstOrThrow({
-      where: { grantsRole: { isOwnerRole: true }, revokedAt: null },
+    const invite = await prisma.registrationInvite.findFirstOrThrow({
+      where: { revokedAt: null, uses: 0 },
     });
     ownerInviteCode = invite.code;
   });
@@ -166,26 +179,38 @@ describe('Voxa: критический поток (e2e)', () => {
     ownerRefreshCookie = refreshCookieOf(stillValid);
   });
 
-  it('владелец создаёт обычный инвайт, по нему регистрируется участник', async () => {
-    const created = await request(httpServer)
-      .post(`/api/guilds/${guildId}/invites`)
-      .set('Authorization', `Bearer ${ownerAccess}`)
-      .send({ maxUses: 5, expiresInHours: 24 })
-      .expect(201);
-
+  it('регистрация по коду приложения не даёт сервер; вступление — отдельным инвайтом', async () => {
+    // Код регистрации выдаёт только владелец приложения
+    const regCode = await createRegCode(httpServer, ownerAccess);
     const check = await request(httpServer)
-      .get(`/api/invites/check/${created.body.code}`)
+      .get(`/api/auth/registration-invites/check/${regCode}`)
       .expect(200);
     expect(check.body.valid).toBe(true);
 
     const res = await request(httpServer)
       .post('/api/auth/register')
-      .send({ inviteCode: created.body.code, ...MEMBER })
+      .send({ inviteCode: regCode, ...MEMBER })
       .expect(201);
-    const body = res.body as AuthResponseDto;
-    memberAccess = body.accessToken;
+    memberAccess = (res.body as AuthResponseDto).accessToken;
 
-    // Регистрация по инвайту = вступление на его сервер (без прав админа)
+    // После регистрации серверов нет — код приложения не добавляет на сервер
+    const empty = await request(httpServer)
+      .get('/api/guilds')
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(200);
+    expect(empty.body).toHaveLength(0);
+
+    // Владелец зовёт участника на сервер серверным инвайтом
+    const serverInvite = await request(httpServer)
+      .post(`/api/guilds/${guildId}/invites`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ maxUses: 5, expiresInHours: 24 })
+      .expect(201);
+    await request(httpServer)
+      .post(`/api/invites/${serverInvite.body.code}/join`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(200);
+
     const guilds = await request(httpServer)
       .get('/api/guilds')
       .set('Authorization', `Bearer ${memberAccess}`)
@@ -721,10 +746,16 @@ describe('Voxa: критический поток (e2e)', () => {
     const victim = { username: 'Нарушитель', password: 'пароль-нарушителя-123' };
     const registered = await request(httpServer)
       .post('/api/auth/register')
-      .send({ inviteCode: invite.body.code, ...victim })
+      .send({ inviteCode: await createRegCode(httpServer, ownerAccess), ...victim })
       .expect(201);
     const victimId = (registered.body as AuthResponseDto).user.id;
     const victimAccess = (registered.body as AuthResponseDto).accessToken;
+
+    // Регистрация не добавляет на сервер — вступаем серверным инвайтом
+    await request(httpServer)
+      .post(`/api/invites/${invite.body.code}/join`)
+      .set('Authorization', `Bearer ${victimAccess}`)
+      .expect(200);
 
     // Кик: аккаунт жив, но сервера в списке больше нет и структура закрыта
     await request(httpServer)
@@ -909,15 +940,10 @@ describe('Voxa: критический поток (e2e)', () => {
       .expect(403);
 
     // Третий пользователь не имеет доступа к чужому диалогу
-    const outsiderInvite = await request(httpServer)
-      .post(`/api/guilds/${guildId}/invites`)
-      .set('Authorization', `Bearer ${ownerAccess}`)
-      .send({ maxUses: 1 })
-      .expect(201);
     const outsider = await request(httpServer)
       .post('/api/auth/register')
       .send({
-        inviteCode: outsiderInvite.body.code,
+        inviteCode: await createRegCode(httpServer, ownerAccess),
         username: 'Чужак',
         password: 'пароль-чужака-123',
       })
@@ -1321,15 +1347,10 @@ describe('Voxa: критический поток (e2e)', () => {
     expect(empty.body).toHaveLength(0);
 
     // Чужак не лезет в чужой диалог
-    const outsiderInvite = await request(httpServer)
-      .post(`/api/guilds/${guildId}/invites`)
-      .set('Authorization', `Bearer ${ownerAccess}`)
-      .send({ maxUses: 1 })
-      .expect(201);
     const outsider = await request(httpServer)
       .post('/api/auth/register')
       .send({
-        inviteCode: outsiderInvite.body.code,
+        inviteCode: await createRegCode(httpServer, ownerAccess),
         username: 'Чужак2',
         password: 'пароль-чужака-456',
       })
@@ -1547,12 +1568,19 @@ describe('Voxa: критический поток (e2e)', () => {
     const stranger = await request(httpServer)
       .post('/api/auth/register')
       .send({
-        inviteCode: invite.body.code,
+        inviteCode: await createRegCode(httpServer, ownerAccess),
         username: 'Посторонний',
         password: 'пароль-постороннего-1',
       })
       .expect(201);
     const strangerId = (stranger.body as AuthResponseDto).user.id;
+    const strangerAccess = (stranger.body as AuthResponseDto).accessToken;
+
+    // Вступает на общий сервер серверным инвайтом
+    await request(httpServer)
+      .post(`/api/invites/${invite.body.code}/join`)
+      .set('Authorization', `Bearer ${strangerAccess}`)
+      .expect(200);
 
     // Пока есть общий сервер — писать можно
     await request(httpServer)
@@ -1590,15 +1618,10 @@ describe('Voxa: критический поток (e2e)', () => {
     expect(overview.body.serverVersion).toBeTruthy();
 
     // Жертва для глобального бана
-    const invite = await request(httpServer)
-      .post(`/api/guilds/${guildId}/invites`)
-      .set('Authorization', `Bearer ${ownerAccess}`)
-      .send({ maxUses: 5 })
-      .expect(201);
     const victim = { username: 'Незваный', password: 'пароль-незваного-99' };
     const registered = await request(httpServer)
       .post('/api/auth/register')
-      .send({ inviteCode: invite.body.code, ...victim })
+      .send({ inviteCode: await createRegCode(httpServer, ownerAccess), ...victim })
       .expect(201);
     const victimId = (registered.body as AuthResponseDto).user.id;
 
@@ -1649,15 +1672,11 @@ describe('Voxa: критический поток (e2e)', () => {
       .set('Authorization', `Bearer ${ownerAccess}`)
       .send({ registrationOpen: false, maxGuildsPerUser: 1 })
       .expect(200);
-    const closedInvite = await request(httpServer)
-      .post(`/api/guilds/${guildId}/invites`)
-      .set('Authorization', `Bearer ${ownerAccess}`)
-      .send({ maxUses: 5 })
-      .expect(201);
+    const closedCode = await createRegCode(httpServer, ownerAccess);
     await request(httpServer)
       .post('/api/auth/register')
       .send({
-        inviteCode: closedInvite.body.code,
+        inviteCode: closedCode,
         username: 'Поздний',
         password: 'пароль-позднего-123',
       })
@@ -1699,5 +1718,53 @@ describe('Voxa: критический поток (e2e)', () => {
     expect(await prisma.attachment.count({ where: { messageId: null, dmMessageId: null } })).toBe(
       0,
     );
+  });
+
+  it('серверный инвайт не регистрирует; кодами регистрации владеет только владелец приложения', async () => {
+    // Обычный участник не может ни создавать, ни смотреть коды регистрации
+    await request(httpServer)
+      .post('/api/instance/registration-invites')
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ maxUses: 1 })
+      .expect(403);
+    await request(httpServer)
+      .get('/api/instance/registration-invites')
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(403);
+
+    // Серверный инвайт нельзя использовать как код регистрации в приложении
+    const serverInvite = await request(httpServer)
+      .post(`/api/guilds/${guildId}/invites`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ maxUses: 5 })
+      .expect(201);
+    await request(httpServer)
+      .post('/api/auth/register')
+      .send({
+        inviteCode: serverInvite.body.code,
+        username: 'ПоСерверному',
+        password: 'пароль-по-серверному-1',
+      })
+      .expect(400);
+
+    // Владелец создаёт код регистрации (ссылка ведёт на /register), отзывает — и он не работает
+    const owned = await request(httpServer)
+      .post('/api/instance/registration-invites')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ maxUses: 5 })
+      .expect(201);
+    expect(owned.body.url).toContain('/register/');
+    await request(httpServer)
+      .delete(`/api/instance/registration-invites/${owned.body.id}`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(204);
+    await request(httpServer)
+      .post('/api/auth/register')
+      .send({
+        inviteCode: owned.body.code,
+        username: 'Отозванный',
+        password: 'пароль-отозванного-1',
+      })
+      .expect(400);
   });
 });

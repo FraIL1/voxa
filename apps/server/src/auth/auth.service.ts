@@ -64,24 +64,24 @@ export class AuthService {
     const now = new Date();
 
     const user = await this.prisma.$transaction(async (tx) => {
-      // Инвайт: атомарно занимаем одно использование
-      const claimed = await tx.invite.updateMany({
+      // Код регистрации в приложении: атомарно занимаем одно использование
+      const claimed = await tx.registrationInvite.updateMany({
         where: {
           code: input.inviteCode,
           revokedAt: null,
           OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
-          // uses < maxUses ИЛИ maxUses IS NULL — через сырое условие нельзя,
-          // поэтому забираем каждое условие отдельно ниже
         },
         data: { uses: { increment: 1 } },
       });
       if (claimed.count === 0) {
-        throw new BadRequestException('Инвайт недействителен, истёк или отозван');
+        throw new BadRequestException('Код регистрации недействителен, истёк или отозван');
       }
 
-      const invite = await tx.invite.findUniqueOrThrow({ where: { code: input.inviteCode } });
+      const invite = await tx.registrationInvite.findUniqueOrThrow({
+        where: { code: input.inviteCode },
+      });
       if (invite.maxUses !== null && invite.uses > invite.maxUses) {
-        throw new BadRequestException('Лимит использований инвайта исчерпан');
+        throw new BadRequestException('Лимит использований кода исчерпан');
       }
 
       const existing = await tx.user.findUnique({
@@ -101,38 +101,40 @@ export class AuthService {
         },
       });
 
-      // Регистрация по инвайту = вступление на его сервер
-      await tx.guildMember.create({ data: { guildId: invite.guildId, userId: created.id } });
-
-      // Роли сервера: базовая «Участник» + роль инвайта (например, «Владелец»)
-      const defaultRole = await tx.role.findFirst({
-        where: { guildId: invite.guildId, isDefault: true },
-      });
-      const roleIds = new Set<string>();
-      if (defaultRole) roleIds.add(defaultRole.id);
-      if (invite.grantsRoleId) roleIds.add(invite.grantsRoleId);
-      await tx.userRole.createMany({
-        data: [...roleIds].map((roleId) => ({ userId: created.id, roleId })),
-      });
-
-      // Bootstrap владельца: первый вошедший с owner-ролью становится
-      // владельцем сервера (guild.ownerId)
-      if (invite.grantsRoleId) {
-        const grantsRole = await tx.role.findUnique({ where: { id: invite.grantsRoleId } });
-        if (grantsRole?.isOwnerRole) {
-          await tx.guild.updateMany({
-            where: { id: invite.guildId, ownerId: null },
-            data: { ownerId: created.id },
-          });
+      // Первый пользователь — владелец приложения: становится владельцем и
+      // членом стартового сервера «Voxa». Остальные регистрируются «пустыми»
+      // и дальше создают свои серверы либо вступают по серверным инвайтам.
+      if (isFirstUser) {
+        const seedGuildId = (await tx.appMeta.findUnique({ where: { key: 'seed:v1' } }))?.value;
+        const guild = seedGuildId
+          ? await tx.guild.findUnique({
+              where: { id: seedGuildId },
+              select: { id: true, ownerId: true },
+            })
+          : null;
+        if (guild) {
+          await tx.guildMember.create({ data: { guildId: guild.id, userId: created.id } });
+          const [ownerRole, defaultRole] = await Promise.all([
+            tx.role.findFirst({ where: { guildId: guild.id, isOwnerRole: true } }),
+            tx.role.findFirst({ where: { guildId: guild.id, isDefault: true } }),
+          ]);
+          const roleIds = new Set<string>();
+          if (defaultRole) roleIds.add(defaultRole.id);
+          if (ownerRole) roleIds.add(ownerRole.id);
+          if (roleIds.size > 0) {
+            await tx.userRole.createMany({
+              data: [...roleIds].map((roleId) => ({ userId: created.id, roleId })),
+            });
+          }
+          if (guild.ownerId === null) {
+            await tx.guild.update({ where: { id: guild.id }, data: { ownerId: created.id } });
+          }
         }
       }
 
-      // Одноразовый bootstrap-инвайт владельца гасим сразу
-      if (invite.grantsRoleId && invite.maxUses !== null && invite.uses >= invite.maxUses) {
-        await tx.invite.update({
-          where: { id: invite.id },
-          data: { revokedAt: now },
-        });
+      // Исчерпанный код регистрации гасим сразу
+      if (invite.maxUses !== null && invite.uses >= invite.maxUses) {
+        await tx.registrationInvite.update({ where: { id: invite.id }, data: { revokedAt: now } });
       }
 
       return created;
