@@ -1,9 +1,4 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { VoiceTokenDto } from '@voxa/shared';
 import { AccessToken } from 'livekit-server-sdk';
@@ -25,20 +20,18 @@ export class VoiceService {
 
   /** Комната LiveKit = голосовой канал; имя комнаты — id канала */
   async issueToken(userId: string, channelId: string): Promise<VoiceTokenDto> {
-    // Таймаут запрещает и голос (раздел 5.10 PRD)
     const me = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { timedOutUntil: true, displayName: true },
+      select: { displayName: true },
     });
-    if (me?.timedOutUntil && me.timedOutUntil > new Date()) {
-      throw new ForbiddenException(`Вы в таймауте до ${me.timedOutUntil.toLocaleString('ru-RU')}`);
-    }
     const username = me?.displayName ?? '';
 
     const channel = await this.prisma.channel.findUnique({ where: { id: channelId } });
     if (!channel || !(await this.users.canSeeChannel(userId, channelId))) {
       throw new NotFoundException('Канал не найден');
     }
+    // Таймаут запрещает голос только на своём сервере
+    await this.users.assertNotTimedOut(channel.guildId, userId);
     if (channel.type !== 'VOICE') {
       throw new BadRequestException('Это не голосовой канал');
     }

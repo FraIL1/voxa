@@ -143,8 +143,8 @@ export class ModerationService {
     await this.assertModeratable(guildId, actorId, targetId);
 
     const until = new Date(Date.now() + minutes * 60_000);
-    await this.prisma.user.update({
-      where: { id: targetId },
+    await this.prisma.guildMember.update({
+      where: { guildId_userId: { guildId, userId: targetId } },
       data: { timedOutUntil: until },
     });
 
@@ -156,7 +156,11 @@ export class ModerationService {
       await this.livekit.setCanPublish(voiceChannelId, targetId, false);
     }
 
-    this.ws.emitToUsers([targetId], WsEvents.MeTimedOut, { until: until.toISOString() });
+    this.ws.emitToUsers([targetId], WsEvents.MeTimedOut, {
+      guildId,
+      until: until.toISOString(),
+    });
+    this.ws.emitToGuild(guildId, WsEvents.GuildMembersChanged, { guildId });
     this.audit.log(
       guildId,
       actorId,
@@ -168,8 +172,8 @@ export class ModerationService {
   }
 
   async clearTimeout(guildId: string, actorId: string, targetId: string): Promise<void> {
-    await this.prisma.user.update({
-      where: { id: targetId },
+    await this.prisma.guildMember.update({
+      where: { guildId_userId: { guildId, userId: targetId } },
       data: { timedOutUntil: null },
     });
 
@@ -179,7 +183,8 @@ export class ModerationService {
       await this.livekit.setCanPublish(voiceChannelId, targetId, true);
     }
 
-    this.ws.emitToUsers([targetId], WsEvents.MeTimedOut, { until: null });
+    this.ws.emitToUsers([targetId], WsEvents.MeTimedOut, { guildId, until: null });
+    this.ws.emitToGuild(guildId, WsEvents.GuildMembersChanged, { guildId });
     this.audit.log(guildId, actorId, 'user.timeout.clear', { type: 'user', id: targetId });
   }
 }

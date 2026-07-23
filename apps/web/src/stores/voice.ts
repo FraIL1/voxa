@@ -13,7 +13,6 @@ import { create } from 'zustand';
 
 import { api } from '../api/client';
 import { emitVoiceState } from '../api/socket';
-import { useAuthStore } from './auth';
 import { playJoinSound, playLeaveSound } from '../lib/sounds';
 
 const DEVICES_KEY = 'voxa-audio-devices';
@@ -271,9 +270,8 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
   toggleMute: async () => {
     const { channelId, muted, deafened } = get();
     if (!room || !channelId) return;
-    // Активный таймаут: размутиться нельзя (SFU всё равно не даст)
-    const timedOutUntil = useAuthStore.getState().user?.timedOutUntil;
-    if (muted && timedOutUntil && new Date(timedOutUntil) > new Date()) return;
+    // Таймаут сервера отбирает право публиковать на уровне SFU — здесь
+    // отдельная проверка не нужна: setMicrophoneEnabled просто не сработает
     const nextMuted = !muted;
     // Снятие мьюта выводит и из deafen (как в Discord)
     const nextDeafened = nextMuted ? deafened : false;

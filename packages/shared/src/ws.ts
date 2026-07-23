@@ -25,7 +25,7 @@ export const WsEvents = {
   UserUpdated: 'user.updated',
   /** Адресное: сессия принудительно завершена (кик/бан) — выйти из аккаунта */
   ForceLogout: 'force_logout',
-  /** Адресное: изменился мой таймаут (null — снят) */
+  /** Адресное: изменился мой таймаут на сервере (null — снят) */
   MeTimedOut: 'me.timeout',
   /** Изменение состава/состояния участников голосового канала */
   VoiceUpdate: 'voice.update',
@@ -131,7 +131,7 @@ export interface WsServerEvents {
   [WsEvents.PresenceUpdate]: PresenceUpdatePayload;
   [WsEvents.UserUpdated]: UserPublicDto;
   [WsEvents.ForceLogout]: { reason: string };
-  [WsEvents.MeTimedOut]: { until: string | null };
+  [WsEvents.MeTimedOut]: { guildId: string; until: string | null };
   [WsEvents.VoiceUpdate]: VoiceChannelStateDto;
   [WsEvents.ReadStateUpdated]: ReadStateUpdatedPayload;
   [WsEvents.ChannelCreated]: ChannelDto;

@@ -10,10 +10,12 @@ import {
   type KeyboardEvent,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useParams } from 'react-router';
 
 import { emitTyping } from '../api/socket';
 import { uploadFile } from '../api/uploads';
 import { useSendMessage } from '../hooks/useMessages';
+import { useMembers } from '../hooks/useMembers';
 import { useAuthStore } from '../stores/auth';
 import { useChatStore } from '../stores/chat';
 
@@ -44,7 +46,11 @@ export default function Composer({
   const setReplyTo = useChatStore((s) => s.setReplyTo);
   const lastTypingAt = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const timedOutUntil = useAuthStore((s) => s.user?.timedOutUntil);
+  const { guildId } = useParams<{ guildId: string }>();
+  const myId = useAuthStore((s) => s.user?.id);
+  const { data: members } = useMembers(guildId);
+  // Таймаут действует на конкретном сервере — берём его из своего членства
+  const timedOutUntil = members?.find((m) => m.id === myId)?.timedOutUntil ?? null;
   const [, setTick] = useState(0);
 
   // Черновик, ответ и файлы не переносятся между каналами

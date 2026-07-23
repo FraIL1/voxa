@@ -20,8 +20,6 @@ export interface RoleDto {
 }
 
 export interface MeDto extends UserPublicDto {
-  /** Активный таймаут: до этого момента нельзя писать и говорить */
-  timedOutUntil: string | null;
   createdAt: string;
 }
 

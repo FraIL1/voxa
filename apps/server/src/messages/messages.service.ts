@@ -193,21 +193,17 @@ export class MessagesService {
     return message;
   }
 
-  /** Активный таймаут запрещает писать и говорить (раздел 5.10 PRD) */
-  private async assertNotTimedOut(userId: string): Promise<void> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { timedOutUntil: true },
+  /** Таймаут действует только на сервере, где он выдан */
+  private async assertNotTimedOut(userId: string, channelId: string): Promise<void> {
+    const channel = await this.prisma.channel.findUnique({
+      where: { id: channelId },
+      select: { guildId: true },
     });
-    if (user?.timedOutUntil && user.timedOutUntil > new Date()) {
-      throw new ForbiddenException(
-        `Вы в таймауте до ${user.timedOutUntil.toLocaleString('ru-RU')}`,
-      );
-    }
+    if (channel) await this.users.assertNotTimedOut(channel.guildId, userId);
   }
 
   async send(userId: string, channelId: string, input: SendMessageInput): Promise<MessageDto> {
-    await this.assertNotTimedOut(userId);
+    await this.assertNotTimedOut(userId, channelId);
     await this.assertTextChannelAccess(userId, channelId);
 
     // Вложения в канал сервера требуют права UPLOAD_FILES на этом сервере

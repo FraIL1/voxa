@@ -51,13 +51,11 @@ export class DmCallsService {
   }
 
   private async issueToken(userId: string, conversationId: string): Promise<VoiceTokenDto> {
+    // Таймаут выдаётся на сервере и личных звонков не касается
     const me = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { timedOutUntil: true, displayName: true },
+      select: { displayName: true },
     });
-    if (me?.timedOutUntil && me.timedOutUntil > new Date()) {
-      throw new ForbiddenException(`Вы в таймауте до ${me.timedOutUntil.toLocaleString('ru-RU')}`);
-    }
 
     const room = dmRoomOf(conversationId);
     const token = new AccessToken(

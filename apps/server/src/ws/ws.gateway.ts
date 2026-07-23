@@ -200,13 +200,15 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     if (channelId !== null && !socket.rooms.has(channelRoom(channelId))) return;
 
-    // Активный таймаут: клиент не может объявить себя размученным
+    // Активный таймаут сервера: клиент не может объявить себя размученным
     if (channelId !== null && !muted) {
-      const user = await this.prisma.user.findUnique({
-        where: { id: data.userId },
-        select: { timedOutUntil: true },
+      const channel = await this.prisma.channel.findUnique({
+        where: { id: channelId },
+        select: { guildId: true },
       });
-      if (user?.timedOutUntil && user.timedOutUntil > new Date()) muted = true;
+      if (channel && (await this.usersService.timeoutOf(channel.guildId, data.userId))) {
+        muted = true;
+      }
     }
 
     const affected = this.voiceStates.update(

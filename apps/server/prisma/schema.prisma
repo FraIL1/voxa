@@ -10,18 +10,16 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(uuid(7))
+  id            String   @id @default(uuid(7))
   /// Неизменяемый уникальный логин (регистрация, вход, заявки в друзья)
   username      String
-  usernameLower String    @unique @map("username_lower")
+  usernameLower String   @unique @map("username_lower")
   /// Отображаемое имя — можно менять свободно
-  displayName   String    @map("display_name")
-  passwordHash  String    @map("password_hash")
-  avatarUrl     String?   @map("avatar_url")
-  /// Таймаут: до этого момента не может писать и говорить (раздел 5.10 PRD)
-  timedOutUntil DateTime? @map("timed_out_until")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  displayName   String   @map("display_name")
+  passwordHash  String   @map("password_hash")
+  avatarUrl     String?  @map("avatar_url")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   roles            UserRole[]
   sessions         RefreshSession[]
@@ -70,13 +68,15 @@ model Guild {
 
 /// Членство пользователя на сервере
 model GuildMember {
-  guildId  String   @map("guild_id")
-  guild    Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
-  userId   String   @map("user_id")
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guildId       String    @map("guild_id")
+  guild         Guild     @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  userId        String    @map("user_id")
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   /// Ник на этом сервере; null — используется displayName
-  nickname String?
-  joinedAt DateTime @default(now()) @map("joined_at")
+  nickname      String?
+  /// Таймаут НА ЭТОМ сервере: до этого момента нельзя писать и говорить здесь
+  timedOutUntil DateTime? @map("timed_out_until")
+  joinedAt      DateTime  @default(now()) @map("joined_at")
 
   @@id([guildId, userId])
   @@index([userId])

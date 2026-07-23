@@ -8,6 +8,24 @@ import { PrismaService } from '../prisma/prisma.service';
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /** Активный таймаут участника на сервере (null — нет) */
+  async timeoutOf(guildId: string, userId: string): Promise<Date | null> {
+    const member = await this.prisma.guildMember.findUnique({
+      where: { guildId_userId: { guildId, userId } },
+      select: { timedOutUntil: true },
+    });
+    const until = member?.timedOutUntil ?? null;
+    return until && until > new Date() ? until : null;
+  }
+
+  /** 403, если участник в таймауте на этом сервере */
+  async assertNotTimedOut(guildId: string, userId: string): Promise<void> {
+    const until = await this.timeoutOf(guildId, userId);
+    if (until) {
+      throw new ForbiddenException(`Вы в таймауте до ${until.toLocaleString('ru-RU')}`);
+    }
+  }
+
   /** Участник ли пользователь сервера */
   async isMember(guildId: string, userId: string): Promise<boolean> {
     const member = await this.prisma.guildMember.findUnique({
@@ -132,7 +150,7 @@ export class UsersService {
           .map((ur) => ur.role)
           .sort((a, b) => b.position - a.position)
           .map((r) => ({ id: r.id, name: r.name, color: r.color, position: r.position })),
-        timedOutUntil: member.user.timedOutUntil?.toISOString() ?? null,
+        timedOutUntil: member.timedOutUntil?.toISOString() ?? null,
         banned: member.user.bansReceived.length > 0,
       }))
       .sort((a, b) =>
@@ -202,7 +220,6 @@ export class UsersService {
       username: user.username,
       displayName: user.displayName,
       avatarUrl: user.avatarUrl,
-      timedOutUntil: user.timedOutUntil?.toISOString() ?? null,
       createdAt: user.createdAt.toISOString(),
     };
   }

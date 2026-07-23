@@ -268,15 +268,17 @@ export function useRealtime(): void {
     });
 
     // Таймаут выдан или снят
-    socket.on(WsEvents.MeTimedOut, ({ until }: { until: string | null }) => {
-      const me = useAuthStore.getState().user;
-      if (me) useAuthStore.getState().setUser({ ...me, timedOutUntil: until });
-      if (until) {
-        // Модалка по центру + принудительный мут, если сидим в голосе
-        useChatStore.getState().setTimeoutNotice(until);
-        void useVoiceStore.getState().forceMuteLocal();
-      }
-    });
+    socket.on(
+      WsEvents.MeTimedOut,
+      ({ guildId, until }: { guildId: string; until: string | null }) => {
+        void queryClient.invalidateQueries({ queryKey: ['members', guildId] });
+        if (until) {
+          // Модалка по центру + принудительный мут, если сидим в голосе
+          useChatStore.getState().setTimeoutNotice(until);
+          void useVoiceStore.getState().forceMuteLocal();
+        }
+      },
+    );
 
     return () => {
       disconnectSocket();

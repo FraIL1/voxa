@@ -656,6 +656,10 @@ describe('Voxa: критический поток (e2e)', () => {
       .set('Authorization', `Bearer ${memberAccess}`)
       .expect(200);
     const memberId = (me.body as MeDto).id;
+    const ownerMeForTimeout = await request(httpServer)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
 
     const res = await request(httpServer)
       .post(`/api/guilds/${guildId}/members/${memberId}/timeout`)
@@ -682,6 +686,18 @@ describe('Voxa: критический поток (e2e)', () => {
       .post(`/api/channels/${voiceChannel.id}/voice-token`)
       .set('Authorization', `Bearer ${memberAccess}`)
       .expect(403);
+
+    // Таймаут выдан на сервере — личные сообщения он не трогает
+    const dm = await request(httpServer)
+      .post('/api/dm/conversations')
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ userId: (ownerMeForTimeout.body as MeDto).id })
+      .expect(201);
+    await request(httpServer)
+      .post(`/api/dm/conversations/${dm.body.id}/messages`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ content: 'в личке таймаут не действует' })
+      .expect(201);
 
     // Снятие таймаута
     await request(httpServer)
