@@ -25,6 +25,7 @@ import {
 import { FilesService } from '../files/files.service';
 import { FriendsService } from '../friends/friends.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { UsersService } from '../users/users.service';
 import { WsGateway } from '../ws/ws.gateway';
 
 const EXCERPT_LENGTH = 140;
@@ -61,8 +62,20 @@ export class DmService {
     private readonly prisma: PrismaService,
     private readonly files: FilesService,
     private readonly friends: FriendsService,
+    private readonly users: UsersService,
     private readonly ws: WsGateway,
   ) {}
+
+  /**
+   * Писать в личку можно другу или тому, с кем есть общий сервер —
+   * иначе любой зарегистрированный мог бы написать кому угодно.
+   */
+  private async assertCanDm(meId: string, peerId: string): Promise<void> {
+    await this.friends.assertNotBlocked(meId, peerId);
+    if (await this.friends.areFriends(meId, peerId)) return;
+    if (await this.users.shareGuild(meId, peerId)) return;
+    throw new ForbiddenException('Написать можно другу или участнику общего с вами сервера');
+  }
 
   /** Канонический порядок пары: меньший uuid — userA (одна строка на двоих) */
   private orderPair(a: string, b: string): [string, string] {
@@ -131,7 +144,7 @@ export class DmService {
     if (meId === peerId) throw new BadRequestException('Нельзя написать самому себе');
     const peer = await this.prisma.user.findUnique({ where: { id: peerId }, select: { id: true } });
     if (!peer) throw new NotFoundException('Пользователь не найден');
-    await this.friends.assertNotBlocked(meId, peerId);
+    await this.assertCanDm(meId, peerId);
 
     const [userAId, userBId] = this.orderPair(meId, peerId);
     const conversation = await this.prisma.dmConversation.upsert({
@@ -258,7 +271,7 @@ export class DmService {
 
   async send(meId: string, conversationId: string, input: SendDmInput): Promise<DmMessageDto> {
     const conversation = await this.assertParticipant(conversationId, meId);
-    await this.friends.assertNotBlocked(meId, this.peerIdOf(conversation, meId));
+    await this.assertCanDm(meId, this.peerIdOf(conversation, meId));
 
     if (input.replyToId) {
       const target = await this.prisma.dmMessage.findFirst({
@@ -349,6 +362,8 @@ export class DmService {
       where: { id: messageId },
       data: { deletedAt: new Date() },
     });
+    // Файлы удалённого сообщения не должны вечно занимать квоту автора
+    await this.files.removeForMessage({ dmMessageId: messageId });
     this.ws.emitToUsers([conversation.userAId, conversation.userBId], WsEvents.DmMessageDeleted, {
       id: messageId,
       conversationId,

@@ -60,8 +60,8 @@ export class InvitesController {
     @CurrentUser() user: RequestUser,
     @Param('inviteId', ParseUUIDPipe) inviteId: string,
   ): Promise<void> {
-    await this.invitesService.revoke(inviteId);
-    this.audit.log(null, user.id, 'invite.revoke', { type: 'invite', id: inviteId });
+    const guildId = await this.invitesService.revoke(inviteId);
+    this.audit.log(guildId, user.id, 'invite.revoke', { type: 'invite', id: inviteId });
   }
 
   /** Проверка кода перед регистрацией — без авторизации */

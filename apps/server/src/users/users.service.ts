@@ -8,6 +8,15 @@ import { PrismaService } from '../prisma/prisma.service';
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /** Есть ли у двоих хотя бы один общий сервер */
+  async shareGuild(aId: string, bId: string): Promise<boolean> {
+    const shared = await this.prisma.guildMember.findFirst({
+      where: { userId: aId, guild: { members: { some: { userId: bId } } } },
+      select: { guildId: true },
+    });
+    return shared !== null;
+  }
+
   /** Активный таймаут участника на сервере (null — нет) */
   async timeoutOf(guildId: string, userId: string): Promise<Date | null> {
     const member = await this.prisma.guildMember.findUnique({

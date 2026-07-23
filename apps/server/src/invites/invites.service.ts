@@ -82,14 +82,17 @@ export class InvitesService {
     return invites.map((i) => this.toDto(i));
   }
 
-  async revoke(id: string): Promise<void> {
-    const result = await this.prisma.invite.updateMany({
-      where: { id, revokedAt: null },
-      data: { revokedAt: new Date() },
+  /** Отзыв инвайта; возвращает сервер, которому он принадлежал (для журнала) */
+  async revoke(id: string): Promise<string> {
+    const invite = await this.prisma.invite.findUnique({
+      where: { id },
+      select: { guildId: true, revokedAt: true },
     });
-    if (result.count === 0) {
+    if (!invite || invite.revokedAt) {
       throw new NotFoundException('Инвайт не найден или уже отозван');
     }
+    await this.prisma.invite.update({ where: { id }, data: { revokedAt: new Date() } });
+    return invite.guildId;
   }
 
   /** Публичная проверка кода перед регистрацией (страница инвайта) */

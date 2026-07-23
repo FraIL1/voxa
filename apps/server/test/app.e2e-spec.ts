@@ -1511,4 +1511,66 @@ describe('Voxa: критический поток (e2e)', () => {
     expect((guilds.body as { id: string }[]).some((g) => g.id === testGuildId)).toBe(false);
     expect(ownerId).toBeTruthy();
   });
+
+  it('вложения удаляются вместе с сообщением; ЛС только друзьям и своим по серверу', async () => {
+    // --- Вложения не остаются мусором в хранилище и квоте ---
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      'base64',
+    );
+    const uploaded = await request(httpServer)
+      .post('/api/uploads')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .attach('file', png, 'to-delete.png')
+      .expect(201);
+    const attachmentId = uploaded.body.id as string;
+
+    const sent = await request(httpServer)
+      .post(`/api/channels/${generalChannelId}/messages`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ content: 'с вложением', attachmentIds: [attachmentId] })
+      .expect(201);
+
+    expect(await prisma.attachment.count({ where: { id: attachmentId } })).toBe(1);
+    await request(httpServer)
+      .delete(`/api/channels/${generalChannelId}/messages/${sent.body.id}`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(204);
+    expect(await prisma.attachment.count({ where: { id: attachmentId } })).toBe(0);
+
+    // --- Личка закрыта для посторонних ---
+    const invite = await request(httpServer)
+      .post(`/api/guilds/${guildId}/invites`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ maxUses: 1 })
+      .expect(201);
+    const stranger = await request(httpServer)
+      .post('/api/auth/register')
+      .send({
+        inviteCode: invite.body.code,
+        username: 'Посторонний',
+        password: 'пароль-постороннего-1',
+      })
+      .expect(201);
+    const strangerId = (stranger.body as AuthResponseDto).user.id;
+
+    // Пока есть общий сервер — писать можно
+    await request(httpServer)
+      .post('/api/dm/conversations')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ userId: strangerId })
+      .expect(201);
+
+    // После кика общего сервера нет и дружбы нет — 403
+    await request(httpServer)
+      .post(`/api/guilds/${guildId}/members/${strangerId}/kick`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({})
+      .expect(204);
+    await request(httpServer)
+      .post('/api/dm/conversations')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ userId: strangerId })
+      .expect(403);
+  });
 });

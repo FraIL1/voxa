@@ -312,6 +312,8 @@ export class MessagesService {
       where: { id: messageId },
       data: { deletedAt: new Date() },
     });
+    // Файлы удалённого сообщения не должны вечно занимать квоту автора
+    await this.files.removeForMessage({ messageId });
 
     // Удаление чужого — модерационное действие, фиксируем в журнале
     if (isForeign) {

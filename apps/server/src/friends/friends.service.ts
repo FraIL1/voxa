@@ -50,6 +50,12 @@ export class FriendsService {
     }
   }
 
+  /** Друзья ли двое (принятая дружба) */
+  async areFriends(aId: string, bId: string): Promise<boolean> {
+    const row = await this.pairRow(aId, bId);
+    return row?.status === 'ACCEPTED';
+  }
+
   async listFriends(meId: string): Promise<FriendDto[]> {
     const rows = await this.prisma.friendship.findMany({
       where: { status: 'ACCEPTED', OR: [{ requesterId: meId }, { addresseeId: meId }] },

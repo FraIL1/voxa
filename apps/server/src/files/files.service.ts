@@ -1,5 +1,6 @@
 import {
   CreateBucketCommand,
+  DeleteObjectsCommand,
   GetObjectCommand,
   HeadBucketCommand,
   PutObjectCommand,
@@ -195,6 +196,34 @@ export class FilesService implements OnModuleInit {
     if (count !== ids.length) {
       throw new BadRequestException('Некоторые вложения не найдены или уже использованы');
     }
+  }
+
+  /**
+   * Удаление вложений сообщения: файлы уходят из хранилища и из БД, чтобы
+   * не занимать квоту автора после удаления сообщения.
+   */
+  async removeForMessage(where: { messageId?: string; dmMessageId?: string }): Promise<void> {
+    const attachments = await this.prisma.attachment.findMany({
+      where,
+      select: { id: true, key: true, thumbKey: true },
+    });
+    if (attachments.length === 0) return;
+
+    const keys = attachments.flatMap((a) => [
+      { Key: a.key },
+      ...(a.thumbKey ? [{ Key: a.thumbKey }] : []),
+    ]);
+    try {
+      await this.s3.send(
+        new DeleteObjectsCommand({ Bucket: this.bucket, Delete: { Objects: keys } }),
+      );
+    } catch (error) {
+      // Файл мог исчезнуть из хранилища раньше — запись всё равно чистим
+      this.logger.warn(`Не удалось удалить файлы из хранилища: ${(error as Error).message}`);
+    }
+    await this.prisma.attachment.deleteMany({
+      where: { id: { in: attachments.map((a) => a.id) } },
+    });
   }
 
   /** Привязка загруженных вложений к личному сообщению */

@@ -21,6 +21,8 @@ import { WsGateway } from '../ws/ws.gateway';
 export const OWNER_ROLE_NAME = 'Владелец';
 export const MEMBER_ROLE_NAME = 'Участник';
 export const MEMBER_MASK = Permissions.SEND_MESSAGES | Permissions.UPLOAD_FILES;
+/** Сколько серверов может создать один аккаунт */
+export const MAX_GUILDS_PER_USER = 20;
 
 @Injectable()
 export class GuildsService {
@@ -72,6 +74,13 @@ export class GuildsService {
 
   /** Создание сервера: роли Владелец/Участник + стартовые каналы */
   async create(userId: string, input: CreateGuildInput): Promise<GuildDto> {
+    const owned = await this.prisma.guild.count({ where: { ownerId: userId } });
+    if (owned >= MAX_GUILDS_PER_USER) {
+      throw new BadRequestException(
+        `Нельзя создать больше ${MAX_GUILDS_PER_USER} серверов на один аккаунт`,
+      );
+    }
+
     const guild = await this.prisma.$transaction(async (tx) => {
       const created = await tx.guild.create({ data: { name: input.name, ownerId: userId } });
       const ownerRole = await tx.role.create({
