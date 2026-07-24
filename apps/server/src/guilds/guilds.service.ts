@@ -102,7 +102,7 @@ export class GuildsService {
         data: {
           guildId: created.id,
           name: OWNER_ROLE_NAME,
-          color: '#FF7A45',
+          color: '#FBBF24',
           permissions: Permissions.ADMINISTRATOR,
           position: 100,
           isOwnerRole: true,

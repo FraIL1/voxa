@@ -109,13 +109,16 @@ function ChannelItem({
 
   const unread = (state?.unreadCount ?? 0) > 0;
   const mentions = state?.mentionCount ?? 0;
+  const muted = state?.muted ?? false;
 
   return (
     <div className="channel-row">
       <NavLink
         to={`/guilds/${channel.guildId}/channels/${channel.id}`}
         className={({ isActive }) =>
-          `channel-link${isActive ? ' active' : ''}${unread ? ' unread' : ''}`
+          `channel-link${isActive ? ' active' : ''}${unread ? ' unread' : ''}${
+            muted ? ' muted' : ''
+          }`
         }
       >
         <Hash size={16} />

@@ -49,7 +49,7 @@ export class SeedService implements OnApplicationBootstrap {
           {
             guildId: guild.id,
             name: 'Владелец',
-            color: '#FF7A45',
+            color: '#FBBF24',
             permissions: Permissions.ADMINISTRATOR,
             position: 100,
             isOwnerRole: true,

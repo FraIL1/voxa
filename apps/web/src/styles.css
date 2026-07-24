@@ -1,21 +1,49 @@
-/* Палитра и базовые токены — раздел 7.3 PRD (СВОЯ гамма, не Discord) */
+/* Дизайн-система Voxa — тёмная «техно»-гамма (раздел 7.3 PRD: СВОЯ палитра,
+   намеренно далёкая от фирменных цветов Discord). Ось: глубокий сине-чёрный
+   фон, холодный циан-акцент, мягкие тени и подсветки. */
 :root {
-  --bg: #1a1d24;
-  --panel: #22262e;
-  --panel-raised: #2a2f39;
-  --border: #333945;
-  --text: #e6e9ee;
-  --text-muted: #9aa3b2;
-  --text-faint: #6b7280;
-  --accent: #ff7a45;
-  --accent-hover: #ff8f63;
-  --accent-text: #1a1d24;
-  --danger: #f0564f;
-  --success: #2fb36b;
-  --radius: 8px;
-  --transition: 150ms ease;
-  --sidebar-width: 240px;
-  --members-width: 200px;
+  /* Поверхности: от самой глубокой к приподнятой */
+  --bg: #080b12;
+  --panel: #0f1521;
+  --panel-raised: #161e2d;
+  --panel-hover: #1c2637;
+  --border: #1f2a3c;
+  --border-strong: #2b3a52;
+
+  /* Текст */
+  --text: #e8eef9;
+  --text-muted: #94a6c0;
+  --text-faint: #5d6e88;
+
+  /* Акцент — электрик-циан с бирюзовым переходом */
+  --accent: #22d3ee;
+  --accent-hover: #67e8f9;
+  --accent-deep: #0e9fb8;
+  --accent-text: #04121a;
+  --accent-soft: rgba(34, 211, 238, 0.14);
+  --accent-line: rgba(34, 211, 238, 0.35);
+  --gradient-accent: linear-gradient(135deg, #22d3ee 0%, #2dd4bf 100%);
+  --gradient-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0));
+
+  /* Статусы */
+  --danger: #fb7185;
+  --danger-soft: rgba(251, 113, 133, 0.14);
+  --success: #34d399;
+  --warning: #fbbf24;
+
+  /* Форма и глубина */
+  --radius-sm: 8px;
+  --radius: 10px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 24px 64px rgba(0, 0, 0, 0.6);
+  --ring: 0 0 0 3px rgba(34, 211, 238, 0.25);
+
+  --transition: 160ms cubic-bezier(0.2, 0.8, 0.3, 1);
+  --sidebar-width: 248px;
+  --members-width: 216px;
 }
 
 * {
@@ -32,10 +60,39 @@ body,
 body {
   font-family: 'Inter Variable', system-ui, sans-serif;
   font-size: 15px;
-  line-height: 1.45;
+  line-height: 1.5;
+  letter-spacing: -0.011em;
   background: var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Тонкие скроллбары в тон интерфейсу */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: var(--radius-pill);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--text-faint);
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 button {
@@ -43,14 +100,29 @@ button {
   border: none;
   cursor: pointer;
   border-radius: var(--radius);
+  color: inherit;
   transition:
     background var(--transition),
+    border-color var(--transition),
     color var(--transition),
+    box-shadow var(--transition),
+    transform var(--transition),
     opacity var(--transition);
 }
 
+button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/* Видимый фокус только с клавиатуры — мышью интерфейс остаётся чистым */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+
 input,
-textarea {
+textarea,
+select {
   font: inherit;
   color: var(--text);
   background: var(--panel-raised);
@@ -58,16 +130,40 @@ textarea {
   border-radius: var(--radius);
   padding: 10px 12px;
   outline: none;
-  transition: border-color var(--transition);
+  transition:
+    border-color var(--transition),
+    box-shadow var(--transition),
+    background var(--transition);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-faint);
+}
+
+input:hover,
+textarea:hover,
+select:hover {
+  border-color: var(--border-strong);
 }
 
 input:focus,
-textarea:focus {
+textarea:focus,
+select:focus {
   border-color: var(--accent);
+  box-shadow: var(--ring);
 }
 
 a {
   color: var(--accent);
+  text-decoration-color: var(--accent-line);
+  text-underline-offset: 2px;
+}
+
+h1,
+h2,
+h3 {
+  letter-spacing: -0.02em;
 }
 
 /* ---------- Экран аутентификации ---------- */
@@ -80,15 +176,34 @@ a {
 }
 
 .auth-card {
-  background: var(--panel);
+  position: relative;
+  background: var(--gradient-surface), var(--panel);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 32px;
+  border-radius: var(--radius-lg);
+  padding: 36px;
   width: 100%;
-  max-width: 400px;
+  max-width: 420px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+/* Тонкая акцентная линия сверху карточки */
+.auth-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: var(--gradient-accent);
+  opacity: 0.9;
+}
+
+/* Мягкое сияние за формой входа */
+.auth-screen {
+  background:
+    radial-gradient(60rem 30rem at 50% -10%, rgba(34, 211, 238, 0.09), transparent 70%), var(--bg);
 }
 
 .auth-card h1 {
@@ -117,14 +232,21 @@ a {
 }
 
 .btn-primary {
-  background: var(--accent);
+  background: var(--gradient-accent);
   color: var(--accent-text);
-  font-weight: 600;
-  padding: 10px 16px;
+  font-weight: 650;
+  padding: 10px 18px;
+  border-radius: var(--radius);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.25) inset,
+    0 6px 18px rgba(34, 211, 238, 0.22);
 }
 
-.btn-primary:hover {
-  background: var(--accent-hover);
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.07);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.3) inset,
+    0 10px 26px rgba(34, 211, 238, 0.3);
 }
 
 .btn-primary:disabled {
@@ -153,23 +275,25 @@ a {
 
 /* Левый столбец иконок (Дом + серверы) */
 .server-rail {
-  width: 72px;
+  width: 76px;
   flex-shrink: 0;
-  background: var(--bg);
+  background: linear-gradient(180deg, #0a0e16, var(--bg));
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 10px 0;
+  padding: 12px 0;
+  overflow-y: auto;
 }
 
 .rail-icon {
   position: relative;
   width: 48px;
   height: 48px;
-  border-radius: 24px;
-  background: var(--panel);
+  border-radius: var(--radius-lg);
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
   color: var(--text-muted);
   display: grid;
   place-items: center;
@@ -177,25 +301,56 @@ a {
   font-size: 18px;
   text-decoration: none;
   transition:
-    border-radius var(--transition),
     background var(--transition),
-    color var(--transition);
+    border-color var(--transition),
+    color var(--transition),
+    box-shadow var(--transition),
+    transform var(--transition);
 }
 
-.rail-icon:hover {
-  border-radius: 16px;
+/* Метка активного сервера слева от иконки */
+.rail-icon::after {
+  content: '';
+  position: absolute;
+  left: -13px;
+  width: 3px;
+  height: 0;
+  border-radius: var(--radius-pill);
   background: var(--accent);
-  color: var(--accent-text);
+  transition: height var(--transition);
+}
+
+.rail-icon:hover::after {
+  height: 18px;
+}
+
+.rail-icon.active::after {
+  height: 26px;
+}
+
+.rail-icon:hover:not(.active) {
+  background: var(--panel-hover);
+  border-color: var(--accent-line);
+  color: var(--accent);
 }
 
 .rail-icon.active {
-  border-radius: 16px;
-  background: var(--accent);
+  background: var(--gradient-accent);
+  border-color: transparent;
   color: var(--accent-text);
+  box-shadow: 0 6px 20px rgba(34, 211, 238, 0.28);
 }
 
 .rail-icon.add {
-  background: var(--panel);
+  background: transparent;
+  border-style: dashed;
+  color: var(--success);
+}
+
+.rail-icon.add:hover:not(:disabled) {
+  background: rgba(52, 211, 153, 0.1);
+  border-color: var(--success);
+  border-style: solid;
   color: var(--success);
 }
 
@@ -283,13 +438,14 @@ a {
 }
 
 .friends-tab:hover {
-  background: var(--panel-raised);
+  background: var(--panel-hover);
   color: var(--text);
 }
 
 .friends-tab.active {
-  background: var(--panel-raised);
-  color: var(--text);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
 }
 
 .friends-list {
@@ -388,6 +544,10 @@ a {
 }
 
 .sidebar-header {
+  letter-spacing: -0.01em;
+}
+
+.sidebar-header {
   padding: 14px 16px;
   font-weight: 700;
   border-bottom: 1px solid var(--border);
@@ -409,10 +569,11 @@ a {
 }
 
 .channel-link {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 8px;
+  padding: 7px 10px;
   border-radius: var(--radius);
   color: var(--text-muted);
   text-decoration: none;
@@ -427,8 +588,25 @@ a {
 }
 
 .channel-link.active {
-  background: var(--panel-raised);
+  background: var(--accent-soft);
   color: var(--text);
+}
+
+/* Акцентная риска у активного канала */
+.channel-link.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 60%;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+}
+
+.channel-link.active svg {
+  color: var(--accent);
 }
 
 .channel-link.voice {
@@ -538,14 +716,15 @@ a {
 
 /* Счётчик упоминаний */
 .mention-badge {
-  background: var(--accent);
+  background: var(--gradient-accent);
   color: var(--accent-text);
   font-size: 11px;
   font-weight: 700;
   line-height: 1;
-  border-radius: 999px;
-  padding: 3px 6px;
+  border-radius: var(--radius-pill);
+  padding: 3px 7px;
   flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(34, 211, 238, 0.3);
 }
 
 .user-card {
@@ -568,14 +747,20 @@ a {
 .icon-button {
   background: transparent;
   color: var(--text-muted);
-  padding: 6px;
+  padding: 7px;
+  border-radius: var(--radius-sm);
   display: grid;
   place-items: center;
 }
 
-.icon-button:hover {
-  background: var(--panel-raised);
+.icon-button:hover:not(:disabled) {
+  background: var(--panel-hover);
   color: var(--text);
+}
+
+.icon-button:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 /* Центральная колонка */
@@ -600,9 +785,15 @@ a {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 16px;
+  padding: 13px 18px;
   border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent);
   font-weight: 600;
+  backdrop-filter: blur(8px);
+}
+
+.channel-header svg {
+  color: var(--text-faint);
 }
 
 .channel-header .topic {
@@ -650,7 +841,7 @@ a {
 }
 
 .message:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(255, 255, 255, 0.028);
 }
 
 .message.pending {
@@ -725,8 +916,9 @@ a {
 }
 
 .reaction.mine {
-  border-color: var(--accent);
-  background: rgba(255, 122, 69, 0.12);
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .reaction-count {
@@ -783,9 +975,9 @@ a {
 /* Упоминания */
 .mention {
   color: var(--accent);
-  background: rgba(255, 122, 69, 0.12);
-  border-radius: 4px;
-  padding: 0 3px;
+  background: var(--accent-soft);
+  border-radius: 5px;
+  padding: 0 4px;
   font-weight: 500;
 }
 
@@ -793,13 +985,15 @@ a {
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: var(--panel-raised);
+  background: linear-gradient(140deg, var(--panel-hover), var(--panel-raised));
+  border: 1px solid var(--border);
   color: var(--accent);
   font-weight: 700;
   display: grid;
   place-items: center;
   flex-shrink: 0;
   user-select: none;
+  overflow: hidden;
 }
 
 .message-body {
@@ -1082,8 +1276,17 @@ a {
   gap: 8px;
   background: var(--panel-raised);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   padding: 6px 6px 6px 14px;
+  box-shadow: var(--shadow-sm);
+  transition:
+    border-color var(--transition),
+    box-shadow var(--transition);
+}
+
+.composer-inner:focus-within {
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.12);
 }
 
 .composer textarea {
@@ -1387,11 +1590,19 @@ a {
 }
 
 .admin-tile {
-  background: var(--panel);
+  background: var(--gradient-surface), var(--panel-raised);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 12px;
+  padding: 14px 12px;
   text-align: center;
+  transition:
+    border-color var(--transition),
+    transform var(--transition);
+}
+
+.admin-tile:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
 }
 
 .admin-tile-value {
@@ -1453,13 +1664,25 @@ a {
 
 .btn-secondary {
   background: var(--panel-raised);
+  border: 1px solid var(--border);
   color: var(--text);
   font-size: 13px;
-  padding: 6px 12px;
+  font-weight: 500;
+  padding: 7px 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
-.btn-secondary:hover {
-  background: var(--border);
+.btn-secondary:hover:not(:disabled) {
+  background: var(--panel-hover);
+  border-color: var(--border-strong);
+}
+
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .settings-hint {
@@ -1518,30 +1741,49 @@ a {
   position: fixed;
   inset: 0;
   z-index: 50;
-  background: rgba(0, 0, 0, 0.65);
+  background: rgba(4, 7, 12, 0.72);
+  backdrop-filter: blur(6px);
   display: grid;
   place-items: center;
+  padding: 16px;
+  animation: overlay-in 140ms ease-out;
+}
+
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
 }
 
 .settings-panel {
   position: relative;
   display: flex;
-  width: min(760px, 94vw);
-  height: min(560px, 90vh);
+  width: min(820px, 94vw);
+  height: min(600px, 90vh);
   background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
   overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  animation: modal-in 180ms cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 
 .settings-nav {
-  width: 190px;
-  background: var(--panel);
+  width: 208px;
+  background: linear-gradient(180deg, var(--panel), #0c1119);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 14px 8px;
+  padding: 16px 10px;
+  overflow-y: auto;
 }
 
 .settings-tab {
@@ -1555,14 +1797,14 @@ a {
   font-size: 14px;
 }
 
-.settings-tab:hover {
-  background: var(--panel-raised);
+.settings-tab:hover:not(.active) {
+  background: var(--panel-hover);
   color: var(--text);
 }
 
 .settings-tab.active {
-  background: var(--panel-raised);
-  color: var(--text);
+  background: var(--accent-soft);
+  color: var(--accent);
   font-weight: 600;
 }
 
@@ -1771,14 +2013,23 @@ a {
 /* ---------- Модалка «Добавить сервер» ---------- */
 
 .add-server-modal {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 22px;
-  width: min(420px, 92vw);
+  background: var(--gradient-surface), var(--panel);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  width: min(440px, 92vw);
+  max-height: 86vh;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 14px;
+  box-shadow: var(--shadow-lg);
+  animation: modal-in 180ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.add-server-modal h2 {
+  margin: 0;
+  font-size: 18px;
 }
 
 .add-server-modal h2 {
@@ -2472,4 +2723,254 @@ a {
   gap: 4px;
   font-size: 12px;
   color: var(--text-faint);
+}
+
+/* ================= Полировка интерфейса =================
+   Единый визуальный слой: карточки-строки, панели, меню и состояния.
+   Опирается на токены выше — смена палитры меняет весь облик. */
+
+/* Строки списков (друзья, участники, заявки, витрина, баны) */
+.friend-row,
+.admin-row,
+.discover-row {
+  border-top: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition:
+    background var(--transition),
+    border-color var(--transition);
+}
+
+.friend-row:hover,
+.admin-row:hover,
+.discover-row:hover {
+  background: var(--panel-raised);
+}
+
+/* Точка статуса присутствия — с обводкой под фон */
+.status-dot {
+  border: 2px solid var(--panel);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3);
+}
+
+.status-dot.online {
+  background: var(--success);
+  box-shadow: 0 0 8px rgba(52, 211, 153, 0.5);
+}
+
+/* Панели личных сообщений (закреплённые, поиск, профиль, группа) */
+.dm-panel {
+  background: linear-gradient(180deg, var(--panel-raised), var(--panel));
+  box-shadow: var(--shadow-md);
+}
+
+.dm-panel-head {
+  background: transparent;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 6px;
+}
+
+.dm-panel-search {
+  border-radius: var(--radius-pill);
+}
+
+.dm-panel-search:focus-within {
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.12);
+}
+
+/* Выпадающее меню сервера и контекстные меню */
+.server-dropdown,
+.context-menu {
+  background: var(--panel-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  padding: 6px;
+  animation: modal-in 140ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.menu-item {
+  border-radius: var(--radius-sm);
+  transition:
+    background var(--transition),
+    color var(--transition);
+}
+
+.menu-item:hover {
+  background: var(--panel-hover);
+  color: var(--text);
+}
+
+.menu-item.danger:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+/* Пилюли-вкладки внутри модалок */
+.friends-tab {
+  border-radius: var(--radius-pill);
+  padding: 6px 14px;
+}
+
+/* Карточки выбора режима (доступ, уведомления) */
+.access-mode {
+  border-radius: var(--radius);
+  transition:
+    background var(--transition),
+    border-color var(--transition),
+    box-shadow var(--transition);
+}
+
+.access-mode.active {
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 1px var(--accent-line) inset;
+}
+
+/* Реакции и чипы */
+.reaction {
+  border-radius: var(--radius-pill);
+  transition:
+    background var(--transition),
+    border-color var(--transition),
+    transform var(--transition);
+}
+
+.reaction:hover {
+  transform: translateY(-1px);
+}
+
+.file-chip {
+  border-radius: var(--radius-pill);
+}
+
+/* Пикер эмодзи */
+.emoji-picker {
+  background: var(--panel-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Панель голосового подключения снизу колонки */
+.voice-panel {
+  background: linear-gradient(180deg, rgba(52, 211, 153, 0.1), transparent), var(--panel-raised);
+  border-top: 1px solid var(--border);
+}
+
+.voice-panel-name {
+  color: var(--success);
+  font-weight: 600;
+}
+
+/* Говорящий участник — мягкое свечение вместо резкой рамки */
+.voice-participant.speaking .voice-participant-avatar {
+  box-shadow:
+    0 0 0 2px var(--success),
+    0 0 12px rgba(52, 211, 153, 0.45);
+}
+
+/* Звонок 1-на-1 */
+.call-panel {
+  background: linear-gradient(180deg, var(--accent-soft), transparent), var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.call-status {
+  letter-spacing: 0.01em;
+}
+
+.incoming-call {
+  background: var(--gradient-surface), var(--panel);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  animation: modal-in 200ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.incoming-call-avatar {
+  box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.12);
+  animation: pulse-ring 2s ease-out infinite;
+}
+
+@keyframes pulse-ring {
+  50% {
+    box-shadow: 0 0 0 12px rgba(34, 211, 238, 0);
+  }
+}
+
+.call-button.accept {
+  box-shadow: 0 6px 20px rgba(52, 211, 153, 0.35);
+}
+
+.call-button.decline {
+  box-shadow: 0 6px 20px rgba(251, 113, 133, 0.3);
+}
+
+.call-tile {
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+}
+
+/* Карточка профиля собеседника */
+.dm-profile-avatar {
+  box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.1);
+}
+
+/* Пустые состояния — спокойнее и с воздухом */
+.empty-state {
+  color: var(--text-faint);
+  padding: 32px 16px;
+  text-align: center;
+}
+
+.settings-hint {
+  color: var(--text-faint);
+  font-size: 13px;
+}
+
+/* Приглушённые (mute) каналы бледнее обычных */
+.channel-link.muted {
+  opacity: 0.55;
+}
+
+/* Модалка таймаута/уведомления по центру */
+.timeout-banner {
+  background: var(--danger-soft);
+  border: 1px solid rgba(251, 113, 133, 0.35);
+  border-radius: var(--radius);
+  color: var(--danger);
+}
+
+/* Код инвайта — моноширинный чип */
+.invite-code {
+  background: var(--panel-hover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  font-family: ui-monospace, 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 13px;
+  color: var(--accent);
+}
+
+/* Кнопка «Владелец приложения» в рейле — золотистый оттенок статуса */
+.rail-icon.owner {
+  color: var(--warning);
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+.rail-icon.owner:hover {
+  background: rgba(251, 191, 36, 0.12);
+  border-color: var(--warning);
+  color: var(--warning);
+}
+
+/* Уважение к системной настройке «меньше движения» */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
