@@ -35,6 +35,7 @@ model User {
   auditActions       AuditLog[]           @relation("AuditActor")
   guildsOwned        Guild[]              @relation("GuildOwner")
   guildMemberships   GuildMember[]
+  guildJoinRequests  GuildJoinRequest[]
   dmParticipations   DmParticipant[]
   dmGroupsOwned      DmConversation[]     @relation("DmGroupOwner")
   dmMessages         DmMessage[]
@@ -51,24 +52,50 @@ model User {
   @@map("users")
 }
 
+/// Как попасть на сервер: только по инвайту / по заявке / свободно
+enum GuildJoinMode {
+  INVITE_ONLY
+  REQUEST
+  PUBLIC
+}
+
 /// Сервер (guild): отдельное пространство с каналами, ролями и участниками
 model Guild {
-  id        String   @id @default(uuid(7))
-  name      String
-  iconUrl   String?  @map("icon_url")
-  ownerId   String?  @map("owner_id")
-  owner     User?    @relation("GuildOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id          String        @id @default(uuid(7))
+  name        String
+  iconUrl     String?       @map("icon_url")
+  /// Короткое описание для витрины публичных серверов
+  description String?
+  joinMode    GuildJoinMode @default(INVITE_ONLY) @map("join_mode")
+  ownerId     String?       @map("owner_id")
+  owner       User?         @relation("GuildOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
 
-  members    GuildMember[]
-  categories Category[]
-  channels   Channel[]
-  roles      Role[]
-  invites    Invite[]
-  bans       Ban[]
+  members      GuildMember[]
+  categories   Category[]
+  channels     Channel[]
+  roles        Role[]
+  invites      Invite[]
+  bans         Ban[]
+  joinRequests GuildJoinRequest[]
 
+  @@index([joinMode])
   @@map("guilds")
+}
+
+/// Заявка на вступление (режим REQUEST): ждёт решения модератора
+model GuildJoinRequest {
+  guildId   String   @map("guild_id")
+  guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message   String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@id([guildId, userId])
+  @@index([userId])
+  @@map("guild_join_requests")
 }
 
 /// Членство пользователя на сервере

@@ -1883,4 +1883,147 @@ describe('Voxa: критический поток (e2e)', () => {
       .expect(403);
     expect(afterLeave.body.message).toBeTruthy();
   });
+
+  it('режимы доступа сервера: закрытый, по заявке, публичный', async () => {
+    // Отдельный аккаунт-искатель (регистрация кодом приложения, без серверов)
+    const regCode = await createRegCode(httpServer, ownerAccess);
+    const seeker = await request(httpServer)
+      .post('/api/auth/register')
+      .send({ inviteCode: regCode, username: 'Искатель', password: 'пароль-искателя-55' })
+      .expect(201);
+    const seekerId = (seeker.body as AuthResponseDto).user.id;
+    const seekerAccess = (seeker.body as AuthResponseDto).accessToken;
+
+    // Свой сервер под опыты
+    const created = await request(httpServer)
+      .post('/api/guilds')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ name: 'Открытый дом' })
+      .expect(201);
+    const testGuildId = created.body.id as string;
+    expect(created.body.joinMode).toBe('INVITE_ONLY');
+
+    // Закрытый сервер не виден в витрине и не пускает
+    const hidden = await request(httpServer)
+      .get('/api/guilds/discover')
+      .set('Authorization', `Bearer ${seekerAccess}`)
+      .expect(200);
+    expect((hidden.body as { id: string }[]).some((g) => g.id === testGuildId)).toBe(false);
+    await request(httpServer)
+      .post(`/api/guilds/${testGuildId}/join`)
+      .set('Authorization', `Bearer ${seekerAccess}`)
+      .send({})
+      .expect(403);
+
+    // Режим «по заявке»: сервер виден, вступление создаёт заявку
+    await request(httpServer)
+      .patch(`/api/guilds/${testGuildId}`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ joinMode: 'REQUEST', description: 'Заходите к нам' })
+      .expect(200);
+
+    const visible = await request(httpServer)
+      .get('/api/guilds/discover')
+      .set('Authorization', `Bearer ${seekerAccess}`)
+      .expect(200);
+    const found = (visible.body as { id: string; description: string; requested: boolean }[]).find(
+      (g) => g.id === testGuildId,
+    );
+    expect(found?.description).toBe('Заходите к нам');
+    expect(found?.requested).toBe(false);
+
+    const requested = await request(httpServer)
+      .post(`/api/guilds/${testGuildId}/join`)
+      .set('Authorization', `Bearer ${seekerAccess}`)
+      .send({ message: 'пустите пожалуйста' })
+      .expect(200);
+    expect(requested.body.status).toBe('requested');
+    // Заявка ещё не членство
+    await request(httpServer)
+      .get(`/api/guilds/${testGuildId}/structure`)
+      .set('Authorization', `Bearer ${seekerAccess}`)
+      .expect(403);
+
+    // Заявки видит модератор, посторонний — нет
+    await request(httpServer)
+      .get(`/api/guilds/${testGuildId}/join-requests`)
+      .set('Authorization', `Bearer ${seekerAccess}`)
+      .expect(403);
+    const requests = await request(httpServer)
+      .get(`/api/guilds/${testGuildId}/join-requests`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    expect(
+      (requests.body as { user: { id: string }; message: string }[]).find(
+        (r) => r.user.id === seekerId,
+      )?.message,
+    ).toBe('пустите пожалуйста');
+
+    // Отклонение убирает заявку
+    await request(httpServer)
+      .delete(`/api/guilds/${testGuildId}/join-requests/${seekerId}`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(204);
+    const afterReject = await request(httpServer)
+      .get(`/api/guilds/${testGuildId}/join-requests`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    expect(afterReject.body).toHaveLength(0);
+
+    // Повторная заявка и одобрение — участник внутри
+    await request(httpServer)
+      .post(`/api/guilds/${testGuildId}/join`)
+      .set('Authorization', `Bearer ${seekerAccess}`)
+      .send({})
+      .expect(200);
+    await request(httpServer)
+      .post(`/api/guilds/${testGuildId}/join-requests/${seekerId}`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(204);
+    await request(httpServer)
+      .get(`/api/guilds/${testGuildId}/structure`)
+      .set('Authorization', `Bearer ${seekerAccess}`)
+      .expect(200);
+
+    // Публичный режим: следующий заходит сразу
+    await request(httpServer)
+      .patch(`/api/guilds/${testGuildId}`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ joinMode: 'PUBLIC' })
+      .expect(200);
+    const regCode2 = await createRegCode(httpServer, ownerAccess);
+    const walkIn = await request(httpServer)
+      .post('/api/auth/register')
+      .send({ inviteCode: regCode2, username: 'Прохожий', password: 'пароль-прохожего-1' })
+      .expect(201);
+    const walkInAccess = (walkIn.body as AuthResponseDto).accessToken;
+    const joined = await request(httpServer)
+      .post(`/api/guilds/${testGuildId}/join`)
+      .set('Authorization', `Bearer ${walkInAccess}`)
+      .send({})
+      .expect(200);
+    expect(joined.body.status).toBe('joined');
+    await request(httpServer)
+      .get(`/api/guilds/${testGuildId}/structure`)
+      .set('Authorization', `Bearer ${walkInAccess}`)
+      .expect(200);
+
+    // Забаненного публичный сервер не пускает и в витрине не показывает
+    const walkInId = (walkIn.body as AuthResponseDto).user.id;
+    await request(httpServer)
+      .post(`/api/guilds/${testGuildId}/members/${walkInId}/ban`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ reason: 'проверка' })
+      .expect(204);
+    await request(httpServer)
+      .post(`/api/guilds/${testGuildId}/join`)
+      .set('Authorization', `Bearer ${walkInAccess}`)
+      .send({})
+      .expect(403);
+    const forBanned = await request(httpServer)
+      .get('/api/guilds/discover')
+      .set('Authorization', `Bearer ${walkInAccess}`)
+      .expect(200);
+    expect((forBanned.body as { id: string }[]).some((g) => g.id === testGuildId)).toBe(false);
+  });
 });

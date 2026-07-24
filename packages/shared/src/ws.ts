@@ -64,6 +64,8 @@ export const WsEvents = {
   GuildUpdated: 'guild.updated',
   /** Комнате сервера: роли изменились — перечитать список ролей и участников */
   GuildRolesChanged: 'guild.roles.changed',
+  /** Комнате сервера: изменились заявки на вступление */
+  GuildJoinRequestsChanged: 'guild.joinrequests.changed',
   /** Адресное: мой список серверов изменился (создал/вступил/кик/бан) */
   MeGuildsChanged: 'me.guilds',
 } as const;
@@ -157,6 +159,7 @@ export interface WsServerEvents {
   [WsEvents.GuildMembersChanged]: { guildId: string };
   [WsEvents.GuildUpdated]: { guildId: string };
   [WsEvents.GuildRolesChanged]: { guildId: string };
+  [WsEvents.GuildJoinRequestsChanged]: { guildId: string };
   [WsEvents.MeGuildsChanged]: Record<string, never>;
 }
 

@@ -5,6 +5,7 @@ import {
   Get,
   HttpCode,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Put,
@@ -14,6 +15,7 @@ import { Throttle } from '@nestjs/throttler';
 import {
   auditQuerySchema,
   createGuildSchema,
+  joinGuildRequestSchema,
   transferGuildSchema,
   createRoleSchema,
   Permissions,
@@ -25,7 +27,11 @@ import {
   type AuditQueryInput,
   type CreateGuildInput,
   type CreateRoleInput,
+  type DiscoverGuildDto,
   type GuildDto,
+  type GuildJoinRequestDto,
+  type JoinAttemptResultDto,
+  type JoinGuildRequestInput,
   type TransferGuildInput,
   type MemberDto,
   type RoleDto,
@@ -67,6 +73,12 @@ export class GuildsController {
     @Body(new ZodValidationPipe(createGuildSchema)) body: CreateGuildInput,
   ): Promise<GuildDto> {
     return this.guilds.create(user.id, body);
+  }
+
+  /** Витрина: публичные серверы и серверы по заявке */
+  @Get('discover')
+  discover(@CurrentUser() user: RequestUser, @Query('q') q?: string): Promise<DiscoverGuildDto[]> {
+    return this.guilds.discover(user.id, q);
   }
 
   @Get(':guildId')
@@ -172,6 +184,58 @@ export class GuildsController {
   @HttpCode(204)
   async leave(@CurrentUser() user: RequestUser, @Param('guildId') guildId: string): Promise<void> {
     await this.guilds.leave(user.id, guildId);
+  }
+
+  /** Вступить из витрины: публичный — сразу, по заявке — заявка */
+  @Post(':guildId/join')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @HttpCode(200)
+  join(
+    @CurrentUser() user: RequestUser,
+    @Param('guildId') guildId: string,
+    @Body(new ZodValidationPipe(joinGuildRequestSchema)) body: JoinGuildRequestInput,
+  ): Promise<JoinAttemptResultDto> {
+    return this.guilds.attemptJoin(user.id, guildId, body.message);
+  }
+
+  /** Отозвать свою заявку */
+  @Delete(':guildId/join')
+  @HttpCode(204)
+  async cancelJoin(
+    @CurrentUser() user: RequestUser,
+    @Param('guildId') guildId: string,
+  ): Promise<void> {
+    await this.guilds.cancelJoinRequest(user.id, guildId);
+  }
+
+  @Get(':guildId/join-requests')
+  @RequirePermissions(Permissions.KICK_MEMBERS)
+  joinRequests(@Param('guildId') guildId: string): Promise<GuildJoinRequestDto[]> {
+    return this.guilds.listJoinRequests(guildId);
+  }
+
+  @Post(':guildId/join-requests/:userId')
+  @RequirePermissions(Permissions.KICK_MEMBERS)
+  @HttpCode(204)
+  async approveJoin(
+    @CurrentUser() user: RequestUser,
+    @Param('guildId') guildId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
+  ): Promise<void> {
+    await this.guilds.approveJoinRequest(guildId, userId);
+    this.audit.log(guildId, user.id, 'guild.join.approve', { type: 'user', id: userId });
+  }
+
+  @Delete(':guildId/join-requests/:userId')
+  @RequirePermissions(Permissions.KICK_MEMBERS)
+  @HttpCode(204)
+  async rejectJoin(
+    @CurrentUser() user: RequestUser,
+    @Param('guildId') guildId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
+  ): Promise<void> {
+    await this.guilds.rejectJoinRequest(guildId, userId);
+    this.audit.log(guildId, user.id, 'guild.join.reject', { type: 'user', id: userId });
   }
 
   @Post(':guildId/transfer')

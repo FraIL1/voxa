@@ -61,14 +61,44 @@ export interface CommunityStructureDto {
 }
 
 /** Сервер (guild) глазами запрашивающего участника */
+/** Как попасть на сервер */
+export type GuildJoinMode = 'INVITE_ONLY' | 'REQUEST' | 'PUBLIC';
+
 export interface GuildDto {
   id: string;
   name: string;
   iconUrl: string | null;
+  description: string | null;
+  joinMode: GuildJoinMode;
   ownerId: string | null;
   /** Маска прав запрашивающего на этом сервере (владелец = все права) */
   myPermissions: number;
   createdAt: string;
+}
+
+/** Сервер в витрине: то, что видно НЕ участнику */
+export interface DiscoverGuildDto {
+  id: string;
+  name: string;
+  iconUrl: string | null;
+  description: string | null;
+  joinMode: GuildJoinMode;
+  members: number;
+  /** Я уже отправил заявку на вступление */
+  requested: boolean;
+}
+
+/** Заявка на вступление глазами модератора */
+export interface GuildJoinRequestDto {
+  user: UserPublicDto;
+  message: string | null;
+  createdAt: string;
+}
+
+/** Результат попытки вступить: сразу внутри или заявка отправлена */
+export interface JoinAttemptResultDto {
+  status: 'joined' | 'requested';
+  guildId: string;
 }
 
 export interface JoinGuildResultDto {

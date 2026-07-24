@@ -218,9 +218,13 @@ export const createGuildSchema = z.object({
 export type CreateGuildInput = z.infer<typeof createGuildSchema>;
 
 /** Обновление сервера: имя и/или иконка (data-URL/URL) */
+export const guildJoinModeSchema = z.enum(['INVITE_ONLY', 'REQUEST', 'PUBLIC']);
+
 export const updateGuildSchema = z.object({
   name: z.string().trim().min(2).max(48).optional(),
   iconUrl: z.string().trim().max(500_000).nullish(),
+  description: z.string().trim().max(200).nullish(),
+  joinMode: guildJoinModeSchema.optional(),
 });
 export type UpdateGuildInput = z.infer<typeof updateGuildSchema>;
 
@@ -300,3 +304,9 @@ export const renameGroupSchema = z.object({
   name: z.string().trim().min(1).max(60),
 });
 export type RenameGroupInput = z.infer<typeof renameGroupSchema>;
+
+/** Заявка на вступление: короткое сообщение модераторам */
+export const joinGuildRequestSchema = z.object({
+  message: z.string().trim().max(200).optional(),
+});
+export type JoinGuildRequestInput = z.infer<typeof joinGuildRequestSchema>;

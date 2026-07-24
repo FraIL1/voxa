@@ -9,7 +9,10 @@ import {
   Permissions,
   WsEvents,
   type CreateGuildInput,
+  type DiscoverGuildDto,
   type GuildDto,
+  type GuildJoinRequestDto,
+  type JoinAttemptResultDto,
   type JoinGuildResultDto,
   type UpdateGuildInput,
 } from '@voxa/shared';
@@ -21,6 +24,9 @@ import { WsGateway } from '../ws/ws.gateway';
 
 export const OWNER_ROLE_NAME = 'Владелец';
 export const MEMBER_ROLE_NAME = 'Участник';
+/** Сколько серверов показываем в витрине */
+const DISCOVER_LIMIT = 50;
+
 export const MEMBER_MASK = Permissions.SEND_MESSAGES | Permissions.UPLOAD_FILES;
 
 @Injectable()
@@ -37,6 +43,8 @@ export class GuildsService {
       id: guild.id,
       name: guild.name,
       iconUrl: guild.iconUrl,
+      description: guild.description,
+      joinMode: guild.joinMode,
       ownerId: guild.ownerId,
       myPermissions: await this.users.permissionMaskOf(userId, guild.id),
       createdAt: guild.createdAt.toISOString(),
@@ -66,6 +74,8 @@ export class GuildsService {
       data: {
         name: input.name,
         iconUrl: input.iconUrl === undefined ? undefined : input.iconUrl,
+        description: input.description === undefined ? undefined : input.description,
+        joinMode: input.joinMode,
       },
     });
     this.ws.emitToGuild(guildId, WsEvents.GuildUpdated, { guildId });
@@ -141,8 +151,44 @@ export class GuildsService {
       return { guildId: invite.guildId }; // уже участник — просто переходим
     }
 
+    await this.assertNotBanned(userId, invite.guildId);
+
+    await this.prisma.invite.update({
+      where: { id: invite.id },
+      data: { uses: { increment: 1 } },
+    });
+    await this.addMember(userId, invite.guildId, invite.grantsRoleId ?? undefined);
+    return { guildId: invite.guildId };
+  }
+
+  /** Общий приём в участники: членство + роль по умолчанию + оповещения */
+  private async addMember(userId: string, guildId: string, grantsRoleId?: string): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.guildMember.create({ data: { guildId, userId } });
+
+      const roleIds = new Set<string>();
+      const defaultRole = await tx.role.findFirst({ where: { guildId, isDefault: true } });
+      if (defaultRole) roleIds.add(defaultRole.id);
+      if (grantsRoleId) roleIds.add(grantsRoleId);
+      if (roleIds.size > 0) {
+        await tx.userRole.createMany({
+          data: [...roleIds].map((roleId) => ({ userId, roleId })),
+          skipDuplicates: true,
+        });
+      }
+      // Заявка (если была) больше не нужна
+      await tx.guildJoinRequest.deleteMany({ where: { guildId, userId } });
+    });
+
+    await this.ws.joinUserToGuild(userId, guildId);
+    this.ws.emitToGuild(guildId, WsEvents.GuildMembersChanged, { guildId });
+    this.ws.emitToUsers([userId], WsEvents.MeGuildsChanged, {});
+  }
+
+  /** 403, если пользователь забанен на сервере */
+  private async assertNotBanned(userId: string, guildId: string): Promise<void> {
     const ban = await this.prisma.ban.findUnique({
-      where: { guildId_userId: { guildId: invite.guildId, userId } },
+      where: { guildId_userId: { guildId, userId } },
     });
     if (ban) {
       throw new ForbiddenException(
@@ -151,31 +197,109 @@ export class GuildsService {
           : 'Вы заблокированы на этом сервере',
       );
     }
+  }
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.invite.update({ where: { id: invite.id }, data: { uses: { increment: 1 } } });
-      await tx.guildMember.create({ data: { guildId: invite.guildId, userId } });
-
-      const roleIds = new Set<string>();
-      const defaultRole = await tx.role.findFirst({
-        where: { guildId: invite.guildId, isDefault: true },
-      });
-      if (defaultRole) roleIds.add(defaultRole.id);
-      if (invite.grantsRoleId) roleIds.add(invite.grantsRoleId);
-      if (roleIds.size > 0) {
-        await tx.userRole.createMany({
-          data: [...roleIds].map((roleId) => ({ userId, roleId })),
-          skipDuplicates: true,
-        });
-      }
+  /** Витрина: публичные серверы и серверы по заявке, где я ещё не состою */
+  async discover(userId: string, query?: string): Promise<DiscoverGuildDto[]> {
+    const search = query?.trim();
+    const guilds = await this.prisma.guild.findMany({
+      where: {
+        joinMode: { in: ['PUBLIC', 'REQUEST'] },
+        members: { none: { userId } },
+        bans: { none: { userId } },
+        ...(search ? { name: { contains: search, mode: 'insensitive' as const } } : {}),
+      },
+      orderBy: { createdAt: 'asc' },
+      take: DISCOVER_LIMIT,
+      include: {
+        _count: { select: { members: true } },
+        joinRequests: { where: { userId }, select: { userId: true } },
+      },
     });
 
-    await this.ws.joinUserToGuild(userId, invite.guildId);
-    this.ws.emitToGuild(invite.guildId, WsEvents.GuildMembersChanged, {
-      guildId: invite.guildId,
+    return guilds.map((guild) => ({
+      id: guild.id,
+      name: guild.name,
+      iconUrl: guild.iconUrl,
+      description: guild.description,
+      joinMode: guild.joinMode,
+      members: guild._count.members,
+      requested: guild.joinRequests.length > 0,
+    }));
+  }
+
+  /**
+   * Попытка вступить из витрины: публичный сервер принимает сразу,
+   * сервер по заявке — создаёт заявку, закрытый — отказ.
+   */
+  async attemptJoin(
+    userId: string,
+    guildId: string,
+    message?: string,
+  ): Promise<JoinAttemptResultDto> {
+    const guild = await this.prisma.guild.findUnique({
+      where: { id: guildId },
+      select: { id: true, joinMode: true },
     });
-    this.ws.emitToUsers([userId], WsEvents.MeGuildsChanged, {});
-    return { guildId: invite.guildId };
+    if (!guild) throw new NotFoundException('Сервер не найден');
+    if (await this.users.isMember(guildId, userId)) return { status: 'joined', guildId };
+    await this.assertNotBanned(userId, guildId);
+
+    if (guild.joinMode === 'INVITE_ONLY') {
+      throw new ForbiddenException('На этот сервер можно попасть только по приглашению');
+    }
+
+    if (guild.joinMode === 'PUBLIC') {
+      await this.addMember(userId, guildId);
+      return { status: 'joined', guildId };
+    }
+
+    // REQUEST: заявка ждёт решения модератора
+    await this.prisma.guildJoinRequest.upsert({
+      where: { guildId_userId: { guildId, userId } },
+      create: { guildId, userId, message: message?.trim() || null },
+      update: { message: message?.trim() || null },
+    });
+    this.ws.emitToGuild(guildId, WsEvents.GuildJoinRequestsChanged, { guildId });
+    return { status: 'requested', guildId };
+  }
+
+  /** Отозвать свою заявку */
+  async cancelJoinRequest(userId: string, guildId: string): Promise<void> {
+    await this.prisma.guildJoinRequest.deleteMany({ where: { guildId, userId } });
+    this.ws.emitToGuild(guildId, WsEvents.GuildJoinRequestsChanged, { guildId });
+  }
+
+  /** Заявки на вступление (право KICK_MEMBERS проверяет guard) */
+  async listJoinRequests(guildId: string): Promise<GuildJoinRequestDto[]> {
+    const requests = await this.prisma.guildJoinRequest.findMany({
+      where: { guildId },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        user: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
+      },
+    });
+    return requests.map((r) => ({
+      user: r.user,
+      message: r.message,
+      createdAt: r.createdAt.toISOString(),
+    }));
+  }
+
+  async approveJoinRequest(guildId: string, userId: string): Promise<void> {
+    const request = await this.prisma.guildJoinRequest.findUnique({
+      where: { guildId_userId: { guildId, userId } },
+    });
+    if (!request) throw new NotFoundException('Заявка не найдена');
+    await this.assertNotBanned(userId, guildId);
+    await this.addMember(userId, guildId);
+    this.ws.emitToGuild(guildId, WsEvents.GuildJoinRequestsChanged, { guildId });
+  }
+
+  async rejectJoinRequest(guildId: string, userId: string): Promise<void> {
+    const { count } = await this.prisma.guildJoinRequest.deleteMany({ where: { guildId, userId } });
+    if (count === 0) throw new NotFoundException('Заявка не найдена');
+    this.ws.emitToGuild(guildId, WsEvents.GuildJoinRequestsChanged, { guildId });
   }
 
   async leave(userId: string, guildId: string): Promise<void> {
