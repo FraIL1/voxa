@@ -1,5 +1,6 @@
 import { hasPermission, Permissions } from '@voxa/shared';
 import {
+  Bell,
   ChevronDown,
   FolderPlus,
   LogOut,
@@ -16,6 +17,7 @@ import { useCreateCategory, useSetNickname } from '../hooks/useGuildAdmin';
 import { useMembers } from '../hooks/useMembers';
 import { useAuthStore } from '../stores/auth';
 import CreateChannelModal from './CreateChannelModal';
+import NotifySettingsModal from './NotifySettingsModal';
 import PromptModal from './PromptModal';
 import ServerSettingsModal from './ServerSettingsModal';
 
@@ -32,6 +34,7 @@ export default function ServerMenu({ guildId }: { guildId: string }) {
   const [open, setOpen] = useState(false);
   const [settings, setSettings] = useState<'profile' | 'invites' | null>(null);
   const [createChannel, setCreateChannel] = useState(false);
+  const [notifyOpen, setNotifyOpen] = useState(false);
   const [prompt, setPrompt] = useState<'nick' | 'category' | null>(null);
 
   const mask = guild?.myPermissions ?? 0;
@@ -101,6 +104,15 @@ export default function ServerMenu({ guildId }: { guildId: string }) {
               className="menu-item"
               onClick={() => {
                 close();
+                setNotifyOpen(true);
+              }}
+            >
+              <Bell size={16} /> {t('guild.menuNotifications')}
+            </button>
+            <button
+              className="menu-item"
+              onClick={() => {
+                close();
                 setPrompt('nick');
               }}
             >
@@ -131,6 +143,7 @@ export default function ServerMenu({ guildId }: { guildId: string }) {
       {createChannel && (
         <CreateChannelModal guildId={guildId} onClose={() => setCreateChannel(false)} />
       )}
+      {notifyOpen && <NotifySettingsModal guildId={guildId} onClose={() => setNotifyOpen(false)} />}
       {prompt === 'nick' && (
         <PromptModal
           title={t('guild.menuNickname')}

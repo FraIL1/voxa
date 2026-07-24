@@ -59,3 +59,16 @@ export function useAutoAck(channelId: string, latestMessageId: string | undefine
     };
   }, [channelId, latestMessageId, queryClient]);
 }
+
+/** Заглушить/включить канал лично для себя */
+export function useMuteChannel() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ channelId, muted }: { channelId: string; muted: boolean }) =>
+      api<ReadStateDto>(`/channels/${channelId}/mute`, { method: 'PATCH', body: { muted } }),
+    onSuccess: (state) =>
+      queryClient.setQueryData<ReadStateDto[]>(READ_STATES_KEY, (list) =>
+        (list ?? []).map((s) => (s.channelId === state.channelId ? state : s)),
+      ),
+  });
+}

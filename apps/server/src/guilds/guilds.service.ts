@@ -13,6 +13,7 @@ import {
   type GuildDto,
   type GuildJoinRequestDto,
   type JoinAttemptResultDto,
+  type NotifyMode,
   type JoinGuildResultDto,
   type UpdateGuildInput,
 } from '@voxa/shared';
@@ -39,6 +40,10 @@ export class GuildsService {
   ) {}
 
   private async toDto(guild: Guild, userId: string): Promise<GuildDto> {
+    const membership = await this.prisma.guildMember.findUnique({
+      where: { guildId_userId: { guildId: guild.id, userId } },
+      select: { notifyMode: true },
+    });
     return {
       id: guild.id,
       name: guild.name,
@@ -47,6 +52,7 @@ export class GuildsService {
       joinMode: guild.joinMode,
       ownerId: guild.ownerId,
       myPermissions: await this.users.permissionMaskOf(userId, guild.id),
+      myNotifyMode: membership?.notifyMode ?? 'ALL',
       createdAt: guild.createdAt.toISOString(),
     };
   }
@@ -159,6 +165,17 @@ export class GuildsService {
     });
     await this.addMember(userId, invite.guildId, invite.grantsRoleId ?? undefined);
     return { guildId: invite.guildId };
+  }
+
+  /** Мои уведомления с этого сервера */
+  async setNotifyMode(userId: string, guildId: string, mode: NotifyMode): Promise<GuildDto> {
+    await this.users.assertMember(guildId, userId);
+    await this.prisma.guildMember.update({
+      where: { guildId_userId: { guildId, userId } },
+      data: { notifyMode: mode },
+    });
+    const guild = await this.prisma.guild.findUniqueOrThrow({ where: { id: guildId } });
+    return this.toDto(guild, userId);
   }
 
   /** Общий приём в участники: членство + роль по умолчанию + оповещения */

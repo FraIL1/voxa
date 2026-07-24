@@ -32,6 +32,7 @@ const EXCERPT_LENGTH = 140;
 const MAX_DISTINCT_REACTIONS = 20;
 
 type MessageWithRelations = Message & {
+  channel: { guildId: string };
   author: Pick<User, 'id' | 'username' | 'displayName' | 'avatarUrl'> | null;
   reactions: Pick<Reaction, 'emoji' | 'userId'>[];
   attachments: Attachment[];
@@ -47,6 +48,7 @@ const AUTHOR_SELECT = {
 } as const;
 
 const MESSAGE_INCLUDE = {
+  channel: { select: { guildId: true } },
   author: AUTHOR_SELECT,
   reactions: { select: { emoji: true, userId: true }, orderBy: { createdAt: 'asc' } },
   attachments: true,
@@ -121,6 +123,7 @@ export class MessagesService {
     return {
       id: message.id,
       channelId: message.channelId,
+      guildId: message.channel.guildId,
       author: message.author
         ? {
             id: message.author.id,

@@ -14,7 +14,14 @@ export function setReadState(
     if (!exists) {
       return [
         ...data,
-        { channelId, lastReadMessageId: null, unreadCount: 0, mentionCount: 0, ...patch },
+        {
+          channelId,
+          lastReadMessageId: null,
+          unreadCount: 0,
+          mentionCount: 0,
+          muted: false,
+          ...patch,
+        },
       ];
     }
     return data.map((s) => (s.channelId === channelId ? { ...s, ...patch } : s));
@@ -31,6 +38,7 @@ export function bumpUnread(queryClient: QueryClient, channelId: string, mentione
       lastReadMessageId: null,
       unreadCount: 0,
       mentionCount: 0,
+      muted: false,
     };
     const list = exists ? data : [...data, base];
     return list.map((s) =>

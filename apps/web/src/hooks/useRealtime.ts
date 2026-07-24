@@ -6,6 +6,8 @@ import {
   type DmCallEndReason,
   type DmCallIncomingPayload,
   type DmReactionEventPayload,
+  type GuildDto,
+  type ReadStateDto,
   type FriendDto,
   type FriendRequestDto,
   type MemberDto,
@@ -35,7 +37,7 @@ import {
   renameDmAuthor,
   updateDmMessage,
 } from '../api/dm-cache';
-import { bumpUnread, setReadState } from '../api/read-states-cache';
+import { bumpUnread, READ_STATES_KEY, setReadState } from '../api/read-states-cache';
 import { connectSocket, disconnectSocket, emitVoiceState } from '../api/socket';
 import { notify } from '../lib/notify';
 import { playJoinSound, playLeaveSound } from '../lib/sounds';
@@ -72,10 +74,27 @@ export function useRealtime(): void {
       const myId = useAuthStore.getState().user?.id;
       if (myId && message.author?.id !== myId) {
         const mentioned = message.mentionedUserIds?.includes(myId) ?? false;
-        bumpUnread(queryClient, message.channelId, mentioned);
 
-        // Нативное уведомление об упоминании, когда окно не на виду (раздел 5.8 PRD)
-        if (mentioned && document.hidden) {
+        // Настройки уведомлений: режим сервера и мьют канала
+        const guild = queryClient
+          .getQueryData<GuildDto[]>(GUILDS_KEY)
+          ?.find((g) => g.id === message.guildId);
+        const mode = guild?.myNotifyMode ?? 'ALL';
+        const channelMuted =
+          queryClient
+            .getQueryData<ReadStateDto[]>(READ_STATES_KEY)
+            ?.find((s) => s.channelId === message.channelId)?.muted ?? false;
+
+        // «Ничего» и мьют канала не подсвечивают непрочитанное (упоминания всё
+        // равно считаем — иначе можно молча пропустить прямое обращение)
+        const silent = mode === 'NONE' || channelMuted;
+        if (!silent || mentioned) bumpUnread(queryClient, message.channelId, mentioned);
+
+        // Нативное уведомление, когда окно не на виду (раздел 5.8 PRD)
+        const shouldNotify = mentioned
+          ? !channelMuted && mode !== 'NONE'
+          : !silent && mode === 'ALL';
+        if (shouldNotify && document.hidden) {
           void notify(message.author?.username ?? 'Voxa', message.content.slice(0, 120) || '…');
         }
       }

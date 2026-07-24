@@ -1,6 +1,8 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { AttachmentDto, MessageDto, MessagesPageDto } from '@voxa/shared';
 
+import { useParams } from 'react-router';
+
 import { api } from '../api/client';
 import {
   addMessage,
@@ -37,6 +39,7 @@ interface SendMessageVars {
 
 export function useSendMessage(channelId: string) {
   const queryClient = useQueryClient();
+  const { guildId = '' } = useParams<{ guildId: string }>();
 
   return useMutation({
     mutationFn: ({ content, replyToId, attachmentIds }: SendMessageVars) =>
@@ -54,6 +57,7 @@ export function useSendMessage(channelId: string) {
       const temp: ChatMessage = {
         id: `temp-${crypto.randomUUID()}`,
         channelId,
+        guildId,
         author: user
           ? {
               id: user.id,

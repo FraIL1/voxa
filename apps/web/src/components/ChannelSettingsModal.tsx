@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ApiError } from '../api/client';
+import { useMuteChannel, useReadStates } from '../hooks/useReadStates';
 import { useDeleteChannel, useUpdateChannel } from '../hooks/useGuildAdmin';
 
 /** Настройки канала: переименование и удаление */
@@ -16,6 +17,9 @@ export default function ChannelSettingsModal({
   const { t } = useTranslation();
   const updateChannel = useUpdateChannel(channel.guildId);
   const deleteChannel = useDeleteChannel(channel.guildId);
+  const { data: readStates } = useReadStates();
+  const muteChannel = useMuteChannel();
+  const muted = readStates?.find((s) => s.channelId === channel.id)?.muted ?? false;
   const [name, setName] = useState(channel.name);
   const [topic, setTopic] = useState(channel.topic ?? '');
   const [error, setError] = useState('');
@@ -58,6 +62,16 @@ export default function ChannelSettingsModal({
               <input value={topic} onChange={(e) => setTopic(e.target.value)} maxLength={1024} />
             </label>
           )}
+          <label className="settings-toggle">
+            <input
+              type="checkbox"
+              checked={muted}
+              onChange={(e) =>
+                muteChannel.mutate({ channelId: channel.id, muted: e.target.checked })
+              }
+            />
+            {t('notify.muteChannel')}
+          </label>
           {error && <p className="friends-add-error">{error}</p>}
           <div className="modal-actions">
             <button type="button" className="btn-secondary danger-text" onClick={remove}>

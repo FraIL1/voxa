@@ -310,3 +310,12 @@ export const joinGuildRequestSchema = z.object({
   message: z.string().trim().max(200).optional(),
 });
 export type JoinGuildRequestInput = z.infer<typeof joinGuildRequestSchema>;
+
+/** Режим уведомлений сервера */
+export const notifyModeSchema = z.enum(['ALL', 'MENTIONS', 'NONE']);
+export const updateNotifyModeSchema = z.object({ mode: notifyModeSchema });
+export type UpdateNotifyModeInput = z.infer<typeof updateNotifyModeSchema>;
+
+/** Заглушить/включить канал */
+export const muteChannelSchema = z.object({ muted: z.boolean() });
+export type MuteChannelInput = z.infer<typeof muteChannelSchema>;

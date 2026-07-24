@@ -49,9 +49,29 @@ export class ReadStatesService {
           lastReadMessageId,
           unreadCount: await this.countUnread(userId, id, lastReadMessageId),
           mentionCount: state?.mentionCount ?? 0,
+          muted: state?.muted ?? false,
         };
       }),
     );
+  }
+
+  /** Заглушить/включить канал лично для себя */
+  async setMuted(userId: string, channelId: string, muted: boolean): Promise<ReadStateDto> {
+    if (!(await this.users.canSeeChannel(userId, channelId))) {
+      throw new NotFoundException('Канал не найден');
+    }
+    const state = await this.prisma.channelReadState.upsert({
+      where: { userId_channelId: { userId, channelId } },
+      create: { userId, channelId, muted },
+      update: { muted },
+    });
+    return {
+      channelId,
+      lastReadMessageId: state.lastReadMessageId,
+      unreadCount: await this.countUnread(userId, channelId, state.lastReadMessageId),
+      mentionCount: state.mentionCount,
+      muted: state.muted,
+    };
   }
 
   /** Отметка «прочитано до messageId»; курсор двигается только вперёд */
@@ -90,6 +110,7 @@ export class ReadStatesService {
       lastReadMessageId: state.lastReadMessageId,
       unreadCount: await this.countUnread(userId, channelId, state.lastReadMessageId),
       mentionCount: 0,
+      muted: state.muted,
     };
   }
 

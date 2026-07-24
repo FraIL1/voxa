@@ -61,6 +61,9 @@ export interface CommunityStructureDto {
 }
 
 /** Сервер (guild) глазами запрашивающего участника */
+/** Что уведомлять на сервере */
+export type NotifyMode = 'ALL' | 'MENTIONS' | 'NONE';
+
 /** Как попасть на сервер */
 export type GuildJoinMode = 'INVITE_ONLY' | 'REQUEST' | 'PUBLIC';
 
@@ -73,6 +76,8 @@ export interface GuildDto {
   ownerId: string | null;
   /** Маска прав запрашивающего на этом сервере (владелец = все права) */
   myPermissions: number;
+  /** Мои уведомления с этого сервера */
+  myNotifyMode: NotifyMode;
   createdAt: string;
 }
 
@@ -147,6 +152,8 @@ export interface ReplyPreviewDto {
 export interface MessageDto {
   id: string;
   channelId: string;
+  /** Сервер, которому принадлежит канал (нужен для настроек уведомлений) */
+  guildId: string;
   author: UserPublicDto | null;
   content: string;
   replyToId: string | null;
@@ -186,6 +193,8 @@ export interface ReadStateDto {
   lastReadMessageId: string | null;
   unreadCount: number;
   mentionCount: number;
+  /** Канал заглушён лично мной */
+  muted: boolean;
 }
 
 export interface MessagesPageDto {

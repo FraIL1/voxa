@@ -98,17 +98,26 @@ model GuildJoinRequest {
   @@map("guild_join_requests")
 }
 
+/// Что уведомлять на сервере: всё / только упоминания / ничего
+enum NotifyMode {
+  ALL
+  MENTIONS
+  NONE
+}
+
 /// Членство пользователя на сервере
 model GuildMember {
-  guildId       String    @map("guild_id")
-  guild         Guild     @relation(fields: [guildId], references: [id], onDelete: Cascade)
-  userId        String    @map("user_id")
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guildId       String     @map("guild_id")
+  guild         Guild      @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  userId        String     @map("user_id")
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   /// Ник на этом сервере; null — используется displayName
   nickname      String?
   /// Таймаут НА ЭТОМ сервере: до этого момента нельзя писать и говорить здесь
-  timedOutUntil DateTime? @map("timed_out_until")
-  joinedAt      DateTime  @default(now()) @map("joined_at")
+  timedOutUntil DateTime?  @map("timed_out_until")
+  /// Уведомления с этого сервера
+  notifyMode    NotifyMode @default(ALL) @map("notify_mode")
+  joinedAt      DateTime   @default(now()) @map("joined_at")
 
   @@id([guildId, userId])
   @@index([userId])
@@ -517,6 +526,8 @@ model ChannelReadState {
   /// id последнего прочитанного сообщения (uuid v7 — монотонен)
   lastReadMessageId String?  @map("last_read_message_id")
   mentionCount      Int      @default(0) @map("mention_count")
+  /// Канал заглушён лично мной: не подсвечивать и не уведомлять
+  muted             Boolean  @default(false)
   updatedAt         DateTime @updatedAt @map("updated_at")
 
   @@id([userId, channelId])

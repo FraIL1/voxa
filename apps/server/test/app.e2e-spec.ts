@@ -2026,4 +2026,79 @@ describe('Voxa: критический поток (e2e)', () => {
       .expect(200);
     expect((forBanned.body as { id: string }[]).some((g) => g.id === testGuildId)).toBe(false);
   });
+
+  it('параметры уведомлений: режим сервера и мьют канала', async () => {
+    // По умолчанию уведомляем обо всём
+    const before = await request(httpServer)
+      .get('/api/guilds')
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(200);
+    expect(
+      (before.body as { id: string; myNotifyMode: string }[]).find((g) => g.id === guildId)
+        ?.myNotifyMode,
+    ).toBe('ALL');
+
+    // Режим меняется и виден только мне
+    const updated = await request(httpServer)
+      .patch(`/api/guilds/${guildId}/notifications`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ mode: 'MENTIONS' })
+      .expect(200);
+    expect(updated.body.myNotifyMode).toBe('MENTIONS');
+
+    const forOwner = await request(httpServer)
+      .get('/api/guilds')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    expect(
+      (forOwner.body as { id: string; myNotifyMode: string }[]).find((g) => g.id === guildId)
+        ?.myNotifyMode,
+    ).toBe('ALL');
+
+    // Неизвестный режим отклоняется
+    await request(httpServer)
+      .patch(`/api/guilds/${guildId}/notifications`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ mode: 'SOMETIMES' })
+      .expect(400);
+
+    // Мьют канала — личная настройка
+    const muted = await request(httpServer)
+      .patch(`/api/channels/${generalChannelId}/mute`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ muted: true })
+      .expect(200);
+    expect(muted.body.muted).toBe(true);
+
+    const states = await request(httpServer)
+      .get('/api/read-states')
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(200);
+    expect(
+      (states.body as ReadStateDto[]).find((s) => s.channelId === generalChannelId)?.muted,
+    ).toBe(true);
+
+    const ownerStates = await request(httpServer)
+      .get('/api/read-states')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    expect(
+      (ownerStates.body as ReadStateDto[]).find((s) => s.channelId === generalChannelId)?.muted,
+    ).toBe(false);
+
+    // Сообщения по-прежнему несут сервер (клиенту нужен для настроек)
+    const sent = await request(httpServer)
+      .post(`/api/channels/${generalChannelId}/messages`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ content: 'проверка уведомлений' })
+      .expect(201);
+    expect(sent.body.guildId).toBe(guildId);
+
+    // Возвращаем как было
+    await request(httpServer)
+      .patch(`/api/channels/${generalChannelId}/mute`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ muted: false })
+      .expect(200);
+  });
 });

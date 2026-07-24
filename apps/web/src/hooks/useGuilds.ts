@@ -6,6 +6,7 @@ import type {
   GuildJoinRequestDto,
   JoinAttemptResultDto,
   JoinGuildResultDto,
+  NotifyMode,
 } from '@voxa/shared';
 
 import { api } from '../api/client';
@@ -135,5 +136,18 @@ export function useResolveJoinRequest(guildId: string | undefined) {
       void queryClient.invalidateQueries({ queryKey: joinRequestsKey(guildId) });
       void queryClient.invalidateQueries({ queryKey: ['members', guildId] });
     },
+  });
+}
+
+/** Мои уведомления с сервера */
+export function useSetNotifyMode(guildId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (mode: NotifyMode) =>
+      api<GuildDto>(`/guilds/${guildId}/notifications`, { method: 'PATCH', body: { mode } }),
+    onSuccess: (updated) =>
+      queryClient.setQueryData<GuildDto[]>(GUILDS_KEY, (list) =>
+        list?.map((g) => (g.id === updated.id ? updated : g)),
+      ),
   });
 }

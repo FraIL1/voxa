@@ -16,6 +16,7 @@ import {
   auditQuerySchema,
   createGuildSchema,
   joinGuildRequestSchema,
+  updateNotifyModeSchema,
   transferGuildSchema,
   createRoleSchema,
   Permissions,
@@ -32,6 +33,7 @@ import {
   type GuildJoinRequestDto,
   type JoinAttemptResultDto,
   type JoinGuildRequestInput,
+  type UpdateNotifyModeInput,
   type TransferGuildInput,
   type MemberDto,
   type RoleDto,
@@ -178,6 +180,16 @@ export class GuildsController {
   ): Promise<void> {
     await this.users.setNickname(guildId, user.id, body.nickname);
     this.ws.emitToGuild(guildId, WsEvents.GuildMembersChanged, { guildId });
+  }
+
+  /** Мои уведомления с сервера */
+  @Patch(':guildId/notifications')
+  setNotifyMode(
+    @CurrentUser() user: RequestUser,
+    @Param('guildId') guildId: string,
+    @Body(new ZodValidationPipe(updateNotifyModeSchema)) body: UpdateNotifyModeInput,
+  ): Promise<GuildDto> {
+    return this.guilds.setNotifyMode(user.id, guildId, body.mode);
   }
 
   @Post(':guildId/leave')
