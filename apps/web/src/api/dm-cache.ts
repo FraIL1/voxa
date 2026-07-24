@@ -90,13 +90,17 @@ export function renameDmAuthor(queryClient: QueryClient, user: UserPublicDto): v
       ),
     ),
   );
-  // Собеседник в списке диалогов
+  // Собеседник/участники в списке диалогов
   queryClient.setQueryData<DmConversationDto[]>(DM_CONVERSATIONS_KEY, (list) =>
-    list?.map((c) =>
-      c.peer.id === user.id
-        ? { ...c, peer: { ...c.peer, displayName: user.displayName, avatarUrl: user.avatarUrl } }
-        : c,
-    ),
+    list?.map((c) => {
+      const patch = (u: UserPublicDto): UserPublicDto =>
+        u.id === user.id ? { ...u, displayName: user.displayName, avatarUrl: user.avatarUrl } : u;
+      return {
+        ...c,
+        peer: c.peer ? patch(c.peer) : null,
+        members: c.members.map(patch),
+      };
+    }),
   );
 }
 
@@ -126,4 +130,15 @@ export function applyDmReaction(
       }),
     ),
   );
+}
+
+/** Заголовок диалога: имя группы или отображаемое имя собеседника */
+export function dmTitle(c: DmConversationDto): string {
+  if (c.isGroup) return c.name ?? 'Группа';
+  return c.peer?.displayName ?? 'Личный диалог';
+}
+
+/** Буква для аватара диалога */
+export function dmAvatarLetter(c: DmConversationDto): string {
+  return dmTitle(c).slice(0, 1).toUpperCase();
 }

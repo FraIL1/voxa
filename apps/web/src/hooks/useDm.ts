@@ -200,3 +200,56 @@ export function useDmSearch(conversationId: string, query: string) {
     enabled: query.trim().length > 0,
   });
 }
+
+// ---------- Группы ----------
+
+export function useCreateGroupDm() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { name: string; userIds: string[] }) =>
+      api<DmConversationDto>('/dm/conversations/group', { method: 'POST', body: input }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: DM_CONVERSATIONS_KEY }),
+  });
+}
+
+export function useAddGroupMembers(conversationId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (userIds: string[]) =>
+      api<DmConversationDto>(`/dm/conversations/${conversationId}/members`, {
+        method: 'POST',
+        body: { userIds },
+      }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: DM_CONVERSATIONS_KEY }),
+  });
+}
+
+export function useRemoveGroupMember(conversationId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) =>
+      api<void>(`/dm/conversations/${conversationId}/members/${userId}`, { method: 'DELETE' }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: DM_CONVERSATIONS_KEY }),
+  });
+}
+
+export function useRenameGroup(conversationId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) =>
+      api<DmConversationDto>(`/dm/conversations/${conversationId}/name`, {
+        method: 'PATCH',
+        body: { name },
+      }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: DM_CONVERSATIONS_KEY }),
+  });
+}
+
+export function useLeaveGroup() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (conversationId: string) =>
+      api<void>(`/dm/conversations/${conversationId}/leave`, { method: 'POST' }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: DM_CONVERSATIONS_KEY }),
+  });
+}

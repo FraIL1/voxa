@@ -9,6 +9,7 @@ import {
   Search,
   SendHorizontal,
   UserRound,
+  UsersRound,
   Video,
   X,
 } from 'lucide-react';
@@ -30,7 +31,8 @@ import { uploadFile } from '../api/uploads';
 import { useDmAck, useDmConversations, useDmMessages, useSendDm } from '../hooks/useDm';
 import { useCallStore } from '../stores/call';
 import CallPanel from './CallPanel';
-import { PeerProfilePanel, PinnedPanel, SearchPanel } from './DmHeaderPanels';
+import { dmTitle } from '../api/dm-cache';
+import { GroupPanel, PeerProfilePanel, PinnedPanel, SearchPanel } from './DmHeaderPanels';
 import DmMessageItem from './DmMessageItem';
 
 interface PendingFile {
@@ -250,51 +252,60 @@ export default function DmView() {
   const { t } = useTranslation();
   const { conversationId } = useParams<{ conversationId: string }>();
   const { data: conversations } = useDmConversations();
-  const [peer, setPeer] = useState<DmConversationDto['peer'] | null>(null);
-  const [panel, setPanel] = useState<'pins' | 'search' | 'profile' | null>(null);
+  const [conversation, setConversation] = useState<DmConversationDto | null>(null);
+  const [panel, setPanel] = useState<'pins' | 'search' | 'profile' | 'group' | null>(null);
   const callStatus = useCallStore((s) => s.status);
   const startCall = useCallStore((s) => s.startCall);
 
-  // Собеседника берём из списка, а если диалог только что открыт — догружаем
-  const fromList = conversations?.find((c) => c.id === conversationId)?.peer ?? null;
+  // Диалог берём из списка, а если только что открыт — догружаем
+  const fromList = conversations?.find((c) => c.id === conversationId) ?? null;
   useEffect(() => {
     if (fromList) {
-      setPeer(fromList);
+      setConversation(fromList);
       return;
     }
     if (!conversationId) return;
-    // Обновим список, чтобы получить peer нового диалога
     void api<DmConversationDto[]>('/dm/conversations').then((list) => {
-      const found = list.find((c) => c.id === conversationId)?.peer ?? null;
-      setPeer(found);
+      setConversation(list.find((c) => c.id === conversationId) ?? null);
     });
   }, [conversationId, fromList]);
 
   if (!conversationId) return <Navigate to="/" replace />;
 
+  const isGroup = conversation?.isGroup ?? false;
+  const peer = conversation?.peer ?? null;
+  const title = conversation ? dmTitle(conversation) : t('dm.title');
+
   return (
     <div className="channel-view">
       <header className="channel-header">
-        <AtSign size={18} />
-        {peer?.displayName ?? t('dm.title')}
+        {isGroup ? <UsersRound size={18} /> : <AtSign size={18} />}
+        {title}
+        {isGroup && conversation && (
+          <span className="dm-header-count">{conversation.members.length}</span>
+        )}
 
         <div className="dm-header-actions">
-          <button
-            className="icon-button"
-            title={t('call.startVoice')}
-            disabled={!peer || callStatus !== 'idle'}
-            onClick={() => void startCall(conversationId, peer?.displayName ?? '', false)}
-          >
-            <Phone size={17} />
-          </button>
-          <button
-            className="icon-button"
-            title={t('call.startVideo')}
-            disabled={!peer || callStatus !== 'idle'}
-            onClick={() => void startCall(conversationId, peer?.displayName ?? '', true)}
-          >
-            <Video size={17} />
-          </button>
+          {!isGroup && (
+            <>
+              <button
+                className="icon-button"
+                title={t('call.startVoice')}
+                disabled={!peer || callStatus !== 'idle'}
+                onClick={() => void startCall(conversationId, peer?.displayName ?? '', false)}
+              >
+                <Phone size={17} />
+              </button>
+              <button
+                className="icon-button"
+                title={t('call.startVideo')}
+                disabled={!peer || callStatus !== 'idle'}
+                onClick={() => void startCall(conversationId, peer?.displayName ?? '', true)}
+              >
+                <Video size={17} />
+              </button>
+            </>
+          )}
           <button
             className={`icon-button${panel === 'pins' ? ' engaged' : ''}`}
             title={t('dm.pinnedTitle')}
@@ -302,14 +313,24 @@ export default function DmView() {
           >
             <Pin size={17} />
           </button>
-          <button
-            className={`icon-button${panel === 'profile' ? ' engaged' : ''}`}
-            title={t('dm.profileTitle')}
-            disabled={!peer}
-            onClick={() => setPanel((p) => (p === 'profile' ? null : 'profile'))}
-          >
-            <UserRound size={17} />
-          </button>
+          {isGroup ? (
+            <button
+              className={`icon-button${panel === 'group' ? ' engaged' : ''}`}
+              title={t('dm.groupSettings')}
+              onClick={() => setPanel((p) => (p === 'group' ? null : 'group'))}
+            >
+              <UsersRound size={17} />
+            </button>
+          ) : (
+            <button
+              className={`icon-button${panel === 'profile' ? ' engaged' : ''}`}
+              title={t('dm.profileTitle')}
+              disabled={!peer}
+              onClick={() => setPanel((p) => (p === 'profile' ? null : 'profile'))}
+            >
+              <UserRound size={17} />
+            </button>
+          )}
           <button
             className={`icon-button${panel === 'search' ? ' engaged' : ''}`}
             title={t('dm.searchTitle')}
@@ -331,9 +352,12 @@ export default function DmView() {
       {panel === 'profile' && peer && (
         <PeerProfilePanel peer={peer} onClose={() => setPanel(null)} />
       )}
+      {panel === 'group' && conversation && (
+        <GroupPanel conversation={conversation} onClose={() => setPanel(null)} />
+      )}
 
       <DmMessages conversationId={conversationId} />
-      <DmComposer conversationId={conversationId} peerName={peer?.displayName ?? ''} />
+      <DmComposer conversationId={conversationId} peerName={title} />
     </div>
   );
 }

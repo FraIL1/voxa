@@ -179,7 +179,21 @@
     "searchTitle": "Поиск по переписке",
     "searchPlaceholder": "Что ищем?",
     "searchEmpty": "Ничего не найдено",
-    "profileTitle": "Профиль"
+    "profileTitle": "Профиль",
+    "createGroup": "Создать группу",
+    "groupNameLabel": "Название группы",
+    "groupNamePlaceholder": "Наша беседа",
+    "groupPickMembers": "Выберите друзей (минимум двое)",
+    "groupCreateButton": "Создать ({{count}})",
+    "groupSettings": "Настройки группы",
+    "groupMembers": "Участники",
+    "groupOwner": "владелец",
+    "groupAdd": "Добавить участника",
+    "groupKick": "Убрать из группы",
+    "groupRename": "Переименовать группу",
+    "groupLeave": "Выйти из группы",
+    "groupLeaveConfirm": "Выйти из этой группы?",
+    "groupNoFriends": "Все друзья уже в группе"
   },
   "call": {
     "startVoice": "Голосовой звонок",

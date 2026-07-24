@@ -246,6 +246,11 @@ export function useRealtime(): void {
       },
     );
 
+    socket.on(WsEvents.DmConversationRemoved, ({ id }: { id: string }) => {
+      queryClient.setQueryData<DmConversationDto[]>(DM_CONVERSATIONS_KEY, (list) =>
+        (list ?? []).filter((c) => c.id !== id),
+      );
+    });
     socket.on(WsEvents.DmConversationUpdated, (conv: DmConversationDto) => {
       queryClient.setQueryData<DmConversationDto[]>(DM_CONVERSATIONS_KEY, (list) => {
         const rest = (list ?? []).filter((c) => c.id !== conv.id);
