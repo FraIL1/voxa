@@ -257,10 +257,18 @@ export interface DmMessagesPageDto {
   hasMore: boolean;
 }
 
-/** Диалог в списке: собеседник + превью последнего сообщения + непрочитанные */
+/** Диалог в списке: 1-на-1 (peer) или группа (name + members) */
 export interface DmConversationDto {
   id: string;
-  peer: UserPublicDto;
+  isGroup: boolean;
+  /** Название группы; для 1-на-1 — null */
+  name: string | null;
+  /** Собеседник в 1-на-1; для группы — null */
+  peer: UserPublicDto | null;
+  /** Все участники (в 1-на-1 — оба, включая себя) */
+  members: UserPublicDto[];
+  /** Владелец группы (кто может звать/убирать/переименовывать); null для 1-на-1 */
+  ownerId: string | null;
   lastMessage: {
     content: string;
     authorId: string | null;

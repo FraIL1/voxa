@@ -14,12 +14,14 @@ import {
 } from '@prisma/client';
 import {
   WsEvents,
+  type CreateGroupDmInput,
   type DmConversationDto,
   type DmMessageDto,
   type DmMessagesPageDto,
   type EditDmInput,
   type MessagesQueryInput,
   type SendDmInput,
+  type UserPublicDto,
 } from '@voxa/shared';
 
 import { FilesService } from '../files/files.service';
@@ -33,6 +35,7 @@ const MAX_DISTINCT_REACTIONS = 20;
 const MAX_PINNED = 50;
 const SEARCH_LIMIT = 50;
 const PREVIEW_LENGTH = 100;
+const MAX_GROUP_MEMBERS = 20;
 
 type DmMessageWithRelations = DmMessage & {
   author: Pick<User, 'id' | 'username' | 'displayName' | 'avatarUrl'> | null;
@@ -42,6 +45,18 @@ type DmMessageWithRelations = DmMessage & {
     | (Pick<DmMessage, 'id' | 'content' | 'deletedAt'> & { author: Pick<User, 'username'> | null })
     | null;
 };
+
+/** Диалог с участниками/прочитанностью/последним сообщением — для DTO */
+interface ConversationForDto {
+  id: string;
+  isGroup: boolean;
+  name: string | null;
+  ownerId: string | null;
+  lastMessageAt: Date;
+  participants: { user: Pick<User, 'id' | 'username' | 'displayName' | 'avatarUrl'> }[];
+  readStates: { lastReadMessageId: string | null; pinned: boolean }[];
+  messages: { content: string; authorId: string | null; createdAt: Date }[];
+}
 
 const AUTHOR_SELECT = {
   select: { id: true, username: true, displayName: true, avatarUrl: true },
@@ -55,6 +70,20 @@ const DM_INCLUDE = {
     select: { id: true, content: true, deletedAt: true, author: { select: { username: true } } },
   },
 } as const;
+
+/** include для сборки DmConversationDto под конкретного зрителя */
+function conversationInclude(meId: string) {
+  return {
+    participants: { include: { user: AUTHOR_SELECT } },
+    readStates: { where: { userId: meId }, select: { lastReadMessageId: true, pinned: true } },
+    messages: {
+      where: { deletedAt: null },
+      orderBy: { id: 'desc' },
+      take: 1,
+      select: { content: true, authorId: true, createdAt: true },
+    },
+  } as const;
+}
 
 @Injectable()
 export class DmService {
@@ -77,33 +106,39 @@ export class DmService {
     throw new ForbiddenException('Написать можно другу или участнику общего с вами сервера');
   }
 
-  /** Канонический порядок пары: меньший uuid — userA (одна строка на двоих) */
-  private orderPair(a: string, b: string): [string, string] {
-    return a < b ? [a, b] : [b, a];
+  /** id участников диалога */
+  private async participantIdsOf(conversationId: string): Promise<string[]> {
+    const parts = await this.prisma.dmParticipant.findMany({
+      where: { conversationId },
+      select: { userId: true },
+    });
+    return parts.map((p) => p.userId);
   }
 
-  private peerIdOf(
-    conversation: Pick<DmConversation, 'userAId' | 'userBId'>,
-    meId: string,
-  ): string {
-    return conversation.userAId === meId ? conversation.userBId : conversation.userAId;
-  }
-
-  private async assertParticipant(conversationId: string, userId: string): Promise<DmConversation> {
+  /** Проверить участие; вернуть диалог и список участников */
+  private async assertParticipant(
+    conversationId: string,
+    userId: string,
+  ): Promise<{ conversation: DmConversation; participantIds: string[] }> {
     const conversation = await this.prisma.dmConversation.findUnique({
       where: { id: conversationId },
     });
     if (!conversation) throw new NotFoundException('Диалог не найден');
-    if (conversation.userAId !== userId && conversation.userBId !== userId) {
+    const participantIds = await this.participantIdsOf(conversationId);
+    if (!participantIds.includes(userId)) {
       throw new ForbiddenException('Нет доступа к этому диалогу');
     }
-    return conversation;
+    return { conversation, participantIds };
   }
 
-  /** id собеседника; заодно проверяет участие и отсутствие блокировки */
+  /** id собеседника в 1-на-1; для групп звонки недоступны */
   async peerOf(meId: string, conversationId: string): Promise<string> {
-    const conversation = await this.assertParticipant(conversationId, meId);
-    const peerId = this.peerIdOf(conversation, meId);
+    const { conversation, participantIds } = await this.assertParticipant(conversationId, meId);
+    if (conversation.isGroup) {
+      throw new BadRequestException('Групповые звонки пока недоступны');
+    }
+    const peerId = participantIds.find((id) => id !== meId);
+    if (!peerId) throw new NotFoundException('Собеседник не найден');
     await this.friends.assertNotBlocked(meId, peerId);
     return peerId;
   }
@@ -139,21 +174,197 @@ export class DmService {
     }))();
   }
 
-  /** Открыть (или создать) диалог с пользователем; возвращает id */
+  private async toConversationDto(
+    meId: string,
+    conv: ConversationForDto,
+  ): Promise<DmConversationDto> {
+    const members: UserPublicDto[] = conv.participants.map((p) => ({
+      id: p.user.id,
+      username: p.user.username,
+      displayName: p.user.displayName,
+      avatarUrl: p.user.avatarUrl,
+    }));
+    const peer = conv.isGroup ? null : (members.find((m) => m.id !== meId) ?? null);
+    const state = conv.readStates[0];
+    const last = conv.messages[0];
+    return {
+      id: conv.id,
+      isGroup: conv.isGroup,
+      name: conv.name,
+      ownerId: conv.ownerId,
+      peer,
+      members,
+      lastMessage: last
+        ? {
+            content: last.content.slice(0, PREVIEW_LENGTH),
+            authorId: last.authorId,
+            createdAt: last.createdAt.toISOString(),
+          }
+        : null,
+      unreadCount: await this.unreadCount(conv.id, meId, state?.lastReadMessageId ?? null),
+      lastMessageAt: conv.lastMessageAt.toISOString(),
+      pinned: state?.pinned ?? false,
+    };
+  }
+
+  /** Открыть (или создать) 1-на-1 диалог; возвращает id */
   async openConversation(meId: string, peerId: string): Promise<{ id: string }> {
     if (meId === peerId) throw new BadRequestException('Нельзя написать самому себе');
     const peer = await this.prisma.user.findUnique({ where: { id: peerId }, select: { id: true } });
     if (!peer) throw new NotFoundException('Пользователь не найден');
     await this.assertCanDm(meId, peerId);
 
-    const [userAId, userBId] = this.orderPair(meId, peerId);
-    const conversation = await this.prisma.dmConversation.upsert({
-      where: { userAId_userBId: { userAId, userBId } },
-      create: { userAId, userBId },
-      update: {},
+    const pairKey = [meId, peerId].sort().join(':');
+    const existing = await this.prisma.dmConversation.findUnique({
+      where: { pairKey },
       select: { id: true },
     });
-    return conversation;
+    if (existing) return existing;
+
+    try {
+      const created = await this.prisma.dmConversation.create({
+        data: {
+          isGroup: false,
+          pairKey,
+          participants: { create: [{ userId: meId }, { userId: peerId }] },
+        },
+        select: { id: true },
+      });
+      return created;
+    } catch (error) {
+      // Гонка: диалог создан параллельным запросом — возвращаем его
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const conv = await this.prisma.dmConversation.findUniqueOrThrow({
+          where: { pairKey },
+          select: { id: true },
+        });
+        return conv;
+      }
+      throw error;
+    }
+  }
+
+  /** Создать групповую беседу с указанными участниками */
+  async createGroup(meId: string, input: CreateGroupDmInput): Promise<DmConversationDto> {
+    const memberIds = [...new Set(input.userIds)].filter((id) => id !== meId);
+    if (memberIds.length < 2) {
+      throw new BadRequestException('В группе должно быть минимум три участника');
+    }
+    if (memberIds.length + 1 > MAX_GROUP_MEMBERS) {
+      throw new BadRequestException(`В группе не больше ${MAX_GROUP_MEMBERS} участников`);
+    }
+    // Каждого добавляемого создатель должен иметь право писать
+    for (const id of memberIds) await this.assertCanDm(meId, id);
+
+    const conversation = await this.prisma.dmConversation.create({
+      data: {
+        isGroup: true,
+        name: input.name.trim(),
+        ownerId: meId,
+        participants: { create: [meId, ...memberIds].map((userId) => ({ userId })) },
+      },
+      select: { id: true },
+    });
+
+    await this.notifyAll([meId, ...memberIds], conversation.id);
+    return this.conversationDto(meId, conversation.id);
+  }
+
+  /** Добавить участников в группу (любой участник может позвать своих) */
+  async addMembers(
+    meId: string,
+    conversationId: string,
+    userIds: string[],
+  ): Promise<DmConversationDto> {
+    const { conversation, participantIds } = await this.assertParticipant(conversationId, meId);
+    if (!conversation.isGroup) throw new BadRequestException('Это не групповая беседа');
+
+    const toAdd = [...new Set(userIds)].filter((id) => !participantIds.includes(id));
+    if (toAdd.length === 0) return this.conversationDto(meId, conversationId);
+    if (participantIds.length + toAdd.length > MAX_GROUP_MEMBERS) {
+      throw new BadRequestException(`В группе не больше ${MAX_GROUP_MEMBERS} участников`);
+    }
+    for (const id of toAdd) await this.assertCanDm(meId, id);
+
+    await this.prisma.dmParticipant.createMany({
+      data: toAdd.map((userId) => ({ conversationId, userId })),
+      skipDuplicates: true,
+    });
+
+    await this.notifyAll([...participantIds, ...toAdd], conversationId);
+    return this.conversationDto(meId, conversationId);
+  }
+
+  /** Убрать участника (только владелец группы) */
+  async removeMember(meId: string, conversationId: string, userId: string): Promise<void> {
+    const { conversation, participantIds } = await this.assertParticipant(conversationId, meId);
+    if (!conversation.isGroup) throw new BadRequestException('Это не групповая беседа');
+    if (conversation.ownerId !== meId) {
+      throw new ForbiddenException('Убирать участников может только владелец группы');
+    }
+    if (userId === meId) throw new BadRequestException('Владелец не может убрать себя');
+    if (!participantIds.includes(userId)) throw new NotFoundException('Участник не найден');
+
+    await this.dropParticipant(conversationId, userId);
+    this.ws.emitToUsers([userId], WsEvents.DmConversationRemoved, { id: conversationId });
+    await this.notifyAll(
+      participantIds.filter((id) => id !== userId),
+      conversationId,
+    );
+  }
+
+  /** Выйти из группы; владелец передаёт группу следующему или она удаляется */
+  async leaveGroup(meId: string, conversationId: string): Promise<void> {
+    const { conversation, participantIds } = await this.assertParticipant(conversationId, meId);
+    if (!conversation.isGroup) throw new BadRequestException('Это не групповая беседа');
+
+    const rest = participantIds.filter((id) => id !== meId);
+    await this.dropParticipant(conversationId, meId);
+    this.ws.emitToUsers([meId], WsEvents.DmConversationRemoved, { id: conversationId });
+
+    if (rest.length === 0) {
+      await this.prisma.dmConversation.delete({ where: { id: conversationId } });
+      return;
+    }
+    if (conversation.ownerId === meId) {
+      await this.prisma.dmConversation.update({
+        where: { id: conversationId },
+        data: { ownerId: rest[0] },
+      });
+    }
+    await this.notifyAll(rest, conversationId);
+  }
+
+  /** Переименовать группу (любой участник) */
+  async renameGroup(
+    meId: string,
+    conversationId: string,
+    name: string,
+  ): Promise<DmConversationDto> {
+    const { conversation, participantIds } = await this.assertParticipant(conversationId, meId);
+    if (!conversation.isGroup) throw new BadRequestException('Это не групповая беседа');
+    await this.prisma.dmConversation.update({
+      where: { id: conversationId },
+      data: { name: name.trim() },
+    });
+    await this.notifyAll(participantIds, conversationId);
+    return this.conversationDto(meId, conversationId);
+  }
+
+  private async dropParticipant(conversationId: string, userId: string): Promise<void> {
+    await this.prisma.dmParticipant.deleteMany({ where: { conversationId, userId } });
+    await this.prisma.dmReadState.deleteMany({ where: { conversationId, userId } });
+  }
+
+  /** Каждому участнику — обновление диалога с его личными непрочитанными/закреплением */
+  private async notifyAll(participantIds: string[], conversationId: string): Promise<void> {
+    for (const uid of participantIds) {
+      this.ws.emitToUsers(
+        [uid],
+        WsEvents.DmConversationUpdated,
+        await this.conversationDto(uid, conversationId),
+      );
+    }
   }
 
   private async unreadCount(
@@ -174,81 +385,27 @@ export class DmService {
   /** Список диалогов пользователя (свежие сверху), с превью и непрочитанными */
   async listConversations(meId: string): Promise<DmConversationDto[]> {
     const conversations = await this.prisma.dmConversation.findMany({
-      where: { OR: [{ userAId: meId }, { userBId: meId }] },
+      where: { participants: { some: { userId: meId } } },
       orderBy: { lastMessageAt: 'desc' },
-      include: {
-        userA: AUTHOR_SELECT,
-        userB: AUTHOR_SELECT,
-        readStates: { where: { userId: meId } },
-        messages: {
-          where: { deletedAt: null },
-          orderBy: { id: 'desc' },
-          take: 1,
-          select: { content: true, authorId: true, createdAt: true },
-        },
-      },
+      include: conversationInclude(meId),
     });
 
-    const list = await Promise.all(
-      conversations.map(async (c) => {
-        const peer = c.userAId === meId ? c.userB : c.userA;
-        const lastRead = c.readStates[0]?.lastReadMessageId ?? null;
-        const last = c.messages[0];
-        return {
-          id: c.id,
-          peer: {
-            id: peer.id,
-            username: peer.username,
-            displayName: peer.displayName,
-            avatarUrl: peer.avatarUrl,
-          },
-          lastMessage: last
-            ? {
-                content: last.content.slice(0, PREVIEW_LENGTH),
-                authorId: last.authorId,
-                createdAt: last.createdAt.toISOString(),
-              }
-            : null,
-          unreadCount: await this.unreadCount(c.id, meId, lastRead),
-          lastMessageAt: c.lastMessageAt.toISOString(),
-          pinned: c.readStates[0]?.pinned ?? false,
-        };
-      }),
-    );
+    const list = await Promise.all(conversations.map((c) => this.toConversationDto(meId, c)));
     // Закреплённые диалоги — всегда сверху, внутри групп по свежести
     return list.sort((a, b) => Number(b.pinned) - Number(a.pinned));
   }
 
-  /** Диалог как DTO (для перехода после open) */
+  /** Диалог как DTO (для перехода после open и обновлений) */
   async conversationDto(meId: string, conversationId: string): Promise<DmConversationDto> {
-    const conversation = await this.assertParticipant(conversationId, meId);
-    const peerId = this.peerIdOf(conversation, meId);
-    const peer = await this.prisma.user.findUniqueOrThrow({
-      where: { id: peerId },
-      select: { id: true, username: true, displayName: true, avatarUrl: true },
+    const conversation = await this.prisma.dmConversation.findUnique({
+      where: { id: conversationId },
+      include: conversationInclude(meId),
     });
-    const state = await this.prisma.dmReadState.findUnique({
-      where: { conversationId_userId: { conversationId, userId: meId } },
-    });
-    const last = await this.prisma.dmMessage.findFirst({
-      where: { conversationId, deletedAt: null },
-      orderBy: { id: 'desc' },
-      select: { content: true, authorId: true, createdAt: true },
-    });
-    return {
-      id: conversation.id,
-      peer,
-      lastMessage: last
-        ? {
-            content: last.content.slice(0, PREVIEW_LENGTH),
-            authorId: last.authorId,
-            createdAt: last.createdAt.toISOString(),
-          }
-        : null,
-      unreadCount: await this.unreadCount(conversationId, meId, state?.lastReadMessageId ?? null),
-      lastMessageAt: conversation.lastMessageAt.toISOString(),
-      pinned: state?.pinned ?? false,
-    };
+    if (!conversation) throw new NotFoundException('Диалог не найден');
+    if (!conversation.participants.some((p) => p.user.id === meId)) {
+      throw new ForbiddenException('Нет доступа к этому диалогу');
+    }
+    return this.toConversationDto(meId, conversation);
   }
 
   async history(
@@ -270,8 +427,12 @@ export class DmService {
   }
 
   async send(meId: string, conversationId: string, input: SendDmInput): Promise<DmMessageDto> {
-    const conversation = await this.assertParticipant(conversationId, meId);
-    await this.assertCanDm(meId, this.peerIdOf(conversation, meId));
+    const { conversation, participantIds } = await this.assertParticipant(conversationId, meId);
+    // Для 1-на-1 — правило «друг или общий сервер»; в группе достаточно членства
+    if (!conversation.isGroup) {
+      const peerId = participantIds.find((id) => id !== meId);
+      if (peerId) await this.assertCanDm(meId, peerId);
+    }
 
     if (input.replyToId) {
       const target = await this.prisma.dmMessage.findFirst({
@@ -305,16 +466,9 @@ export class DmService {
     });
     const dto = await this.toMessageDto(full);
 
-    // Оба участника получают сообщение и обновление превью диалога
-    const both = [conversation.userAId, conversation.userBId];
-    this.ws.emitToUsers(both, WsEvents.DmMessageNew, dto);
-    for (const uid of both) {
-      this.ws.emitToUsers(
-        [uid],
-        WsEvents.DmConversationUpdated,
-        await this.conversationDto(uid, conversationId),
-      );
-    }
+    // Все участники получают сообщение и обновление превью диалога
+    this.ws.emitToUsers(participantIds, WsEvents.DmMessageNew, dto);
+    await this.notifyAll(participantIds, conversationId);
     return dto;
   }
 
@@ -324,7 +478,7 @@ export class DmService {
     messageId: string,
     input: EditDmInput,
   ): Promise<DmMessageDto> {
-    const conversation = await this.assertParticipant(conversationId, meId);
+    const { participantIds } = await this.assertParticipant(conversationId, meId);
     const message = await this.prisma.dmMessage.findFirst({
       where: { id: messageId, conversationId, deletedAt: null },
     });
@@ -341,16 +495,12 @@ export class DmService {
       include: DM_INCLUDE,
     });
     const dto = await this.toMessageDto(full);
-    this.ws.emitToUsers(
-      [conversation.userAId, conversation.userBId],
-      WsEvents.DmMessageEdited,
-      dto,
-    );
+    this.ws.emitToUsers(participantIds, WsEvents.DmMessageEdited, dto);
     return dto;
   }
 
   async remove(meId: string, conversationId: string, messageId: string): Promise<void> {
-    const conversation = await this.assertParticipant(conversationId, meId);
+    const { participantIds } = await this.assertParticipant(conversationId, meId);
     const message = await this.prisma.dmMessage.findFirst({
       where: { id: messageId, conversationId, deletedAt: null },
     });
@@ -364,7 +514,7 @@ export class DmService {
     });
     // Файлы удалённого сообщения не должны вечно занимать квоту автора
     await this.files.removeForMessage({ dmMessageId: messageId });
-    this.ws.emitToUsers([conversation.userAId, conversation.userBId], WsEvents.DmMessageDeleted, {
+    this.ws.emitToUsers(participantIds, WsEvents.DmMessageDeleted, {
       id: messageId,
       conversationId,
     });
@@ -416,7 +566,7 @@ export class DmService {
     messageId: string,
     emoji: string,
   ): Promise<void> {
-    const conversation = await this.assertParticipant(conversationId, meId);
+    const { participantIds } = await this.assertParticipant(conversationId, meId);
     await this.findAliveOrThrow(conversationId, messageId);
 
     // Идемпотентность: реакция уже стоит — не ошибка и не событие
@@ -445,7 +595,7 @@ export class DmService {
       throw error;
     }
 
-    this.ws.emitToUsers([conversation.userAId, conversation.userBId], WsEvents.DmReactionAdded, {
+    this.ws.emitToUsers(participantIds, WsEvents.DmReactionAdded, {
       conversationId,
       messageId,
       emoji,
@@ -459,13 +609,13 @@ export class DmService {
     messageId: string,
     emoji: string,
   ): Promise<void> {
-    const conversation = await this.assertParticipant(conversationId, meId);
+    const { participantIds } = await this.assertParticipant(conversationId, meId);
     const deleted = await this.prisma.dmReaction.deleteMany({
       where: { dmMessageId: messageId, userId: meId, emoji },
     });
     if (deleted.count === 0) return;
 
-    this.ws.emitToUsers([conversation.userAId, conversation.userBId], WsEvents.DmReactionRemoved, {
+    this.ws.emitToUsers(participantIds, WsEvents.DmReactionRemoved, {
       conversationId,
       messageId,
       emoji,
@@ -475,14 +625,14 @@ export class DmService {
 
   // ---------- Закреплённые сообщения ----------
 
-  /** Закрепить/открепить сообщение — видно обоим участникам */
+  /** Закрепить/открепить сообщение — видно всем участникам */
   async setMessagePinned(
     meId: string,
     conversationId: string,
     messageId: string,
     pinned: boolean,
   ): Promise<DmMessageDto> {
-    const conversation = await this.assertParticipant(conversationId, meId);
+    const { participantIds } = await this.assertParticipant(conversationId, meId);
     await this.findAliveOrThrow(conversationId, messageId);
 
     if (pinned) {
@@ -509,11 +659,7 @@ export class DmService {
       include: DM_INCLUDE,
     });
     const dto = await this.toMessageDto(full);
-    this.ws.emitToUsers(
-      [conversation.userAId, conversation.userBId],
-      WsEvents.DmMessageEdited,
-      dto,
-    );
+    this.ws.emitToUsers(participantIds, WsEvents.DmMessageEdited, dto);
     return dto;
   }
 

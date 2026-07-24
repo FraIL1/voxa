@@ -1767,4 +1767,120 @@ describe('Voxa: критический поток (e2e)', () => {
       })
       .expect(400);
   });
+
+  it('групповые беседы: создание, доставка всем, добавление/кик, выход', async () => {
+    const ownerMe = await request(httpServer)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${ownerAccess}`);
+    const memberMe = await request(httpServer)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${memberAccess}`);
+    const ownerId = (ownerMe.body as MeDto).id;
+    const memberId = (memberMe.body as MeDto).id;
+
+    // Третий участник: регистрируется по коду приложения и вступает на тот же
+    // сервер серверным инвайтом — тогда владелец может писать ему в личку
+    const regCode = await createRegCode(httpServer, ownerAccess);
+    const third = await request(httpServer)
+      .post('/api/auth/register')
+      .send({ inviteCode: regCode, username: 'Группович', password: 'пароль-группы-777' })
+      .expect(201);
+    const thirdId = (third.body as AuthResponseDto).user.id;
+    const thirdAccess = (third.body as AuthResponseDto).accessToken;
+    const serverInvite = await request(httpServer)
+      .post(`/api/guilds/${guildId}/invites`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ maxUses: 5 })
+      .expect(201);
+    await request(httpServer)
+      .post(`/api/invites/${serverInvite.body.code}/join`)
+      .set('Authorization', `Bearer ${thirdAccess}`)
+      .expect(200);
+
+    // Создание группы: минимум два участника кроме себя
+    await request(httpServer)
+      .post('/api/dm/conversations/group')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ name: 'Тусовка', userIds: [memberId] })
+      .expect(400);
+
+    const group = await request(httpServer)
+      .post('/api/dm/conversations/group')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ name: 'Тусовка', userIds: [memberId, thirdId] })
+      .expect(201);
+    const groupId = group.body.id as string;
+    expect(group.body.isGroup).toBe(true);
+    expect(group.body.name).toBe('Тусовка');
+    expect(group.body.ownerId).toBe(ownerId);
+    expect((group.body.members as { id: string }[]).map((m) => m.id).sort()).toEqual(
+      [ownerId, memberId, thirdId].sort(),
+    );
+
+    // Группа видна всем троим
+    for (const token of [ownerAccess, memberAccess, thirdAccess]) {
+      const list = await request(httpServer)
+        .get('/api/dm/conversations')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect((list.body as { id: string }[]).some((c) => c.id === groupId)).toBe(true);
+    }
+
+    // Сообщение в группу доходит по WS всем (проверим участника)
+    const memberSocket = io(baseUrl, { auth: { token: memberAccess }, transports: ['websocket'] });
+    await new Promise((resolve, reject) => {
+      memberSocket.once(WsEvents.Ready, resolve);
+      memberSocket.once('auth_error', () => reject(new Error('WS-авторизация не прошла')));
+    });
+    const delivered = new Promise<{ content: string }>((resolve) =>
+      memberSocket.once(WsEvents.DmMessageNew, resolve),
+    );
+    await request(httpServer)
+      .post(`/api/dm/conversations/${groupId}/messages`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ content: 'привет группе' })
+      .expect(201);
+    expect((await delivered).content).toBe('привет группе');
+    memberSocket.disconnect();
+
+    // Переименование доступно участнику
+    const renamed = await request(httpServer)
+      .patch(`/api/dm/conversations/${groupId}/name`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ name: 'Новая тусовка' })
+      .expect(200);
+    expect(renamed.body.name).toBe('Новая тусовка');
+
+    // Кикать может только владелец; участник — 403
+    await request(httpServer)
+      .delete(`/api/dm/conversations/${groupId}/members/${thirdId}`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(403);
+    await request(httpServer)
+      .delete(`/api/dm/conversations/${groupId}/members/${thirdId}`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(204);
+    // Кикнутый больше не видит группу и не может писать
+    const thirdList = await request(httpServer)
+      .get('/api/dm/conversations')
+      .set('Authorization', `Bearer ${thirdAccess}`)
+      .expect(200);
+    expect((thirdList.body as { id: string }[]).some((c) => c.id === groupId)).toBe(false);
+    await request(httpServer)
+      .post(`/api/dm/conversations/${groupId}/messages`)
+      .set('Authorization', `Bearer ${thirdAccess}`)
+      .send({ content: 'я вернулся' })
+      .expect(403);
+
+    // Участник выходит сам
+    await request(httpServer)
+      .post(`/api/dm/conversations/${groupId}/leave`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(204);
+    const afterLeave = await request(httpServer)
+      .get(`/api/dm/conversations/${groupId}/messages`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(403);
+    expect(afterLeave.body.message).toBeTruthy();
+  });
 });

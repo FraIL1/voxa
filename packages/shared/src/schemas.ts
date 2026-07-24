@@ -281,3 +281,22 @@ export const instanceSettingsSchema = z.object({
   maxGuildsPerUser: z.number().int().min(1).max(500).optional(),
 });
 export type InstanceSettingsInput = z.infer<typeof instanceSettingsSchema>;
+
+/** Создание групповой беседы: название + участники (минимум 2) */
+export const createGroupDmSchema = z.object({
+  name: z.string().trim().min(1, 'Введите название').max(60),
+  userIds: z.array(z.string().uuid()).min(2, 'Нужно минимум два участника').max(20),
+});
+export type CreateGroupDmInput = z.infer<typeof createGroupDmSchema>;
+
+/** Добавить участников в группу */
+export const addGroupMembersSchema = z.object({
+  userIds: z.array(z.string().uuid()).min(1).max(20),
+});
+export type AddGroupMembersInput = z.infer<typeof addGroupMembersSchema>;
+
+/** Переименовать группу */
+export const renameGroupSchema = z.object({
+  name: z.string().trim().min(1).max(60),
+});
+export type RenameGroupInput = z.infer<typeof renameGroupSchema>;

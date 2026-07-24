@@ -31,6 +31,12 @@ import {
   type MessagesQueryInput,
   type OpenDmInput,
   type SendDmInput,
+  addGroupMembersSchema,
+  createGroupDmSchema,
+  renameGroupSchema,
+  type AddGroupMembersInput,
+  type CreateGroupDmInput,
+  type RenameGroupInput,
 } from '@voxa/shared';
 
 import { CurrentUser, type RequestUser } from '../common/decorators/current-user.decorator';
@@ -57,6 +63,53 @@ export class DmController {
     @Body(new ZodValidationPipe(openDmSchema)) body: OpenDmInput,
   ): Promise<{ id: string }> {
     return this.dm.openConversation(user.id, body.userId);
+  }
+
+  /** Создать групповую беседу */
+  @Post('conversations/group')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async createGroup(
+    @CurrentUser() user: RequestUser,
+    @Body(new ZodValidationPipe(createGroupDmSchema)) body: CreateGroupDmInput,
+  ): Promise<DmConversationDto> {
+    return this.dm.createGroup(user.id, body);
+  }
+
+  @Post('conversations/:id/members')
+  async addMembers(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(addGroupMembersSchema)) body: AddGroupMembersInput,
+  ): Promise<DmConversationDto> {
+    return this.dm.addMembers(user.id, id, body.userIds);
+  }
+
+  @Delete('conversations/:id/members/:userId')
+  @HttpCode(204)
+  async removeMember(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
+  ): Promise<void> {
+    await this.dm.removeMember(user.id, id, userId);
+  }
+
+  @Post('conversations/:id/leave')
+  @HttpCode(204)
+  async leave(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<void> {
+    await this.dm.leaveGroup(user.id, id);
+  }
+
+  @Patch('conversations/:id/name')
+  async rename(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(renameGroupSchema)) body: RenameGroupInput,
+  ): Promise<DmConversationDto> {
+    return this.dm.renameGroup(user.id, id, body.name);
   }
 
   @Get('conversations/:id/messages')

@@ -43,6 +43,8 @@ export const WsEvents = {
   DmMessageDeleted: 'dm.message.delete',
   /** Диалог создан/поднялся в списке (обновить превью и порядок) */
   DmConversationUpdated: 'dm.conversation.updated',
+  /** Адресное: диалог/группа пропал из моего списка (вышел / кикнули) */
+  DmConversationRemoved: 'dm.conversation.removed',
   /** Реакции в личке (обоим участникам) */
   DmReactionAdded: 'dm.reaction.add',
   DmReactionRemoved: 'dm.reaction.remove',
@@ -144,6 +146,7 @@ export interface WsServerEvents {
   [WsEvents.DmMessageEdited]: DmMessageDto;
   [WsEvents.DmMessageDeleted]: { id: string; conversationId: string };
   [WsEvents.DmConversationUpdated]: DmConversationDto;
+  [WsEvents.DmConversationRemoved]: { id: string };
   [WsEvents.DmReactionAdded]: DmReactionEventPayload;
   [WsEvents.DmReactionRemoved]: DmReactionEventPayload;
   [WsEvents.DmCallIncoming]: DmCallIncomingPayload;
