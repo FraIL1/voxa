@@ -1,5 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { CreateGuildInput, GuildDto, JoinGuildResultDto } from '@voxa/shared';
+import type {
+  CreateGuildInput,
+  DiscoverGuildDto,
+  GuildDto,
+  GuildJoinRequestDto,
+  JoinAttemptResultDto,
+  JoinGuildResultDto,
+} from '@voxa/shared';
 
 import { api } from '../api/client';
 
@@ -65,5 +72,68 @@ export function useDeleteGuild() {
   return useMutation({
     mutationFn: (guildId: string) => api<void>(`/guilds/${guildId}`, { method: 'DELETE' }),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: GUILDS_KEY }),
+  });
+}
+
+// ---------- Витрина и заявки ----------
+
+const DISCOVER_KEY = ['discoverGuilds'] as const;
+
+export function useDiscoverGuilds(query: string, enabled: boolean) {
+  return useQuery({
+    queryKey: [...DISCOVER_KEY, query],
+    queryFn: () =>
+      api<DiscoverGuildDto[]>(`/guilds/discover${query ? `?q=${encodeURIComponent(query)}` : ''}`),
+    enabled,
+  });
+}
+
+/** Вступить в сервер из витрины (или отправить заявку) */
+export function useJoinGuildById() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ guildId, message }: { guildId: string; message?: string }) =>
+      api<JoinAttemptResultDto>(`/guilds/${guildId}/join`, {
+        method: 'POST',
+        body: message ? { message } : {},
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: GUILDS_KEY });
+      void queryClient.invalidateQueries({ queryKey: DISCOVER_KEY });
+    },
+  });
+}
+
+export function useCancelJoinRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (guildId: string) => api<void>(`/guilds/${guildId}/join`, { method: 'DELETE' }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: DISCOVER_KEY }),
+  });
+}
+
+export function joinRequestsKey(guildId: string | undefined): readonly unknown[] {
+  return ['joinRequests', guildId];
+}
+
+export function useGuildJoinRequests(guildId: string | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: joinRequestsKey(guildId),
+    queryFn: () => api<GuildJoinRequestDto[]>(`/guilds/${guildId}/join-requests`),
+    enabled: enabled && Boolean(guildId),
+  });
+}
+
+export function useResolveJoinRequest(guildId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, approve }: { userId: string; approve: boolean }) =>
+      api<void>(`/guilds/${guildId}/join-requests/${userId}`, {
+        method: approve ? 'POST' : 'DELETE',
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: joinRequestsKey(guildId) });
+      void queryClient.invalidateQueries({ queryKey: ['members', guildId] });
+    },
   });
 }

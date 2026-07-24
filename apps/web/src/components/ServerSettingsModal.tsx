@@ -5,11 +5,12 @@ import { useTranslation } from 'react-i18next';
 
 import { useGuild } from '../hooks/useGuilds';
 import { Audit, Bans, Invites } from './CommunityTab';
+import JoinRequestsTab from './JoinRequestsTab';
 import MembersTab from './MembersTab';
 import RolesTab from './RolesTab';
 import ServerProfileTab from './ServerProfileTab';
 
-type Tab = 'profile' | 'roles' | 'members' | 'invites' | 'bans' | 'audit';
+type Tab = 'profile' | 'roles' | 'members' | 'requests' | 'invites' | 'bans' | 'audit';
 
 /** Настройки сервера (guild): профиль, роли, участники, приглашения, баны, журнал */
 export default function ServerSettingsModal({
@@ -37,12 +38,14 @@ export default function ServerSettingsModal({
   const canRoles = hasPermission(mask, Permissions.MANAGE_ROLES);
   const canInvite = hasPermission(mask, Permissions.CREATE_INVITES);
   const canBan = hasPermission(mask, Permissions.BAN_MEMBERS);
+  const canKick = hasPermission(mask, Permissions.KICK_MEMBERS);
   const isAdmin = hasPermission(mask, Permissions.ADMINISTRATOR);
 
   const tabs: [Tab, string, boolean][] = [
     ['profile', t('serverSettings.profile'), true],
     ['roles', t('roles.title'), canRoles],
     ['members', t('serverSettings.members'), canRoles],
+    ['requests', t('serverSettings.requests'), canKick],
     ['invites', t('community.invites'), canInvite],
     ['bans', t('community.bans'), canBan],
     ['audit', t('community.audit'), isAdmin],
@@ -77,6 +80,7 @@ export default function ServerSettingsModal({
           {tab === 'profile' && <ServerProfileTab guildId={guildId} onClose={onClose} />}
           {tab === 'roles' && <RolesTab guildId={guildId} />}
           {tab === 'members' && <MembersTab guildId={guildId} />}
+          {tab === 'requests' && <JoinRequestsTab guildId={guildId} />}
           {tab === 'invites' && (
             <>
               <h2>{t('community.invites')}</h2>

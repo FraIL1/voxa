@@ -29,6 +29,7 @@ export default function ServerProfileTab({
   const updateGuild = useUpdateGuild(guildId);
   const leaveGuild = useLeaveGuild();
   const [name, setName] = useState(guild?.name ?? '');
+  const [description, setDescription] = useState(guild?.description ?? '');
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
 
@@ -43,7 +44,7 @@ export default function ServerProfileTab({
     const trimmed = name.trim();
     if (trimmed.length < 2) return;
     updateGuild.mutate(
-      { name: trimmed },
+      { name: trimmed, description: description.trim() || null },
       {
         onSuccess: () => setSaved(true),
         onError: (err) => setError(err instanceof ApiError ? err.message : t('auth.genericError')),
@@ -102,6 +103,16 @@ export default function ServerProfileTab({
           {t('serverSettings.name')}
           <input value={name} disabled={!canManage} onChange={(e) => setName(e.target.value)} />
         </label>
+        <label>
+          {t('serverSettings.description')}
+          <input
+            value={description}
+            disabled={!canManage}
+            maxLength={200}
+            placeholder={t('serverSettings.descriptionPlaceholder')}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        </label>
         {error && <p className="auth-error">{error}</p>}
         {saved && <p className="settings-ok">{t('settings.saved')}</p>}
         {canManage && (
@@ -110,6 +121,25 @@ export default function ServerProfileTab({
           </button>
         )}
       </form>
+
+      {canManage && guild && (
+        <>
+          <h2>{t('serverSettings.access')}</h2>
+          <p className="settings-hint">{t('serverSettings.accessHint')}</p>
+          <div className="access-modes">
+            {(['INVITE_ONLY', 'REQUEST', 'PUBLIC'] as const).map((mode) => (
+              <button
+                key={mode}
+                className={`access-mode${guild.joinMode === mode ? ' active' : ''}`}
+                onClick={() => updateGuild.mutate({ joinMode: mode })}
+              >
+                <span className="access-mode-name">{t(`serverSettings.mode.${mode}`)}</span>
+                <span className="access-mode-desc">{t(`serverSettings.modeHint.${mode}`)}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       {!isOwner && (
         <button
