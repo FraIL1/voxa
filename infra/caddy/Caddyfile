@@ -22,9 +22,21 @@
 		reverse_proxy server:3000
 	}
 
-	# Статика веб-клиента появится на этапе 2; пока — заглушка
+	# Веб-клиент: собранная статика лежит в образе Caddy (infra/caddy/Dockerfile)
 	handle {
-		respond "Voxa server is up. API: /api/healthz" 200
+		root * /srv
+
+		# Хэшированные ассеты неизменяемы — кэшируем надолго
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+
+		# index.html не кэшируем: иначе после обновления клиент останется старым
+		@html path / /index.html
+		header @html Cache-Control "no-cache"
+
+		# SPA: неизвестные пути отдаём index.html — маршрутизация на клиенте
+		try_files {path} /index.html
+		file_server
 	}
 }
 

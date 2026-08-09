@@ -79,7 +79,9 @@ docker compose up -d --build
 
 Наружу открыт только Caddy (80/443, автосертификат Let's Encrypt для `DOMAIN`); PostgreSQL, Redis и MinIO живут во внутренней Docker-сети. Для локальной проверки прод-стека можно оставить `DOMAIN=localhost` — Caddy выпустит self-signed сертификат.
 
-Файлы раздаются с поддомена `files.DOMAIN` (изолированный origin с CSP sandbox) — при настройке DNS добавь **вторую A-запись** `files.твой-домен` на тот же VPS; сертификат Caddy получит сам.
+Веб-клиент собирается внутрь образа Caddy (`infra/caddy/Dockerfile`) и раздаётся им же: `https://DOMAIN` открывает приложение, `/api` и `/socket.io` уходят на сервер. Неизвестные пути отдают `index.html` — маршрутизация на клиенте.
+
+DNS: помимо основного домена нужны **A-записи поддоменов** на тот же VPS — `files.твой-домен` (файлы, изолированный origin с CSP sandbox) и `livekit.твой-домен` (сигналинг голоса). Сертификаты Caddy получит сам.
 
 Обновление: `git pull && docker compose up -d --build`.
 

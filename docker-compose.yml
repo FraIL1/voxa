@@ -7,7 +7,9 @@ name: voxa
 
 services:
   caddy:
-    image: caddy:2-alpine
+    build:
+      context: .
+      dockerfile: infra/caddy/Dockerfile
     restart: unless-stopped
     ports:
       - '80:80'
@@ -39,6 +41,8 @@ services:
       S3_BUCKET: voxa-files
       # Подписанные ссылки на файлы указывают на поддомен за Caddy
       PUBLIC_S3_ENDPOINT: https://files.${DOMAIN}
+      # Домен для ссылок-приглашений и кодов регистрации
+      PUBLIC_URL: ${PUBLIC_URL:-https://${DOMAIN}}
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}

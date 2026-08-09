@@ -10,4 +10,6 @@ node_modules
 *.docx
 apps/desktop
 infra
+# Dockerfile образа Caddy лежит в infra — он нужен сборщику
+!infra/caddy/Dockerfile
 docker-compose*.yml
