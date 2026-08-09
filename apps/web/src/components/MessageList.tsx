@@ -1,5 +1,8 @@
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { MessageSquare } from 'lucide-react';
+
+import { EmptyBlock, MessagesSkeleton } from './Skeletons';
 
 import { useMessages } from '../hooks/useMessages';
 import { useAutoAck } from '../hooks/useReadStates';
@@ -44,10 +47,16 @@ export default function MessageList({ channelId }: { channelId: string }) {
   };
 
   if (isLoading) {
-    return <div className="empty-state">{t('app.loading')}</div>;
+    return <MessagesSkeleton />;
   }
   if (messages.length === 0) {
-    return <div className="empty-state">{t('chat.empty')}</div>;
+    return (
+      <EmptyBlock
+        icon={<MessageSquare size={26} />}
+        title={t('chat.emptyTitle')}
+        hint={t('chat.empty')}
+      />
+    );
   }
 
   return (

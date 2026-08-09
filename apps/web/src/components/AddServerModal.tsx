@@ -9,6 +9,7 @@ import {
   useJoinGuild,
   useJoinGuildById,
 } from '../hooks/useGuilds';
+import { ListSkeleton } from './Skeletons';
 
 type Mode = 'create' | 'join' | 'discover';
 
@@ -46,7 +47,7 @@ function Discover({ onJoined }: { onJoined: (guildId: string) => void }) {
       </div>
 
       {error && <p className="friends-add-error">{error}</p>}
-      {isLoading && <p className="settings-hint">{t('app.loading')}</p>}
+      {isLoading && <ListSkeleton rows={3} />}
       {guilds && guilds.length === 0 && <p className="settings-hint">{t('guild.discoverEmpty')}</p>}
 
       <div className="group-pick-list">

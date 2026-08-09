@@ -808,10 +808,11 @@ h3 {
 .message-list {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
+  padding: 16px 18px 8px;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  scroll-behavior: smooth;
 }
 
 /* Пока сообщений мало — прижимаем их к низу, как в мессенджерах */
@@ -1007,17 +1008,54 @@ h3 {
 }
 
 .message-author {
-  font-weight: 600;
+  font-weight: 650;
   font-size: 14px;
+  letter-spacing: -0.01em;
 }
 
 .message-time {
   font-size: 11px;
   color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
 }
 
 .message-content {
   overflow-wrap: anywhere;
+  line-height: 1.55;
+}
+
+.message-content a {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+}
+
+.message-content ul,
+.message-content ol {
+  margin: 4px 0;
+  padding-left: 22px;
+}
+
+.message-content hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 10px 0;
+}
+
+.message-content table {
+  border-collapse: collapse;
+  margin: 6px 0;
+  font-size: 14px;
+}
+
+.message-content th,
+.message-content td {
+  border: 1px solid var(--border);
+  padding: 5px 9px;
+  text-align: left;
+}
+
+.message-content th {
+  background: var(--panel-raised);
 }
 
 .message-content p {
@@ -1025,19 +1063,25 @@ h3 {
 }
 
 .message-content pre {
-  background: var(--bg);
+  background: #06090f;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 10px;
+  padding: 12px 14px;
   overflow-x: auto;
+  font-family: ui-monospace, 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
   font-size: 13px;
+  line-height: 1.5;
+  box-shadow: var(--shadow-sm);
 }
 
 .message-content code {
-  background: var(--bg);
-  border-radius: 4px;
+  background: var(--panel-hover);
+  border: 1px solid var(--border);
+  border-radius: 5px;
   padding: 1px 5px;
+  font-family: ui-monospace, 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
   font-size: 13px;
+  color: #a5f3fc;
 }
 
 .message-content pre code {
@@ -1046,9 +1090,11 @@ h3 {
 }
 
 .message-content blockquote {
-  border-left: 3px solid var(--border);
-  margin: 4px 0;
-  padding-left: 10px;
+  border-left: 3px solid var(--accent-line);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: rgba(34, 211, 238, 0.05);
+  margin: 6px 0;
+  padding: 4px 12px;
   color: var(--text-muted);
 }
 
@@ -2973,4 +3019,110 @@ h3 {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ---------- Загрузка и пустые состояния ---------- */
+
+/* Мягкое мерцание для заглушек загрузки */
+@keyframes skeleton-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--panel-raised), var(--panel-hover), var(--panel-raised));
+  background-size: 200% 100%;
+  border-radius: var(--radius-sm);
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+}
+
+.skeleton-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.skeleton-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.skeleton-lines {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.skeleton-line {
+  height: 10px;
+}
+
+.skeleton-line.short {
+  width: 22%;
+}
+
+.skeleton-line.long {
+  width: 68%;
+}
+
+.skeleton-line.medium {
+  width: 45%;
+}
+
+/* Пустой экран: иконка, заголовок, подсказка */
+.empty-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--text-muted);
+  margin: auto;
+}
+
+.empty-block-icon {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.empty-block-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.empty-block-hint {
+  font-size: 13px;
+  color: var(--text-faint);
+  max-width: 320px;
+}
+
+/* Мягкое появление контента после загрузки */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+.fade-in {
+  animation: fade-in 180ms ease-out;
 }

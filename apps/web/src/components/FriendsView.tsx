@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 
 import { useOpenDm } from '../hooks/useDm';
+import { EmptyBlock } from './Skeletons';
 import {
   useAcceptFriendRequest,
   useBlockUser,
@@ -62,7 +63,13 @@ function FriendRows({ online }: { online: boolean }) {
       <div className="friends-count">
         {(online ? t('friends.online') : t('friends.all')).toUpperCase()} — {shown.length}
       </div>
-      {shown.length === 0 && <p className="empty-state">{t('friends.empty')}</p>}
+      {shown.length === 0 && (
+        <EmptyBlock
+          icon={<Users size={26} />}
+          title={t('friends.emptyTitle')}
+          hint={t('friends.empty')}
+        />
+      )}
       {shown.map((friend) => (
         <div key={friend.id} className="friend-row">
           <Avatar username={friend.displayName} status={friend.status} />
@@ -103,7 +110,13 @@ function RequestRows() {
   const outgoing = (requests ?? []).filter((r) => r.direction === 'outgoing');
 
   if (incoming.length === 0 && outgoing.length === 0) {
-    return <p className="empty-state">{t('friends.noRequests')}</p>;
+    return (
+      <EmptyBlock
+        icon={<UserPlus size={26} />}
+        title={t('friends.noRequestsTitle')}
+        hint={t('friends.noRequests')}
+      />
+    );
   }
 
   return (

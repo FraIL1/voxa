@@ -3,6 +3,7 @@ import { MAX_ATTACHMENTS_PER_MESSAGE } from '@voxa/shared';
 import {
   AtSign,
   Loader2,
+  MessageSquare,
   Paperclip,
   Phone,
   Pin,
@@ -34,6 +35,7 @@ import CallPanel from './CallPanel';
 import { dmTitle } from '../api/dm-cache';
 import { GroupPanel, PeerProfilePanel, PinnedPanel, SearchPanel } from './DmHeaderPanels';
 import DmMessageItem from './DmMessageItem';
+import { EmptyBlock, MessagesSkeleton } from './Skeletons';
 
 interface PendingFile {
   localId: string;
@@ -220,8 +222,16 @@ function DmMessages({ conversationId }: { conversationId: string }) {
       ?.dispatchEvent(new CustomEvent('dm-reply', { detail: message }));
   };
 
-  if (isLoading) return <div className="empty-state">{t('app.loading')}</div>;
-  if (messages.length === 0) return <div className="empty-state">{t('dm.empty')}</div>;
+  if (isLoading) return <MessagesSkeleton />;
+  if (messages.length === 0) {
+    return (
+      <EmptyBlock
+        icon={<MessageSquare size={26} />}
+        title={t('dm.emptyTitle')}
+        hint={t('dm.empty')}
+      />
+    );
+  }
 
   return (
     <div
