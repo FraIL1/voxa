@@ -6,7 +6,16 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['**/node_modules/**', '**/dist/**', '**/src-tauri/**', '**/*.tsbuildinfo'],
+    ignores: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/src-tauri/**',
+      '**/*.tsbuildinfo',
+      // Отчёты и трассировки Playwright — сгенерированные артефакты прогона
+      'tests/ui/report/**',
+      'tests/ui/artifacts/**',
+      'tests/ui/.auth/**',
+    ],
   },
   eslintJs.configs.recommended,
   ...tseslint.configs.recommended,

@@ -22,7 +22,31 @@ export interface RoleDto {
 export interface MeDto extends UserPublicDto {
   /** Владелец всего приложения — видит глобальную панель */
   isInstanceOwner: boolean;
+  /** Рассказ о себе в карточке профиля */
+  bio: string | null;
+  /** Акцентный цвет профиля (#rrggbb); null — фирменный цвет приложения */
+  accentColor: string | null;
   createdAt: string;
+}
+
+/** Как связан со мной человек, чью карточку я открыл */
+export type ProfileRelation = 'self' | 'friends' | 'incoming' | 'outgoing' | 'none';
+
+/** Публичная карточка пользователя (профиль глазами другого) */
+export interface UserProfileDto extends UserPublicDto {
+  bio: string | null;
+  accentColor: string | null;
+  /** Дата регистрации в приложении */
+  createdAt: string;
+  status: PresenceStatus;
+  isInstanceOwner: boolean;
+  relation: ProfileRelation;
+  /** Я его заблокировал */
+  blocked: boolean;
+  /** Серверы, где мы оба состоим */
+  mutualGuilds: { id: string; name: string; iconUrl: string | null }[];
+  /** Сколько общих друзей */
+  mutualFriends: number;
 }
 
 export interface AuthResponseDto {

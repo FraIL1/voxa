@@ -12,6 +12,7 @@ import { useDeleteMessage, useEditMessage, useToggleReaction } from '../hooks/us
 import { rehypeMentions } from '../lib/rehype-mentions';
 import { useAuthStore } from '../stores/auth';
 import { useChatStore } from '../stores/chat';
+import { openProfile } from '../stores/profileView';
 import Attachments from './Attachments';
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥', '🎉', '👀', '💯', '🤔', '👎', '🫡'];
@@ -102,7 +103,11 @@ export default function Message({ message }: { message: ChatMessage }) {
 
   return (
     <div className={`message${message.pending ? ' pending' : ''}`}>
-      <div className="avatar" aria-hidden>
+      <div
+        className="avatar message-avatar"
+        aria-hidden
+        onClick={() => message.author && openProfile(message.author.id)}
+      >
         {authorName.slice(0, 1).toUpperCase()}
       </div>
 
@@ -126,7 +131,17 @@ export default function Message({ message }: { message: ChatMessage }) {
         )}
 
         <div className="message-meta">
-          <span className="message-author">{authorName}</span>
+          <span
+            className="message-author"
+            role="button"
+            tabIndex={0}
+            onClick={() => message.author && openProfile(message.author.id)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && message.author) openProfile(message.author.id);
+            }}
+          >
+            {authorName}
+          </span>
           <span className="message-time">
             {formatTimestamp(message.createdAt)}
             {message.editedAt && ` (${t('chat.edited')})`}

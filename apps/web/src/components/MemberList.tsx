@@ -6,6 +6,7 @@ import { useParams } from 'react-router';
 
 import { useMembers } from '../hooks/useMembers';
 import { useAuthStore } from '../stores/auth';
+import { openProfile } from '../stores/profileView';
 import MemberContextMenu, { type MenuState } from './MemberContextMenu';
 
 interface Group {
@@ -56,6 +57,12 @@ export default function MemberList() {
               <div
                 key={member.id}
                 className={`member ${member.status}`}
+                role="button"
+                tabIndex={0}
+                onClick={() => openProfile(member.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') openProfile(member.id);
+                }}
                 onContextMenu={(e) => {
                   if (member.id === myId) return;
                   e.preventDefault();

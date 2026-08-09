@@ -14,6 +14,7 @@ import {
   useRenameGroup,
 } from '../hooks/useDm';
 import { useAuthStore } from '../stores/auth';
+import { ProfileBody } from './ProfileCard';
 
 const dateFormat = new Intl.DateTimeFormat('ru', {
   day: 'numeric',
@@ -121,13 +122,7 @@ export function PeerProfilePanel({
           <X size={16} />
         </button>
       </div>
-      <div className="dm-profile">
-        <div className="avatar dm-profile-avatar" aria-hidden>
-          {peer.displayName.slice(0, 1).toUpperCase()}
-        </div>
-        <div className="dm-profile-name">{peer.displayName}</div>
-        <div className="dm-profile-username">@{peer.username}</div>
-      </div>
+      <ProfileBody userId={peer.id} onNavigate={onClose} />
     </div>
   );
 }

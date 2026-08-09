@@ -19,3 +19,8 @@ apps/desktop/src-tauri/target/
 apps/desktop/src-tauri/gen/
 
 *.docx
+
+# Прогоны UI-тестов: отчёты, трассировки, сохранённые сессии
+tests/ui/report/
+tests/ui/artifacts/
+tests/ui/.auth/

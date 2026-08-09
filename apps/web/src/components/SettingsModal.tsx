@@ -1,5 +1,5 @@
 import { changePasswordSchema, updateProfileSchema, type MeDto } from '@voxa/shared';
-import { LogOut, X } from 'lucide-react';
+import { Check, LogOut, X } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -7,9 +7,24 @@ import { logout } from '../api/auth';
 import { api, ApiError } from '../api/client';
 import { getAutostart, isTauri, setAutostart } from '../lib/tauri';
 import { useAuthStore } from '../stores/auth';
+import { useThemeStore, type ThemeMode } from '../stores/theme';
 import AudioDeviceSelects from './AudioDeviceSelects';
 
-type Tab = 'profile' | 'voice' | 'app';
+type Tab = 'profile' | 'appearance' | 'voice' | 'app';
+
+/** Палитра акцента профиля: свои оттенки, не фирменные цвета чужих мессенджеров */
+const ACCENTS = [
+  '#22d3ee',
+  '#2dd4bf',
+  '#34d399',
+  '#a855f7',
+  '#f472b6',
+  '#fb7185',
+  '#fbbf24',
+  '#38bdf8',
+] as const;
+
+const THEMES: ThemeMode[] = ['dark', 'light', 'auto'];
 
 /** Вкладка «Приложение» (только в десктоп-клиенте): автозапуск */
 function AppTab() {
@@ -38,14 +53,17 @@ function AppTab() {
   );
 }
 
-/** Полноэкранные настройки: профиль (ник, пароль), звук, выход из аккаунта */
+/** Полноэкранные настройки: профиль, оформление, звук, выход из аккаунта */
 export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
+  const themeMode = useThemeStore((s) => s.mode);
+  const setThemeMode = useThemeStore((s) => s.setMode);
   const [tab, setTab] = useState<Tab>('profile');
 
   const [displayName, setDisplayName] = useState(user?.displayName ?? '');
+  const [bio, setBio] = useState(user?.bio ?? '');
   const [profileMessage, setProfileMessage] = useState('');
   const [profileError, setProfileError] = useState('');
 
@@ -63,15 +81,15 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [onClose]);
 
+  /** Сохранение профиля: имя и рассказ о себе идут вместе */
   const saveProfile = async (e: FormEvent): Promise<void> => {
     e.preventDefault();
     setProfileMessage('');
-    const parsed = updateProfileSchema.safeParse({ displayName });
+    const parsed = updateProfileSchema.safeParse({ displayName, bio });
     if (!parsed.success) {
       setProfileError(parsed.error.issues[0]?.message ?? t('auth.genericError'));
       return;
     }
-    if (parsed.data.displayName === user?.displayName) return;
     setBusy(true);
     setProfileError('');
     try {
@@ -82,6 +100,20 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
       setProfileError(error instanceof ApiError ? error.message : t('auth.genericError'));
     } finally {
       setBusy(false);
+    }
+  };
+
+  /** Акцент применяется сразу — это не форма, а выбор мышью */
+  const pickAccent = async (color: string): Promise<void> => {
+    setProfileError('');
+    try {
+      const me = await api<MeDto>('/users/me', {
+        method: 'PATCH',
+        body: { displayName: user?.displayName ?? displayName, accentColor: color },
+      });
+      setUser(me);
+    } catch (error) {
+      setProfileError(error instanceof ApiError ? error.message : t('auth.genericError'));
     }
   };
 
@@ -116,6 +148,12 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
             onClick={() => setTab('profile')}
           >
             {t('settings.profile')}
+          </button>
+          <button
+            className={`settings-tab${tab === 'appearance' ? ' active' : ''}`}
+            onClick={() => setTab('appearance')}
+          >
+            {t('settings.appearanceTab')}
           </button>
           <button
             className={`settings-tab${tab === 'voice' ? ' active' : ''}`}
@@ -159,6 +197,17 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                   {t('settings.displayName')}
                   <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
                 </label>
+                <label>
+                  {t('settings.bio')}
+                  <textarea
+                    value={bio}
+                    rows={3}
+                    maxLength={190}
+                    placeholder={t('settings.bioPlaceholder')}
+                    onChange={(e) => setBio(e.target.value)}
+                  />
+                </label>
+                <p className="settings-hint">{190 - bio.length}</p>
                 <p className="auth-error">{profileError}</p>
                 <p className="settings-ok">{profileMessage}</p>
                 <button className="btn-primary" type="submit" disabled={busy}>
@@ -193,6 +242,58 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                   {t('settings.changePassword')}
                 </button>
               </form>
+            </>
+          )}
+
+          {tab === 'appearance' && (
+            <>
+              <h2>{t('settings.appearanceTab')}</h2>
+              <div className="settings-form">
+                <label>{t('settings.theme')}</label>
+                <div className="theme-choices">
+                  {THEMES.map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      className={`theme-choice${themeMode === mode ? ' active' : ''}`}
+                      onClick={() => setThemeMode(mode)}
+                    >
+                      <span className={`theme-preview ${mode}`} aria-hidden>
+                        <i className="rail" />
+                        <i className="side" />
+                        <i className="main" />
+                      </span>
+                      <span className="theme-choice-label">{t(`settings.theme_${mode}`)}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="settings-hint">{t('settings.themeHint')}</p>
+
+                <label>{t('settings.accent')}</label>
+                <div className="accent-swatches">
+                  <button
+                    type="button"
+                    className={`accent-swatch reset${user?.accentColor ? '' : ' active'}`}
+                    title={t('settings.accentDefault')}
+                    onClick={() => void pickAccent('')}
+                  >
+                    ✕
+                  </button>
+                  {ACCENTS.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      className={`accent-swatch${user?.accentColor === color ? ' active' : ''}`}
+                      style={{ background: color }}
+                      title={color}
+                      onClick={() => void pickAccent(color)}
+                    >
+                      {user?.accentColor === color && <Check size={14} color="#04121a" />}
+                    </button>
+                  ))}
+                </div>
+                <p className="settings-hint">{t('settings.accentHint')}</p>
+              </div>
             </>
           )}
 

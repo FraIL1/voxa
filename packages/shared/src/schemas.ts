@@ -145,8 +145,17 @@ export const displayNameSchema = z
   .min(2, 'Минимум 2 символа')
   .max(32, 'Максимум 32 символа');
 
+/** Акцентный цвет профиля: #rrggbb, пустая строка снимает выбор */
+export const accentColorSchema = z
+  .string()
+  .regex(/^#[0-9a-fA-F]{6}$/, 'Ожидается цвет в формате #rrggbb')
+  .or(z.literal(''));
+
 export const updateProfileSchema = z.object({
   displayName: displayNameSchema,
+  /** Рассказ о себе; пустая строка очищает поле */
+  bio: z.string().trim().max(190, 'Максимум 190 символов').optional(),
+  accentColor: accentColorSchema.optional(),
 });
 
 /** Ник на сервере: пусто (null) — вернуть displayName */

@@ -2,40 +2,44 @@ import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, Outlet } from 'react-router';
 
+import { toggleActiveDeafen, toggleActiveMute } from '../hooks/useAudioSession';
 import { useRealtime } from '../hooks/useRealtime';
 import { registerGlobalShortcuts } from '../lib/tauri';
 import { useAuthStore } from '../stores/auth';
-import { useVoiceStore } from '../stores/voice';
+import { useProfileViewStore } from '../stores/profileView';
 import IncomingCallModal from './IncomingCallModal';
+import ProfileModal from './ProfileCard';
 import ServerRail from './ServerRail';
 import TimeoutNotice from './TimeoutNotice';
 
 export default function AppShell() {
   const { t } = useTranslation();
   const status = useAuthStore((s) => s.status);
+  const profileUserId = useProfileViewStore((s) => s.userId);
+  const closeProfile = useProfileViewStore((s) => s.close);
 
   useRealtime();
 
   // Хоткеи PRD 7.4: mute Ctrl+Shift+M, deafen Ctrl+Shift+D.
   // В окне — обычный keydown; в Tauri дополнительно глобальные (вне фокуса).
+  // Управляют активной сессией: голосовым каналом или звонком в личке.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
       if (!e.ctrlKey || !e.shiftKey) return;
-      const voice = useVoiceStore.getState();
       if (e.code === 'KeyM') {
         e.preventDefault();
-        void voice.toggleMute();
+        toggleActiveMute();
       } else if (e.code === 'KeyD') {
         e.preventDefault();
-        void voice.toggleDeafen();
+        toggleActiveDeafen();
       }
     };
     window.addEventListener('keydown', onKeyDown);
 
     let cleanupGlobal: (() => void) | undefined;
     void registerGlobalShortcuts({
-      toggleMute: () => void useVoiceStore.getState().toggleMute(),
-      toggleDeafen: () => void useVoiceStore.getState().toggleDeafen(),
+      toggleMute: toggleActiveMute,
+      toggleDeafen: toggleActiveDeafen,
     }).then((cleanup) => {
       cleanupGlobal = cleanup;
     });
@@ -55,6 +59,7 @@ export default function AppShell() {
       <Outlet />
       <TimeoutNotice />
       <IncomingCallModal />
+      {profileUserId && <ProfileModal userId={profileUserId} onClose={closeProfile} />}
     </div>
   );
 }

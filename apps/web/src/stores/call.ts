@@ -27,6 +27,11 @@ export function localVideoTrack(): LocalVideoTrack | null {
   return localVideo;
 }
 
+/** Приглушить/вернуть звук собеседника (режим «наушники выключены») */
+function applyDeafen(deafened: boolean): void {
+  for (const element of audioElements.values()) element.muted = deafened;
+}
+
 function attachAudio(track: RemoteTrack, identity: string): void {
   const element = track.attach();
   element.autoplay = true;
@@ -53,9 +58,13 @@ interface CallState {
   /** Имя собеседника для панели звонка */
   peerName: string;
   muted: boolean;
+  /** Звук собеседника выключен (и микрофон вместе с ним, как в каналах) */
+  deafened: boolean;
   cameraOn: boolean;
   /** Собеседник включил камеру */
   peerVideo: boolean;
+  /** Момент, когда собеседник ответил (для таймера длительности) */
+  startedAt: number | null;
   /** Счётчик обновлений видеодорожек — чтобы компоненты перерисовались */
   videoVersion: number;
   error: string | null;
@@ -67,6 +76,7 @@ interface CallState {
   declineIncoming: () => Promise<void>;
   hangUp: () => Promise<void>;
   toggleMute: () => Promise<void>;
+  toggleDeafen: () => Promise<void>;
   toggleCamera: () => Promise<void>;
   /** Обработчики WS-событий */
   onIncoming: (payload: DmCallIncomingPayload) => void;
@@ -81,15 +91,24 @@ export const useCallStore = create<CallState>()((set, get) => ({
   incoming: null,
   peerName: '',
   muted: false,
+  deafened: false,
   cameraOn: false,
   peerVideo: false,
+  startedAt: null,
   videoVersion: 0,
   error: null,
   endedReason: null,
 
   startCall: async (conversationId, peerName, video) => {
     if (get().status !== 'idle') return;
-    set({ status: 'outgoing', conversationId, peerName, error: null, endedReason: null });
+    set({
+      status: 'outgoing',
+      conversationId,
+      peerName,
+      startedAt: null,
+      error: null,
+      endedReason: null,
+    });
     try {
       const grant = await api<VoiceTokenDto>(`/dm/conversations/${conversationId}/call`, {
         method: 'POST',
@@ -110,7 +129,14 @@ export const useCallStore = create<CallState>()((set, get) => ({
     const incoming = get().incoming;
     if (!incoming) return;
     const conversationId = incoming.conversationId;
-    set({ status: 'active', conversationId, peerName, incoming: null, error: null });
+    set({
+      status: 'active',
+      conversationId,
+      peerName,
+      incoming: null,
+      startedAt: Date.now(),
+      error: null,
+    });
     try {
       const grant = await api<VoiceTokenDto>(`/dm/conversations/${conversationId}/call/accept`, {
         method: 'POST',
@@ -147,6 +173,8 @@ export const useCallStore = create<CallState>()((set, get) => ({
       peerVideo: false,
       cameraOn: false,
       muted: false,
+      deafened: false,
+      startedAt: null,
     });
     playLeaveSound();
     if (conversationId) {
@@ -157,8 +185,20 @@ export const useCallStore = create<CallState>()((set, get) => ({
   },
 
   toggleMute: async () => {
-    const next = !get().muted;
-    set({ muted: next });
+    const { muted, deafened } = get();
+    const next = !muted;
+    // Включение микрофона снимает и «наушники» — как в голосовых каналах
+    const nextDeafened = next ? deafened : false;
+    set({ muted: next, deafened: nextDeafened });
+    applyDeafen(nextDeafened);
+    await room?.localParticipant.setMicrophoneEnabled(!next).catch(() => undefined);
+  },
+
+  toggleDeafen: async () => {
+    const next = !get().deafened;
+    // Выключенный звук выключает и микрофон, включение — возвращает его
+    set({ deafened: next, muted: next });
+    applyDeafen(next);
     await room?.localParticipant.setMicrophoneEnabled(!next).catch(() => undefined);
   },
 
@@ -182,7 +222,7 @@ export const useCallStore = create<CallState>()((set, get) => ({
   },
 
   onAccepted: () => {
-    if (get().status === 'outgoing') set({ status: 'active' });
+    if (get().status === 'outgoing') set({ status: 'active', startedAt: Date.now() });
   },
 
   onEnded: (conversationId, reason) => {
@@ -203,6 +243,8 @@ export const useCallStore = create<CallState>()((set, get) => ({
       peerVideo: false,
       cameraOn: false,
       muted: false,
+      deafened: false,
+      startedAt: null,
       endedReason: reason,
     });
   },
@@ -223,6 +265,7 @@ async function connect(
   next.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, _pub, participant: RemoteParticipant) => {
     if (track.kind === Track.Kind.Audio) {
       attachAudio(track, participant.identity);
+      applyDeafen(get().deafened);
       return;
     }
     if (track.source === Track.Source.Camera) {
@@ -244,14 +287,23 @@ async function connect(
 
   // Собеседник вошёл в комнату — звонок реально начался
   next.on(RoomEvent.ParticipantConnected, () => {
-    if (get().status !== 'idle') set({ status: 'active' });
+    if (get().status !== 'idle')
+      set({ status: 'active', startedAt: get().startedAt ?? Date.now() });
     playJoinSound();
   });
 
   next.on(RoomEvent.Disconnected, () => {
     if (room === next) {
       cleanup();
-      set({ status: 'idle', conversationId: null, peerVideo: false, cameraOn: false });
+      set({
+        status: 'idle',
+        conversationId: null,
+        peerVideo: false,
+        cameraOn: false,
+        muted: false,
+        deafened: false,
+        startedAt: null,
+      });
     }
   });
 
@@ -268,7 +320,9 @@ async function connect(
   const someoneElse = next.remoteParticipants.size > 0;
   set((s) => ({
     status: someoneElse ? 'active' : s.status,
+    startedAt: someoneElse ? (s.startedAt ?? Date.now()) : s.startedAt,
     muted: false,
+    deafened: false,
     cameraOn: video,
     videoVersion: s.videoVersion + 1,
   }));

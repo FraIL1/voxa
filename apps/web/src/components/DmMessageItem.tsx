@@ -7,6 +7,7 @@ import remarkGfm from 'remark-gfm';
 import type { DmChatMessage } from '../api/dm-cache';
 import { useDeleteDm, useEditDm, useToggleDmPin, useToggleDmReaction } from '../hooks/useDm';
 import { useAuthStore } from '../stores/auth';
+import { openProfile } from '../stores/profileView';
 import Attachments from './Attachments';
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '🎉', '🔥', '👀', '😢', '🤔'];
@@ -115,7 +116,17 @@ export default function DmMessageItem({
         )}
 
         <div className="message-meta">
-          <span className="message-author">{authorName}</span>
+          <span
+            className="message-author"
+            role="button"
+            tabIndex={0}
+            onClick={() => message.author && openProfile(message.author.id)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && message.author) openProfile(message.author.id);
+            }}
+          >
+            {authorName}
+          </span>
           {isPinned && (
             <span className="pinned-mark" title={t('dm.pinned')}>
               <Pin size={12} />

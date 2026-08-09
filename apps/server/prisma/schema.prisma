@@ -18,6 +18,10 @@ model User {
   displayName     String   @map("display_name")
   passwordHash    String   @map("password_hash")
   avatarUrl       String?  @map("avatar_url")
+  /// Короткий рассказ о себе в карточке профиля
+  bio             String?
+  /// Акцентный цвет профиля (#rrggbb) — шапка карточки и подсветка
+  accentColor     String?  @map("accent_color")
   /// Владелец всего приложения (первый зарегистрированный): глобальная панель
   isInstanceOwner Boolean  @default(false) @map("is_instance_owner")
   createdAt       DateTime @default(now()) @map("created_at")

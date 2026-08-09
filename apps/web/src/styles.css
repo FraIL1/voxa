@@ -41,9 +41,58 @@
   --shadow-lg: 0 24px 64px rgba(0, 0, 0, 0.6);
   --ring: 0 0 0 3px rgba(34, 211, 238, 0.25);
 
+  /* Едва заметная подсветка поверхностей (в светлой теме — тень вместо блика) */
+  --tint: rgba(255, 255, 255, 0.028);
+  --overlay: rgba(3, 6, 12, 0.72);
+  --rail-bg: linear-gradient(180deg, #0a0e16, var(--bg));
+  --code-bg: #06090f;
+  --nav-bg: linear-gradient(180deg, var(--panel), #0c1119);
+
   --transition: 160ms cubic-bezier(0.2, 0.8, 0.3, 1);
   --sidebar-width: 248px;
   --members-width: 216px;
+}
+
+/* Светлая тема: та же геометрия и тот же циан, но на дневных поверхностях.
+   Акцент затемнён — на белом ярко-циановый текст нечитаем. */
+:root[data-theme='light'] {
+  --bg: #eef1f7;
+  --panel: #ffffff;
+  --panel-raised: #f7f9fc;
+  --panel-hover: #e9eef6;
+  --border: #dfe5ee;
+  --border-strong: #c3ccdb;
+
+  --text: #101826;
+  --text-muted: #56657d;
+  --text-faint: #8593a8;
+
+  --accent: #0891b2;
+  --accent-hover: #0e7490;
+  --accent-deep: #155e75;
+  --accent-text: #ffffff;
+  --accent-soft: rgba(8, 145, 178, 0.12);
+  --accent-line: rgba(8, 145, 178, 0.32);
+  --gradient-accent: linear-gradient(135deg, #0891b2 0%, #0d9488 100%);
+  --gradient-surface: linear-gradient(180deg, rgba(16, 24, 38, 0.03), rgba(16, 24, 38, 0));
+
+  --danger: #e11d48;
+  --danger-soft: rgba(225, 29, 72, 0.1);
+  --success: #059669;
+  --warning: #d97706;
+
+  --shadow-sm: 0 1px 2px rgba(16, 24, 38, 0.08);
+  --shadow-md: 0 8px 24px rgba(16, 24, 38, 0.1);
+  --shadow-lg: 0 24px 64px rgba(16, 24, 38, 0.16);
+  --ring: 0 0 0 3px rgba(8, 145, 178, 0.22);
+
+  --tint: rgba(16, 24, 38, 0.025);
+  --overlay: rgba(24, 33, 48, 0.42);
+  --rail-bg: linear-gradient(180deg, #e3e8f1, var(--bg));
+  --code-bg: #f1f4f9;
+  --nav-bg: linear-gradient(180deg, var(--panel), #eaeff7);
+
+  color-scheme: light;
 }
 
 * {
@@ -277,7 +326,7 @@ h3 {
 .server-rail {
   width: 76px;
   flex-shrink: 0;
-  background: linear-gradient(180deg, #0a0e16, var(--bg));
+  background: var(--rail-bg);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -787,7 +836,7 @@ h3 {
   gap: 8px;
   padding: 13px 18px;
   border-bottom: 1px solid var(--border);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent);
+  background: var(--gradient-surface);
   font-weight: 600;
   backdrop-filter: blur(8px);
 }
@@ -842,7 +891,7 @@ h3 {
 }
 
 .message:hover {
-  background: rgba(255, 255, 255, 0.028);
+  background: var(--tint);
 }
 
 .message.pending {
@@ -1063,7 +1112,7 @@ h3 {
 }
 
 .message-content pre {
-  background: #06090f;
+  background: var(--code-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 12px 14px;
@@ -1787,7 +1836,7 @@ h3 {
   position: fixed;
   inset: 0;
   z-index: 50;
-  background: rgba(4, 7, 12, 0.72);
+  background: var(--overlay);
   backdrop-filter: blur(6px);
   display: grid;
   place-items: center;
@@ -1823,7 +1872,7 @@ h3 {
 
 .settings-nav {
   width: 208px;
-  background: linear-gradient(180deg, var(--panel), #0c1119);
+  background: var(--nav-bg);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -2477,30 +2526,6 @@ h3 {
   overflow-wrap: anywhere;
 }
 
-.dm-profile {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 12px 0 4px;
-}
-
-.dm-profile-avatar {
-  width: 64px;
-  height: 64px;
-  font-size: 26px;
-}
-
-.dm-profile-name {
-  font-weight: 700;
-  font-size: 17px;
-}
-
-.dm-profile-username {
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
 /* Метка закреплённого сообщения */
 .pinned-mark {
   color: var(--accent);
@@ -2577,21 +2602,6 @@ h3 {
   filter: brightness(1.1);
 }
 
-.call-panel {
-  border-bottom: 1px solid var(--border);
-  background: var(--panel);
-  padding: 10px 16px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.call-status {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--accent);
-}
-
 .call-tiles {
   display: flex;
   gap: 10px;
@@ -2619,21 +2629,17 @@ h3 {
   left: 6px;
   bottom: 6px;
   font-size: 12px;
+  color: #fff;
   background: rgba(0, 0, 0, 0.55);
-  padding: 2px 6px;
-  border-radius: 4px;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  backdrop-filter: blur(4px);
 }
 
 .call-controls {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.call-controls .call-button {
-  width: 36px;
-  height: 36px;
-  border-radius: 18px;
 }
 
 .call-error {
@@ -2915,16 +2921,6 @@ h3 {
     0 0 12px rgba(52, 211, 153, 0.45);
 }
 
-/* Звонок 1-на-1 */
-.call-panel {
-  background: linear-gradient(180deg, var(--accent-soft), transparent), var(--panel);
-  border-bottom: 1px solid var(--border);
-}
-
-.call-status {
-  letter-spacing: 0.01em;
-}
-
 .incoming-call {
   background: var(--gradient-surface), var(--panel);
   border: 1px solid var(--border-strong);
@@ -2955,11 +2951,6 @@ h3 {
 .call-tile {
   border-radius: var(--radius);
   box-shadow: var(--shadow-md);
-}
-
-/* Карточка профиля собеседника */
-.dm-profile-avatar {
-  box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.1);
 }
 
 /* Пустые состояния — спокойнее и с воздухом */
@@ -3125,4 +3116,557 @@ h3 {
 
 .fade-in {
   animation: fade-in 180ms ease-out;
+}
+
+/* ---------- Экран звонка 1-на-1 ---------- */
+
+.call-stage {
+  position: relative;
+  border-bottom: 1px solid var(--border);
+  background:
+    radial-gradient(120% 90% at 50% 0%, var(--accent-soft), transparent 70%),
+    var(--gradient-surface), var(--panel);
+  padding: 26px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  animation: call-in 240ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+@keyframes call-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+/* Свёрнутый режим: полоска с управлением, чтобы читать переписку */
+.call-stage.collapsed {
+  padding: 8px 18px;
+  flex-direction: row;
+  justify-content: center;
+  gap: 12px;
+}
+
+.call-stage.collapsed .call-hero,
+.call-stage.collapsed .call-tiles,
+.call-stage.collapsed .call-overlay-status {
+  display: none;
+}
+
+.call-collapse {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  z-index: 2;
+}
+
+.call-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.call-avatar-wrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  margin-bottom: 10px;
+}
+
+.call-avatar {
+  width: 84px;
+  height: 84px;
+  font-size: 32px;
+  position: relative;
+  z-index: 1;
+  box-shadow:
+    0 0 0 4px var(--accent-soft),
+    var(--shadow-md);
+}
+
+/* Волны идут только пока идёт дозвон — в разговоре они отвлекают */
+.call-pulse {
+  position: absolute;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  border: 2px solid var(--accent-line);
+  opacity: 0;
+}
+
+.call-stage.ringing .call-pulse {
+  animation: call-wave 2.4s cubic-bezier(0.2, 0.6, 0.4, 1) infinite;
+}
+
+.call-stage.ringing .call-pulse.delayed {
+  animation-delay: 1.2s;
+}
+
+@keyframes call-wave {
+  0% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.1);
+  }
+}
+
+.call-name {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.call-substatus {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.call-stage.ringing .call-substatus {
+  color: var(--accent);
+}
+
+/* Видеорежим: собеседник крупно, своя камера — врезкой в углу */
+.call-stage.with-video {
+  padding: 14px;
+}
+
+.call-stage.with-video .call-tiles {
+  position: relative;
+  width: 100%;
+  justify-content: center;
+}
+
+.call-stage.with-video .call-tile {
+  width: min(560px, 100%);
+}
+
+.call-stage.with-video .call-tile.self {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  width: 148px;
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-lg);
+}
+
+.call-overlay-status {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.call-overlay-status .call-name {
+  font-size: 15px;
+}
+
+/* Круглые кнопки управления разговором */
+.call-control {
+  width: 46px;
+  height: 46px;
+  border-radius: var(--radius-pill);
+  display: grid;
+  place-items: center;
+  background: var(--panel-raised);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  transition:
+    transform var(--transition),
+    background var(--transition),
+    color var(--transition);
+}
+
+.call-control:hover {
+  background: var(--panel-hover);
+  transform: translateY(-1px);
+}
+
+.call-control.engaged {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.call-control.hangup {
+  background: var(--danger);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 6px 20px rgba(251, 113, 133, 0.3);
+}
+
+.call-control.hangup:hover {
+  filter: brightness(1.08);
+}
+
+.call-stage.collapsed .call-control {
+  width: 36px;
+  height: 36px;
+}
+
+/* Панель голоса внизу в режиме звонка — акцент вместо цвета канала */
+.voice-panel.call .voice-panel-info svg {
+  color: var(--accent);
+}
+
+/* ---------- Карточка профиля ---------- */
+
+.profile-card {
+  --profile-accent: var(--accent);
+  position: relative;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+}
+
+.profile-cover {
+  height: 76px;
+  background: linear-gradient(135deg, var(--profile-accent), transparent 78%), var(--panel-hover);
+}
+
+.profile-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 0 16px;
+  margin-top: -30px;
+}
+
+.profile-avatar {
+  width: 74px;
+  height: 74px;
+  font-size: 28px;
+  border: 4px solid var(--panel-raised);
+  box-shadow: var(--shadow-md);
+  flex-shrink: 0;
+}
+
+/* Точка присутствия в углу аватара */
+.profile-avatar::after {
+  content: '';
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 3px solid var(--panel-raised);
+  background: var(--text-faint);
+}
+
+.profile-avatar.status-online::after {
+  background: var(--success);
+}
+
+.profile-titles {
+  padding-bottom: 6px;
+  min-width: 0;
+}
+
+.profile-name {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.profile-username {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.profile-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-strong);
+  color: var(--text-muted);
+}
+
+.profile-badge.owner {
+  color: var(--warning);
+  border-color: rgba(251, 191, 36, 0.4);
+  background: rgba(251, 191, 36, 0.1);
+}
+
+.profile-badge.friend {
+  color: var(--accent);
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+
+.profile-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.profile-section h4 {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.profile-bio {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.profile-fact {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.profile-guilds {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.profile-guild {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  color: var(--text);
+  transition: background var(--transition);
+}
+
+.profile-guild:hover {
+  background: var(--panel-hover);
+}
+
+.profile-guild-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: var(--panel-hover);
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.profile-guild-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-guild-name {
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.profile-actions button {
+  flex: 1 1 auto;
+  justify-content: center;
+}
+
+/* Профиль поверх интерфейса */
+.profile-modal {
+  position: relative;
+  width: min(420px, 100%);
+  max-height: 86vh;
+  overflow-y: auto;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  animation: modal-in 200ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.profile-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  background: rgba(0, 0, 0, 0.3);
+  color: #fff;
+}
+
+.profile-card.loading .profile-body {
+  gap: 10px;
+}
+
+/* Профиль внутри выпадающей панели диалога — без второй рамки */
+.dm-panel .profile-card {
+  border: none;
+  background: transparent;
+}
+
+/* Имя автора и аватар в чате открывают карточку */
+.message-author,
+.message-avatar {
+  cursor: pointer;
+}
+
+.message-author:hover {
+  text-decoration: underline;
+}
+
+/* ---------- Выбор оформления ---------- */
+
+.theme-choices {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.theme-choice {
+  flex: 1 1 120px;
+  padding: 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--panel-raised);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+  transition:
+    border-color var(--transition),
+    transform var(--transition);
+}
+
+.theme-choice:hover {
+  transform: translateY(-1px);
+  border-color: var(--border-strong);
+}
+
+.theme-choice.active {
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+
+/* Мини-макет приложения: рейл, боковая панель, чат */
+.theme-preview {
+  height: 46px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  display: flex;
+  border: 1px solid var(--border);
+}
+
+.theme-preview i {
+  display: block;
+  height: 100%;
+}
+
+.theme-preview .rail {
+  width: 20%;
+}
+
+.theme-preview .side {
+  width: 32%;
+}
+
+.theme-preview .main {
+  flex: 1;
+}
+
+.theme-preview.dark .rail {
+  background: #080b12;
+}
+
+.theme-preview.dark .side {
+  background: #0f1521;
+}
+
+.theme-preview.dark .main {
+  background: #161e2d;
+}
+
+.theme-preview.light .rail {
+  background: #dfe5ee;
+}
+
+.theme-preview.light .side {
+  background: #f7f9fc;
+}
+
+.theme-preview.light .main {
+  background: #ffffff;
+}
+
+.theme-preview.auto .rail {
+  background: #080b12;
+}
+
+.theme-preview.auto .side {
+  background: #6b7a90;
+}
+
+.theme-preview.auto .main {
+  background: #ffffff;
+}
+
+.theme-choice-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Палитра акцента профиля */
+.accent-swatches {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.accent-swatch {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+  transition: transform var(--transition);
+}
+
+.accent-swatch:hover {
+  transform: scale(1.08);
+}
+
+.accent-swatch.active {
+  border-color: var(--text);
+}
+
+.accent-swatch.reset {
+  display: grid;
+  place-items: center;
+  background: var(--panel-hover);
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1;
 }

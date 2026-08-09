@@ -1,35 +1,45 @@
-import { Headphones, HeadphoneOff, Mic, MicOff, PhoneOff, Settings, Volume2 } from 'lucide-react';
+import {
+  Headphones,
+  HeadphoneOff,
+  Mic,
+  MicOff,
+  PhoneCall,
+  PhoneOff,
+  Settings,
+  Volume2,
+} from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useAudioSession } from '../hooks/useAudioSession';
 import { useAuthStore } from '../stores/auth';
 import { useVoiceStore } from '../stores/voice';
 import SettingsModal from './SettingsModal';
 
 /** Карточка пользователя внизу боковой панели: голос, микрофон, настройки.
- *  Клик по нику/аватару открывает настройки (профиль). Общая для дома и сервера. */
+ *  Клик по нику/аватару открывает настройки (профиль). Общая для дома и сервера.
+ *  Микрофон и наушники управляют активной сессией — каналом или звонком в личке. */
 export default function UserCard() {
   const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
-  const voice = useVoiceStore();
+  const connecting = useVoiceStore((s) => s.connecting);
+  const audio = useAudioSession();
   const [settingsOpen, setSettingsOpen] = useState(false);
-
-  const voiceChannelName = voice.channelId ? (voice.channelName ?? '') : null;
 
   return (
     <>
-      {voice.channelId && (
-        <div className="voice-panel">
+      {audio.active && (
+        <div className={`voice-panel${audio.kind === 'call' ? ' call' : ''}`}>
           <div className="voice-panel-info">
-            <Volume2 size={15} />
+            {audio.kind === 'call' ? <PhoneCall size={15} /> : <Volume2 size={15} />}
             <span className="voice-panel-name">
-              {voice.connecting ? t('voice.connecting') : voiceChannelName}
+              {audio.kind === 'voice' && connecting ? t('voice.connecting') : (audio.title ?? '')}
             </span>
           </div>
           <button
             className="icon-button danger"
-            title={t('voice.leave')}
-            onClick={() => void voice.leave()}
+            title={audio.kind === 'call' ? t('call.hangUp') : t('voice.leave')}
+            onClick={audio.leave}
           >
             <PhoneOff size={16} />
           </button>
@@ -48,20 +58,20 @@ export default function UserCard() {
           <span className="username">{user?.displayName ?? user?.username}</span>
         </button>
         <button
-          className={`icon-button${voice.muted ? ' engaged' : ''}`}
-          title={voice.muted ? t('voice.unmute') : t('voice.mute')}
-          disabled={!voice.channelId}
-          onClick={() => void voice.toggleMute()}
+          className={`icon-button${audio.muted ? ' engaged' : ''}`}
+          title={audio.muted ? t('voice.unmute') : t('voice.mute')}
+          disabled={!audio.active}
+          onClick={audio.toggleMute}
         >
-          {voice.muted ? <MicOff size={17} /> : <Mic size={17} />}
+          {audio.muted ? <MicOff size={17} /> : <Mic size={17} />}
         </button>
         <button
-          className={`icon-button${voice.deafened ? ' engaged' : ''}`}
-          title={voice.deafened ? t('voice.undeafen') : t('voice.deafen')}
-          disabled={!voice.channelId}
-          onClick={() => void voice.toggleDeafen()}
+          className={`icon-button${audio.deafened ? ' engaged' : ''}`}
+          title={audio.deafened ? t('voice.undeafen') : t('voice.deafen')}
+          disabled={!audio.active}
+          onClick={audio.toggleDeafen}
         >
-          {voice.deafened ? <HeadphoneOff size={17} /> : <Headphones size={17} />}
+          {audio.deafened ? <HeadphoneOff size={17} /> : <Headphones size={17} />}
         </button>
         <button
           className="icon-button"

@@ -1,6 +1,12 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { combineMasks, hasPermission, Permissions } from '@voxa/shared';
-import type { MeDto, MemberDto } from '@voxa/shared';
+import type {
+  MeDto,
+  MemberDto,
+  ProfileRelation,
+  UpdateProfileInput,
+  UserProfileDto,
+} from '@voxa/shared';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -214,9 +220,19 @@ export class UsersService {
     return [...ids];
   }
 
-  /** Смена отображаемого имени (логин @username неизменяем) */
-  async updateProfile(userId: string, displayName: string): Promise<MeDto> {
-    await this.prisma.user.update({ where: { id: userId }, data: { displayName } });
+  /** Смена профиля: имя, рассказ о себе, акцентный цвет (@username неизменяем) */
+  async updateProfile(userId: string, input: UpdateProfileInput): Promise<MeDto> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        displayName: input.displayName,
+        // Пустая строка — осознанная очистка поля, undefined — «не трогать»
+        ...(input.bio === undefined ? {} : { bio: input.bio === '' ? null : input.bio }),
+        ...(input.accentColor === undefined
+          ? {}
+          : { accentColor: input.accentColor === '' ? null : input.accentColor }),
+      },
+    });
     return this.getMe(userId);
   }
 
@@ -230,7 +246,87 @@ export class UsersService {
       displayName: user.displayName,
       avatarUrl: user.avatarUrl,
       isInstanceOwner: user.isInstanceOwner,
+      bio: user.bio,
+      accentColor: user.accentColor,
       createdAt: user.createdAt.toISOString(),
     };
+  }
+
+  /**
+   * Карточка профиля глазами другого пользователя: кто он, как мы связаны,
+   * где пересекаемся. Открыта всем — списки серверов и друзей уже публичны
+   * внутри инстанса, а лишнего (почта, сессии) карточка не содержит.
+   */
+  async getProfile(
+    meId: string,
+    userId: string,
+    online: ReadonlySet<string>,
+  ): Promise<UserProfileDto> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Пользователь не найден');
+
+    const [friendship, block, mutualGuilds, mutualFriends] = await Promise.all([
+      meId === userId
+        ? null
+        : this.prisma.friendship.findFirst({
+            where: {
+              OR: [
+                { requesterId: meId, addresseeId: userId },
+                { requesterId: userId, addresseeId: meId },
+              ],
+            },
+          }),
+      meId === userId
+        ? null
+        : this.prisma.userBlock.findUnique({
+            where: { blockerId_blockedId: { blockerId: meId, blockedId: userId } },
+          }),
+      this.prisma.guild.findMany({
+        where: {
+          AND: [{ members: { some: { userId } } }, { members: { some: { userId: meId } } }],
+        },
+        select: { id: true, name: true, iconUrl: true },
+        orderBy: { name: 'asc' },
+      }),
+      meId === userId ? 0 : this.countMutualFriends(meId, userId),
+    ]);
+
+    let relation: ProfileRelation = 'none';
+    if (meId === userId) relation = 'self';
+    else if (friendship?.status === 'ACCEPTED') relation = 'friends';
+    else if (friendship?.status === 'PENDING') {
+      relation = friendship.requesterId === meId ? 'outgoing' : 'incoming';
+    }
+
+    return {
+      id: user.id,
+      username: user.username,
+      displayName: user.displayName,
+      avatarUrl: user.avatarUrl,
+      bio: user.bio,
+      accentColor: user.accentColor,
+      createdAt: user.createdAt.toISOString(),
+      status: online.has(user.id) ? 'online' : 'offline',
+      isInstanceOwner: user.isInstanceOwner,
+      relation,
+      blocked: block !== null,
+      mutualGuilds,
+      mutualFriends,
+    };
+  }
+
+  /** Сколько друзей у нас общих (по принятым дружбам обеих сторон) */
+  private async countMutualFriends(meId: string, userId: string): Promise<number> {
+    const [mine, theirs] = await Promise.all([this.friendIdsOf(meId), this.friendIdsOf(userId)]);
+    const set = new Set(mine);
+    return theirs.filter((id) => set.has(id)).length;
+  }
+
+  private async friendIdsOf(userId: string): Promise<string[]> {
+    const rows = await this.prisma.friendship.findMany({
+      where: { status: 'ACCEPTED', OR: [{ requesterId: userId }, { addresseeId: userId }] },
+      select: { requesterId: true, addresseeId: true },
+    });
+    return rows.map((r) => (r.requesterId === userId ? r.addresseeId : r.requesterId));
   }
 }

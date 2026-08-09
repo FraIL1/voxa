@@ -4,3 +4,6 @@ pnpm-lock.yaml
 PRD.md
 *.docx
 apps/desktop/src-tauri/
+tests/ui/report/
+tests/ui/artifacts/
+tests/ui/.auth/

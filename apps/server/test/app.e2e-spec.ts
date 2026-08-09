@@ -15,6 +15,7 @@ import {
   type ReadStateDto,
   type ReadStateUpdatedPayload,
   type TypingPayload,
+  type UserProfileDto,
 } from '@voxa/shared';
 import cookieParser from 'cookie-parser';
 import type { AddressInfo } from 'node:net';
@@ -673,6 +674,60 @@ describe('Voxa: критический поток (e2e)', () => {
       .set('Authorization', `Bearer ${ownerAccess}`)
       .send({ displayName: OWNER.username })
       .expect(200);
+  });
+
+  it('карточка профиля: о себе, акцент, общие серверы и связь между людьми', async () => {
+    // Профиль наполняется через свои же настройки
+    await request(httpServer)
+      .patch('/api/users/me')
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ displayName: MEMBER.username, bio: 'Люблю тесты', accentColor: '#a855f7' })
+      .expect(200);
+
+    const me = await request(httpServer)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(200);
+    const memberId = (me.body as MeDto).id;
+
+    const profile = await request(httpServer)
+      .get(`/api/users/${memberId}/profile`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    const card = profile.body as UserProfileDto;
+    expect(card.username).toBe(MEMBER.username);
+    expect(card.bio).toBe('Люблю тесты');
+    expect(card.accentColor).toBe('#a855f7');
+    // Оба на общем сервере — карточка это показывает
+    expect(card.mutualGuilds.map((g) => g.id)).toContain(guildId);
+    // Связь зависит от того, что сделали прошлые сценарии; важно, что она известна
+    expect(['friends', 'none', 'incoming', 'outgoing']).toContain(card.relation);
+
+    // Свой профиль отличается только связью
+    const own = await request(httpServer)
+      .get(`/api/users/${memberId}/profile`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(200);
+    expect((own.body as UserProfileDto).relation).toBe('self');
+
+    // Пустая строка очищает рассказ о себе
+    await request(httpServer)
+      .patch('/api/users/me')
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ displayName: MEMBER.username, bio: '' })
+      .expect(200);
+    const cleared = await request(httpServer)
+      .get(`/api/users/${memberId}/profile`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    expect((cleared.body as UserProfileDto).bio).toBeNull();
+
+    // Мусорный цвет отклоняется валидацией
+    await request(httpServer)
+      .patch('/api/users/me')
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ displayName: MEMBER.username, accentColor: 'красный' })
+      .expect(400);
   });
 
   it('таймаут запрещает писать и говорить; снятие — возвращает', async () => {

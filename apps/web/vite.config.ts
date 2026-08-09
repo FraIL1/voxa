@@ -2,6 +2,9 @@ import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 
+/** Куда проксировать API в dev: обычный бэкенд или стенд UI-тестов */
+const API_TARGET = process.env.VITE_API_TARGET ?? 'http://127.0.0.1:3000';
+
 export default defineConfig({
   plugins: [react()],
   build: {
@@ -36,10 +39,11 @@ export default defineConfig({
     // и IPv4-клиенты не достучатся
     host: '127.0.0.1',
     port: 5173,
-    // Same-origin с бэкендом: cookie и WebSocket работают без CORS
+    // Same-origin с бэкендом: cookie и WebSocket работают без CORS.
+    // Адрес бэкенда параметризован: UI-тесты поднимают свой на другом порту.
     proxy: {
-      '/api': 'http://127.0.0.1:3000',
-      '/socket.io': { target: 'http://127.0.0.1:3000', ws: true },
+      '/api': API_TARGET,
+      '/socket.io': { target: API_TARGET, ws: true },
     },
   },
 });
