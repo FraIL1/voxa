@@ -22,6 +22,11 @@ export function emitTyping(channelId: string): void {
   socket?.emit(WsClientEvents.Typing, { channelId });
 }
 
+/** Отошёл от компьютера или вернулся — влияет на статус для других */
+export function emitPresenceIdle(idle: boolean): void {
+  socket?.emit(WsClientEvents.PresenceIdle, { idle });
+}
+
 export function emitVoiceState(state: VoiceStateInput): void {
   socket?.emit(WsClientEvents.VoiceState, state);
 }

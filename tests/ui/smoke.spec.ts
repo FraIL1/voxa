@@ -58,7 +58,7 @@ test.describe('Карточка профиля', () => {
 
 test.describe('Оформление', () => {
   test('светлая тема переключается и запоминается', async ({ owner }) => {
-    await owner.locator('.user-card-identity').click();
+    await owner.locator('.user-card').getByTitle('Настройки').first().click();
     await owner.getByRole('button', { name: 'Оформление' }).click();
     await owner.getByRole('button', { name: 'Светлая' }).click();
 
@@ -72,10 +72,38 @@ test.describe('Оформление', () => {
     await expect(owner.locator('html')).toHaveAttribute('data-theme', 'light');
 
     // Возвращаем тёмную, чтобы следующий тест начинал с обычного вида
-    await owner.locator('.user-card-identity').click();
+    await owner.locator('.user-card').getByTitle('Настройки').first().click();
     await owner.getByRole('button', { name: 'Оформление' }).click();
     await owner.getByRole('button', { name: 'Тёмная' }).click();
     await expect(owner.locator('html')).toHaveAttribute('data-theme', 'dark');
+  });
+});
+
+test.describe('Присутствие', () => {
+  test('меню статуса меняет режим и подпись под ником', async ({ owner }) => {
+    await owner.locator('.user-card-identity').click();
+    await expect(owner.locator('.status-menu')).toBeVisible();
+
+    await owner.locator('.status-menu-item', { hasText: 'Не беспокоить' }).click();
+    await expect(owner.locator('.user-card-status')).toHaveText('Не беспокоить');
+    await expect(owner.locator('.me-avatar')).toHaveClass(/dot-dnd/);
+
+    // Возвращаем обычный режим, чтобы не влиять на другие сценарии
+    await owner.locator('.user-card-identity').click();
+    await owner.locator('.status-menu-item', { hasText: 'В сети' }).click();
+    await expect(owner.locator('.user-card-status')).toHaveText('В сети');
+  });
+});
+
+test.describe('Быстрый переход', () => {
+  test('Ctrl+K находит сервер и переводит на него', async ({ owner }) => {
+    await owner.keyboard.press('Control+k');
+    await expect(owner.locator('.switcher')).toBeVisible();
+
+    await owner.getByPlaceholder('Куда перейти').fill('uitest_friend');
+    await expect(owner.locator('.switcher-row').first()).toBeVisible();
+    await owner.keyboard.press('Enter');
+    await owner.waitForURL(/\/dm\//);
   });
 });
 
@@ -106,7 +134,8 @@ test.describe('Звонок в личных сообщениях', () => {
 
     // И обратно: размьют из карточки снимает мьют на экране звонка
     await owner.locator('.user-card').getByTitle('Включить микрофон').click();
-    await expect(stage.getByTitle('Выключить микрофон')).not.toHaveClass(/engaged/);
+    // Кнопка снова называется «выключить» — значит микрофон включён
+    await expect(stage.getByTitle('Выключить микрофон')).toBeVisible();
 
     // Наушники тоже общие — и выключают микрофон, как в голосовых каналах
     await owner.locator('.user-card').getByTitle('Выключить звук').click();

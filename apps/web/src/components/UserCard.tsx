@@ -14,7 +14,9 @@ import { useTranslation } from 'react-i18next';
 import { useAudioSession } from '../hooks/useAudioSession';
 import { useAuthStore } from '../stores/auth';
 import { useVoiceStore } from '../stores/voice';
+import Avatar from './Avatar';
 import SettingsModal from './SettingsModal';
+import StatusMenu, { dotOf } from './StatusMenu';
 
 /** Карточка пользователя внизу боковой панели: голос, микрофон, настройки.
  *  Клик по нику/аватару открывает настройки (профиль). Общая для дома и сервера.
@@ -25,6 +27,7 @@ export default function UserCard() {
   const connecting = useVoiceStore((s) => s.connecting);
   const audio = useAudioSession();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
 
   return (
     <>
@@ -47,15 +50,23 @@ export default function UserCard() {
       )}
 
       <div className="user-card">
+        {statusOpen && <StatusMenu onClose={() => setStatusOpen(false)} />}
         <button
           className="user-card-identity"
-          title={t('settings.title')}
-          onClick={() => setSettingsOpen(true)}
+          title={t('presence.change')}
+          onClick={() => setStatusOpen((v) => !v)}
         >
-          <div className="avatar" aria-hidden>
-            {(user?.displayName ?? user?.username ?? '?').slice(0, 1).toUpperCase()}
-          </div>
-          <span className="username">{user?.displayName ?? user?.username}</span>
+          <Avatar
+            name={user?.displayName ?? user?.username ?? '?'}
+            url={user?.avatarUrl}
+            className={`me-avatar dot-${dotOf(user?.presenceMode ?? 'ONLINE')}`}
+          />
+          <span className="user-card-names">
+            <span className="username">{user?.displayName ?? user?.username}</span>
+            <span className="user-card-status">
+              {user?.statusText || t(`presence.${user?.presenceMode ?? 'ONLINE'}`)}
+            </span>
+          </span>
         </button>
         <button
           className={`icon-button${audio.muted ? ' engaged' : ''}`}

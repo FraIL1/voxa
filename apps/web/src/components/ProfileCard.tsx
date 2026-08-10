@@ -21,6 +21,7 @@ import {
 } from '../hooks/useFriends';
 import { useProfile, useRefreshProfile } from '../hooks/useProfile';
 import { useCallStore } from '../stores/call';
+import Avatar from './Avatar';
 
 const joinedFormat = new Intl.DateTimeFormat('ru', {
   day: 'numeric',
@@ -85,7 +86,7 @@ export function ProfileBody({ userId, onNavigate }: { userId: string; onNavigate
       onSuccess: ({ id }) => {
         onNavigate?.();
         navigate(`/dm/${id}`);
-        void startCall(id, profile.displayName, false);
+        void startCall(id, profile.displayName, false, profile.avatarUrl);
       },
     });
   };
@@ -95,9 +96,12 @@ export function ProfileBody({ userId, onNavigate }: { userId: string; onNavigate
       <div className="profile-cover" />
 
       <div className="profile-head">
-        <div className={`avatar profile-avatar status-${profile.status}`} aria-hidden>
-          {initials(profile.displayName)}
-        </div>
+        <Avatar
+          name={profile.displayName}
+          url={profile.avatarUrl}
+          status={profile.status}
+          className="profile-avatar"
+        />
         <div className="profile-titles">
           <div className="profile-name">
             {profile.displayName}
@@ -113,6 +117,7 @@ export function ProfileBody({ userId, onNavigate }: { userId: string; onNavigate
             )}
           </div>
           <div className="profile-username">@{profile.username}</div>
+          {profile.statusText && <p className="profile-status-text">{profile.statusText}</p>}
         </div>
       </div>
 

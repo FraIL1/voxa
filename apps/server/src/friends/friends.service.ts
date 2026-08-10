@@ -19,10 +19,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { WsGateway } from '../ws/ws.gateway';
 
 const USER_SELECT = {
-  select: { id: true, username: true, displayName: true, avatarUrl: true },
+  select: { id: true, username: true, displayName: true, avatarUrl: true, statusText: true },
 } as const;
 
-type PublicUser = Pick<User, 'id' | 'username' | 'displayName' | 'avatarUrl'>;
+type PublicUser = Pick<User, 'id' | 'username' | 'displayName' | 'avatarUrl' | 'statusText'>;
 
 @Injectable()
 export class FriendsService {
@@ -61,7 +61,7 @@ export class FriendsService {
       where: { status: 'ACCEPTED', OR: [{ requesterId: meId }, { addresseeId: meId }] },
       include: { requester: USER_SELECT, addressee: USER_SELECT },
     });
-    const online = this.presence.onlineUserIds();
+    const statusOf = this.presence.snapshot();
 
     return rows
       .map((row) => {
@@ -71,7 +71,8 @@ export class FriendsService {
           username: peer.username,
           displayName: peer.displayName,
           avatarUrl: peer.avatarUrl,
-          status: online.has(peer.id) ? ('online' as const) : ('offline' as const),
+          status: statusOf(peer.id),
+          statusText: peer.statusText,
         };
       })
       .sort((a, b) => a.displayName.localeCompare(b.displayName, 'ru'));

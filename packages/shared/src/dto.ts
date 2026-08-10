@@ -22,6 +22,9 @@ export interface RoleDto {
 export interface MeDto extends UserPublicDto {
   /** Владелец всего приложения — видит глобальную панель */
   isInstanceOwner: boolean;
+  /** Выбранный режим присутствия */
+  presenceMode: PresenceMode;
+  statusText: string | null;
   /** Рассказ о себе в карточке профиля */
   bio: string | null;
   /** Акцентный цвет профиля (#rrggbb); null — фирменный цвет приложения */
@@ -35,6 +38,7 @@ export type ProfileRelation = 'self' | 'friends' | 'incoming' | 'outgoing' | 'no
 /** Публичная карточка пользователя (профиль глазами другого) */
 export interface UserProfileDto extends UserPublicDto {
   bio: string | null;
+  statusText: string | null;
   accentColor: string | null;
   /** Дата регистрации в приложении */
   createdAt: string;
@@ -191,7 +195,11 @@ export interface MessageDto {
   mentionedUserIds?: string[];
 }
 
-export type PresenceStatus = 'online' | 'offline';
+/** Что видят другие. «Невидимка» снаружи неотличима от офлайна */
+export type PresenceStatus = 'online' | 'idle' | 'dnd' | 'offline';
+
+/** Что человек выбрал сам в меню статуса */
+export type PresenceMode = 'ONLINE' | 'IDLE' | 'DND' | 'INVISIBLE';
 
 /** Роль в списке участников (без маски прав) */
 export interface MemberRoleDto {
@@ -203,6 +211,8 @@ export interface MemberRoleDto {
 
 export interface MemberDto extends UserPublicDto {
   status: PresenceStatus;
+  /** Своя строчка статуса под ником */
+  statusText: string | null;
   /** Ник на сервере; null — показывается displayName */
   nickname: string | null;
   /** По убыванию старшинства */
@@ -346,6 +356,7 @@ export interface DmConversationDto {
 /** Друг (принятая дружба) со статусом присутствия */
 export interface FriendDto extends UserPublicDto {
   status: PresenceStatus;
+  statusText: string | null;
 }
 
 /** Заявка в друзья глазами запрашивающего пользователя */

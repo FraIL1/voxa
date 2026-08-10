@@ -21,6 +21,9 @@ const serverEnv = {
   PORT: String(API_PORT),
   REDIS_URL: process.env.REDIS_URL ?? 'redis://localhost:6379',
   PUBLIC_URL: BASE_URL,
+  // На стенде лимиты запросов мешают: подготовка регистрирует аккаунты, а
+  // сценарии логинятся заново на каждом прогоне
+  THROTTLE_DISABLED: '1',
   JWT_ACCESS_SECRET: 'ui-test-access-secret-000000000000',
   JWT_REFRESH_SECRET: 'ui-test-refresh-secret-00000000000',
   S3_ENDPOINT: process.env.S3_ENDPOINT ?? 'http://localhost:9000',

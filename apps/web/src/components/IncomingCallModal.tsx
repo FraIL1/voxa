@@ -4,22 +4,26 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 
 import { startRingtone } from '../lib/sounds';
+import { useAuthStore } from '../stores/auth';
 import { useCallStore } from '../stores/call';
+import Avatar from './Avatar';
 
 /** Входящий вызов: звенит и предлагает принять или отклонить */
 export default function IncomingCallModal() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const incoming = useCallStore((s) => s.incoming);
+  const dnd = useAuthStore((s) => s.user?.presenceMode === 'DND');
   const accept = useCallStore((s) => s.acceptIncoming);
   const decline = useCallStore((s) => s.declineIncoming);
 
   // Звонок звенит, пока висит модалка
   useEffect(() => {
-    if (!incoming) return;
+    // В «не беспокоить» вызов виден, но не звенит
+    if (!incoming || dnd) return;
     const stop = startRingtone();
     return stop;
-  }, [incoming]);
+  }, [incoming, dnd]);
 
   if (!incoming) return null;
 
@@ -28,12 +32,16 @@ export default function IncomingCallModal() {
   return (
     <div className="settings-overlay">
       <div className="incoming-call">
-        <div className="avatar incoming-call-avatar" aria-hidden>
-          {name.slice(0, 1).toUpperCase()}
+        <Avatar name={name} url={incoming.from.avatarUrl} className="incoming-call-avatar" />
+        <div className="incoming-call-name">
+          {incoming.isGroup ? (incoming.conversationName ?? name) : name}
         </div>
-        <div className="incoming-call-name">{name}</div>
         <div className="incoming-call-hint">
-          {incoming.video ? t('call.incomingVideo') : t('call.incomingVoice')}
+          {incoming.isGroup
+            ? `${t('call.incomingGroup')} · ${name}`
+            : incoming.video
+              ? t('call.incomingVideo')
+              : t('call.incomingVoice')}
         </div>
 
         <div className="incoming-call-actions">

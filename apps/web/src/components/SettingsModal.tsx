@@ -1,6 +1,6 @@
 import { changePasswordSchema, updateProfileSchema, type MeDto } from '@voxa/shared';
-import { Check, LogOut, X } from 'lucide-react';
-import { useEffect, useState, type FormEvent } from 'react';
+import { Check, LogOut, Trash2, Upload, X } from 'lucide-react';
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { logout } from '../api/auth';
@@ -9,6 +9,7 @@ import { getAutostart, isTauri, setAutostart } from '../lib/tauri';
 import { useAuthStore } from '../stores/auth';
 import { useThemeStore, type ThemeMode } from '../stores/theme';
 import AudioDeviceSelects from './AudioDeviceSelects';
+import Avatar from './Avatar';
 
 type Tab = 'profile' | 'appearance' | 'voice' | 'app';
 
@@ -64,6 +65,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
 
   const [displayName, setDisplayName] = useState(user?.displayName ?? '');
   const [bio, setBio] = useState(user?.bio ?? '');
+  const [statusText, setStatusText] = useState(user?.statusText ?? '');
   const [profileMessage, setProfileMessage] = useState('');
   const [profileError, setProfileError] = useState('');
 
@@ -100,6 +102,50 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
       setProfileError(error instanceof ApiError ? error.message : t('auth.genericError'));
     } finally {
       setBusy(false);
+    }
+  };
+
+  /** Аватар уходит на сервер сразу после выбора файла */
+  const pickAvatar = async (e: ChangeEvent<HTMLInputElement>): Promise<void> => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setProfileError('');
+    setBusy(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      setUser(await api<MeDto>('/users/me/avatar', { method: 'POST', body: form }));
+    } catch (error) {
+      setProfileError(error instanceof ApiError ? error.message : t('auth.genericError'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const dropAvatar = async (): Promise<void> => {
+    setBusy(true);
+    try {
+      setUser(await api<MeDto>('/users/me/avatar', { method: 'DELETE' }));
+    } catch (error) {
+      setProfileError(error instanceof ApiError ? error.message : t('auth.genericError'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Своя строчка статуса — тоже отдельным запросом, без формы профиля */
+  const saveStatusText = async (): Promise<void> => {
+    if ((user?.statusText ?? '') === statusText.trim()) return;
+    try {
+      setUser(
+        await api<MeDto>('/users/me/presence', {
+          method: 'PATCH',
+          body: { statusText: statusText.trim() },
+        }),
+      );
+    } catch (error) {
+      setProfileError(error instanceof ApiError ? error.message : t('auth.genericError'));
     }
   };
 
@@ -187,6 +233,36 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           {tab === 'profile' && (
             <>
               <h2>{t('settings.profile')}</h2>
+              <div className="avatar-row">
+                <Avatar
+                  name={user?.displayName ?? '?'}
+                  url={user?.avatarUrl}
+                  className="settings-avatar"
+                />
+                <div className="avatar-actions">
+                  <label className="btn-secondary icon-upload">
+                    <Upload size={15} /> {t('settings.changeAvatar')}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/gif"
+                      hidden
+                      onChange={(e) => void pickAvatar(e)}
+                    />
+                  </label>
+                  {user?.avatarUrl && (
+                    <button
+                      type="button"
+                      className="btn-secondary danger-text"
+                      disabled={busy}
+                      onClick={() => void dropAvatar()}
+                    >
+                      <Trash2 size={15} /> {t('settings.removeAvatar')}
+                    </button>
+                  )}
+                  <p className="settings-hint">{t('settings.avatarHint')}</p>
+                </div>
+              </div>
+
               <form className="settings-form" onSubmit={(e) => void saveProfile(e)}>
                 <label>
                   {t('settings.handle')}
@@ -207,7 +283,19 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                     onChange={(e) => setBio(e.target.value)}
                   />
                 </label>
-                <p className="settings-hint">{190 - bio.length}</p>
+                <p className="settings-hint">
+                  {t('settings.bioLeft', { count: 190 - bio.length })}
+                </p>
+                <label>
+                  {t('settings.statusText')}
+                  <input
+                    value={statusText}
+                    maxLength={60}
+                    placeholder={t('settings.statusTextPlaceholder')}
+                    onChange={(e) => setStatusText(e.target.value)}
+                    onBlur={() => void saveStatusText()}
+                  />
+                </label>
                 <p className="auth-error">{profileError}</p>
                 <p className="settings-ok">{profileMessage}</p>
                 <button className="btn-primary" type="submit" disabled={busy}>

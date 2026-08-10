@@ -14,6 +14,7 @@ import {
   useRenameGroup,
 } from '../hooks/useDm';
 import { useAuthStore } from '../stores/auth';
+import Avatar from './Avatar';
 import { ProfileBody } from './ProfileCard';
 
 const dateFormat = new Intl.DateTimeFormat('ru', {
@@ -178,9 +179,7 @@ export function GroupPanel({
       </div>
       {conversation.members.map((m) => (
         <div key={m.id} className="friend-row">
-          <div className="avatar friend-avatar" aria-hidden>
-            {m.displayName.slice(0, 1).toUpperCase()}
-          </div>
+          <Avatar name={m.displayName} url={m.avatarUrl} className="friend-avatar" />
           <span className="friend-name">{m.displayName}</span>
           {conversation.ownerId === m.id && (
             <span className="friend-status">{t('dm.groupOwner')}</span>
@@ -209,9 +208,7 @@ export function GroupPanel({
               className="group-pick-row"
               onClick={() => addMembers.mutate([f.id], { onSuccess: () => setAdding(false) })}
             >
-              <div className="avatar friend-avatar" aria-hidden>
-                {f.displayName.slice(0, 1).toUpperCase()}
-              </div>
+              <Avatar name={f.displayName} url={f.avatarUrl} className="friend-avatar" />
               <span className="friend-name">{f.displayName}</span>
             </button>
           ))}

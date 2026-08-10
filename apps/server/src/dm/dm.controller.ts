@@ -27,6 +27,7 @@ import {
   type DmSearchInput,
   type EditDmInput,
   type StartDmCallInput,
+  type UserPublicDto,
   type VoiceTokenDto,
   type MessagesQueryInput,
   type OpenDmInput,
@@ -244,7 +245,7 @@ export class DmController {
     return this.dm.search(user.id, id, query.q);
   }
 
-  // ---------- Звонки 1-на-1 ----------
+  // ---------- Звонки в личке и беседах ----------
 
   @Post('conversations/:id/call')
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
@@ -253,17 +254,18 @@ export class DmController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(startDmCallSchema)) body: StartDmCallInput,
   ): Promise<VoiceTokenDto> {
-    const peerId = await this.dm.peerOf(user.id, id);
-    return this.calls.start(user.id, peerId, id, body.video);
+    const ctx = await this.dm.callContext(user.id, id);
+    return this.calls.start(user.id, id, ctx.participantIds, ctx.isGroup, ctx.name, body.video);
   }
 
+  /** Принять вызов или войти в уже идущий разговор беседы */
   @Post('conversations/:id/call/accept')
   async acceptCall(
     @CurrentUser() user: RequestUser,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<VoiceTokenDto> {
-    await this.dm.peerOf(user.id, id);
-    return this.calls.accept(user.id, id);
+    const ctx = await this.dm.callContext(user.id, id);
+    return this.calls.join(user.id, id, ctx.participantIds);
   }
 
   @Post('conversations/:id/call/decline')
@@ -272,8 +274,8 @@ export class DmController {
     @CurrentUser() user: RequestUser,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
-    await this.dm.peerOf(user.id, id);
-    this.calls.end(id, 'declined');
+    const ctx = await this.dm.callContext(user.id, id);
+    this.calls.decline(user.id, id, ctx.participantIds);
   }
 
   @Post('conversations/:id/call/end')
@@ -282,7 +284,17 @@ export class DmController {
     @CurrentUser() user: RequestUser,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
-    await this.dm.peerOf(user.id, id);
-    this.calls.end(id, 'ended');
+    const ctx = await this.dm.callContext(user.id, id);
+    await this.calls.leave(user.id, id, ctx.participantIds);
+  }
+
+  /** Кто сейчас в разговоре — чтобы показать «присоединиться» при входе */
+  @Get('conversations/:id/call')
+  async callState(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<{ participants: UserPublicDto[] }> {
+    await this.dm.callContext(user.id, id);
+    return { participants: await this.calls.stateOf(id) };
   }
 }

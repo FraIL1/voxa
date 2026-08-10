@@ -21,6 +21,7 @@ import { detectMedia, isExecutable } from './file-type';
 /** Подписанные ссылки живут час; клиент получает свежие при каждом запросе истории */
 const SIGNED_URL_TTL_S = 3600;
 const THUMB_MAX_PX = 512;
+const AVATAR_PX = 256;
 
 export interface UploadedFileInput {
   originalname: string;
@@ -161,6 +162,53 @@ export class FilesService implements OnModuleInit {
     });
 
     return this.toDto(attachment);
+  }
+
+  /**
+   * Аватар: квадрат 256×256 в PNG под стабильным ключом. Ключ уникален на
+   * каждую загрузку, чтобы браузеры не показывали старую картинку из кэша.
+   */
+  async storeAvatar(userId: string, buffer: Buffer): Promise<string> {
+    const media = detectMedia(buffer);
+    if (!media?.isImage) throw new BadRequestException('Аватар должен быть картинкой');
+    if (media.ext === 'webp') {
+      // jimp не читает webp — просить другой формат честнее, чем молча падать
+      throw new BadRequestException('Формат webp не поддерживается — используйте PNG или JPEG');
+    }
+
+    let png: Buffer;
+    try {
+      const image = await Jimp.read(buffer);
+      // cover: заполняем квадрат целиком, лишнее обрезается по центру
+      image.cover({ w: AVATAR_PX, h: AVATAR_PX });
+      png = Buffer.from(await image.getBuffer('image/png'));
+    } catch {
+      throw new BadRequestException('Не удалось прочитать картинку');
+    }
+
+    const key = `avatars/${userId}/${randomUUID()}.png`;
+    await this.s3.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        Body: png,
+        ContentType: 'image/png',
+        ContentDisposition: 'inline',
+      }),
+    );
+    return key;
+  }
+
+  /** Удаление объекта по ключу (старый аватар после замены) */
+  async removeObject(key: string): Promise<void> {
+    await this.s3
+      .send(new DeleteObjectsCommand({ Bucket: this.bucket, Delete: { Objects: [{ Key: key }] } }))
+      .catch(() => undefined);
+  }
+
+  /** Подписанная ссылка на объект — для публичного редиректа аватара */
+  signedUrlFor(key: string): Promise<string> {
+    return this.presign(key);
   }
 
   private presign(key: string): Promise<string> {

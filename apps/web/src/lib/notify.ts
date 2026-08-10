@@ -1,3 +1,4 @@
+import { useAuthStore } from '../stores/auth';
 import { isTauri } from './tauri';
 
 /**
@@ -5,6 +6,8 @@ import { isTauri } from './tauri';
  * плагин, в браузере — Notification API. Разрешение запрашивается лениво.
  */
 export async function notify(title: string, body: string): Promise<void> {
+  // Режим «не беспокоить» — тишина без исключений
+  if (useAuthStore.getState().user?.presenceMode === 'DND') return;
   try {
     if (isTauri()) {
       const plugin = await import('@tauri-apps/plugin-notification');

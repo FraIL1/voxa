@@ -8,6 +8,7 @@ import type { DmChatMessage } from '../api/dm-cache';
 import { useDeleteDm, useEditDm, useToggleDmPin, useToggleDmReaction } from '../hooks/useDm';
 import { useAuthStore } from '../stores/auth';
 import { openProfile } from '../stores/profileView';
+import Avatar from './Avatar';
 import Attachments from './Attachments';
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '🎉', '🔥', '👀', '😢', '🤔'];
@@ -92,9 +93,12 @@ export default function DmMessageItem({
 
   return (
     <div className={`message${message.pending ? ' pending' : ''}`}>
-      <div className="avatar" aria-hidden>
-        {authorName.slice(0, 1).toUpperCase()}
-      </div>
+      <Avatar
+        name={authorName}
+        url={message.author?.avatarUrl}
+        className="message-avatar"
+        onClick={() => message.author && openProfile(message.author.id)}
+      />
 
       <div className="message-body">
         {message.replyToId && (

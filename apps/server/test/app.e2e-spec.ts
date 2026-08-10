@@ -1462,22 +1462,17 @@ describe('Voxa: критический поток (e2e)', () => {
     expect(call.conversationId).toBe(conversationId);
     expect(call.video).toBe(true);
 
-    // Второй звонок в тот же диалог от другого участника — 400 (занято)
-    await request(httpServer)
-      .post(`/api/dm/conversations/${conversationId}/call`)
-      .set('Authorization', `Bearer ${memberAccess}`)
-      .send({ video: false })
-      .expect(400);
-
     // Принятие: звонящему приходит подтверждение, отвечающему — свой токен
     const accepted = new Promise<{ conversationId: string }>((resolve) => {
       socket?.once(WsEvents.DmCallAccepted, resolve);
     });
-    const answer = await request(httpServer)
-      .post(`/api/dm/conversations/${conversationId}/call/accept`)
+
+    // Звонящий может перезапросить токен (переподключение вкладки)
+    await request(httpServer)
+      .post(`/api/dm/conversations/${conversationId}/call`)
       .set('Authorization', `Bearer ${ownerAccess}`)
-      .expect(403); // вызов адресован участнику, а не звонящему
-    expect(answer.body.message).toBeTruthy();
+      .send({ video: true })
+      .expect(201);
 
     const answered = await request(httpServer)
       .post(`/api/dm/conversations/${conversationId}/call/accept`)
@@ -1897,6 +1892,60 @@ describe('Voxa: критический поток (e2e)', () => {
       .expect(201);
     expect((await delivered).content).toBe('привет группе');
     memberSocket.disconnect();
+
+    // Групповой звонок: вызов летит всем остальным, войти можно любому
+    const callSocket = io(baseUrl, { auth: { token: memberAccess }, transports: ['websocket'] });
+    await new Promise((resolve, reject) => {
+      callSocket.once(WsEvents.Ready, resolve);
+      callSocket.once('auth_error', () => reject(new Error('WS-авторизация не прошла')));
+    });
+    const groupRing = new Promise<{ conversationId: string; isGroup: boolean }>((resolve) =>
+      callSocket.once(WsEvents.DmCallIncoming, resolve),
+    );
+    await request(httpServer)
+      .post(`/api/dm/conversations/${groupId}/call`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ video: false })
+      .expect(201);
+    const ring = await groupRing;
+    expect(ring.conversationId).toBe(groupId);
+    expect(ring.isGroup).toBe(true);
+
+    // Третий участник входит без вызова — как по кнопке «присоединиться»
+    await request(httpServer)
+      .post(`/api/dm/conversations/${groupId}/call/accept`)
+      .set('Authorization', `Bearer ${thirdAccess}`)
+      .expect(201);
+    const inCall = await request(httpServer)
+      .get(`/api/dm/conversations/${groupId}/call`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(200);
+    expect((inCall.body.participants as { id: string }[]).map((p) => p.id).sort()).toEqual(
+      [ownerId, thirdId].sort(),
+    );
+
+    // Уход одного не гасит разговор остальных — это отличие от звонка вдвоём
+    await request(httpServer)
+      .post(`/api/dm/conversations/${groupId}/call/end`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(204);
+    const stillOn = await request(httpServer)
+      .get(`/api/dm/conversations/${groupId}/call`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(200);
+    expect((stillOn.body.participants as { id: string }[]).map((p) => p.id)).toEqual([thirdId]);
+
+    // Последний вышел — разговора больше нет
+    await request(httpServer)
+      .post(`/api/dm/conversations/${groupId}/call/end`)
+      .set('Authorization', `Bearer ${thirdAccess}`)
+      .expect(204);
+    const finished = await request(httpServer)
+      .get(`/api/dm/conversations/${groupId}/call`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(200);
+    expect(finished.body.participants).toEqual([]);
+    callSocket.disconnect();
 
     // Переименование доступно участнику
     const renamed = await request(httpServer)

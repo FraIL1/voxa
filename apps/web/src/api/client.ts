@@ -56,14 +56,21 @@ interface ErrorBody {
  */
 export async function api<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const token = useAuthStore.getState().accessToken;
+  // FormData сериализует и размечает браузер — свой Content-Type всё сломает
+  const isForm = options.body instanceof FormData;
   const res = await fetch(`/api${path}`, {
     method: options.method ?? 'GET',
     credentials: 'include',
     headers: {
-      ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      ...(options.body !== undefined && !isForm ? { 'Content-Type': 'application/json' } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    body:
+      options.body === undefined
+        ? undefined
+        : isForm
+          ? (options.body as FormData)
+          : JSON.stringify(options.body),
   });
 
   if (res.status === 401 && !options._noRetry) {

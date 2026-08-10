@@ -14,6 +14,7 @@ import { useAuthStore } from '../stores/auth';
 import { useChatStore } from '../stores/chat';
 import { openProfile } from '../stores/profileView';
 import Attachments from './Attachments';
+import Avatar from './Avatar';
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥', '🎉', '👀', '💯', '🤔', '👎', '🫡'];
 
@@ -103,13 +104,12 @@ export default function Message({ message }: { message: ChatMessage }) {
 
   return (
     <div className={`message${message.pending ? ' pending' : ''}`}>
-      <div
-        className="avatar message-avatar"
-        aria-hidden
+      <Avatar
+        name={authorName}
+        url={message.author?.avatarUrl}
+        className="message-avatar"
         onClick={() => message.author && openProfile(message.author.id)}
-      >
-        {authorName.slice(0, 1).toUpperCase()}
-      </div>
+      />
 
       <div className="message-body">
         {message.replyToId && (

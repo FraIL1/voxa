@@ -3445,6 +3445,7 @@ h3 {
 }
 
 .profile-guild {
+  background: transparent;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -3669,4 +3670,485 @@ h3 {
   color: var(--text-muted);
   font-size: 15px;
   line-height: 1;
+}
+
+/* ---------- Аватары ---------- */
+
+/* Аватар всегда позиционирован — точка присутствия крепится к его углу */
+.avatar {
+  position: relative;
+}
+
+.avatar.has-image {
+  background: var(--panel-hover);
+  border-color: transparent;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.avatar[role='button'],
+.message-avatar,
+.me-avatar {
+  cursor: pointer;
+}
+
+.status-dot.idle {
+  background: var(--warning);
+}
+
+.status-dot.dnd {
+  background: var(--danger);
+}
+
+/* Настройки: крупный аватар и кнопки рядом */
+.avatar-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.settings-avatar {
+  width: 88px;
+  height: 88px;
+  font-size: 34px;
+}
+
+.avatar-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.avatar-actions .settings-hint {
+  margin: 0;
+}
+
+/* ---------- Присутствие ---------- */
+
+/* Своя карточка: аватар с точкой выбранного режима */
+.me-avatar::after {
+  content: '';
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--panel);
+  background: var(--text-faint);
+}
+
+.me-avatar.dot-online::after {
+  background: var(--success);
+}
+
+.me-avatar.dot-idle::after {
+  background: var(--warning);
+}
+
+.me-avatar.dot-dnd::after {
+  background: var(--danger);
+}
+
+.user-card-names {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  text-align: left;
+}
+
+.user-card-status {
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Меню статуса всплывает над карточкой пользователя */
+.user-card {
+  position: relative;
+}
+
+.status-menu {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: calc(100% + 6px);
+  z-index: 30;
+  background: var(--gradient-surface), var(--panel-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: modal-in 140ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.status-menu-item {
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 9px;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  color: var(--text);
+  transition: background var(--transition);
+}
+
+.status-menu-item:hover {
+  background: var(--panel-hover);
+}
+
+.status-menu-item.active {
+  background: var(--accent-soft);
+}
+
+/* Точка в меню статуса стоит в потоке, а не в углу аватара */
+.status-menu-item .status-dot {
+  position: static;
+  width: 10px;
+  height: 10px;
+  border: none;
+  flex-shrink: 0;
+}
+
+.status-menu-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.status-menu-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.status-menu-hint {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+/* Строчка статуса в списке участников — второй строкой под именем */
+.member-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.member-status-text {
+  font-size: 11px;
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Строчка статуса в карточке профиля */
+.profile-status-text {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* ---------- Плавающая панель разговора ---------- */
+
+.call-dock {
+  position: fixed;
+  right: 20px;
+  /* Выше поля ввода: панель не должна перекрывать отправку сообщения */
+  bottom: 88px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-lg);
+  background: var(--gradient-surface), var(--panel-raised);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-lg);
+  animation: dock-in 200ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+@keyframes dock-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+.call-dock-peer {
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  transition: background var(--transition);
+}
+
+.call-dock-peer:hover {
+  background: var(--panel-hover);
+}
+
+.call-dock-peer svg {
+  color: var(--text-faint);
+}
+
+.call-dock-avatar {
+  width: 32px;
+  height: 32px;
+  font-size: 14px;
+}
+
+.call-dock-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.25;
+  max-width: 150px;
+}
+
+.call-dock-name {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 150px;
+}
+
+.call-dock-time {
+  font-size: 11px;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.call-dock-controls {
+  display: flex;
+  gap: 6px;
+  padding-left: 8px;
+  border-left: 1px solid var(--border);
+}
+
+.call-dock-button {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-pill);
+  display: grid;
+  place-items: center;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  transition:
+    background var(--transition),
+    color var(--transition);
+}
+
+.call-dock-button:hover {
+  background: var(--panel-hover);
+}
+
+.call-dock-button.engaged {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.call-dock-button.hangup {
+  background: var(--danger);
+  border-color: transparent;
+  color: #fff;
+}
+
+.call-dock-button.hangup:hover {
+  filter: brightness(1.08);
+}
+
+/* ---------- Групповой разговор ---------- */
+
+/* Плитки участников выстраиваются сеткой и растут вместе с окном */
+.call-stage.with-video .call-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  width: 100%;
+  max-width: 900px;
+}
+
+.call-stage.with-video .call-tile {
+  width: auto;
+}
+
+/* Аватар вместо чёрного прямоугольника, когда камера выключена */
+.call-tile:not(.video) {
+  display: grid;
+  place-items: center;
+  background: var(--gradient-surface), var(--panel-raised);
+}
+
+.call-tile-avatar {
+  width: 64px;
+  height: 64px;
+  font-size: 26px;
+}
+
+/* Своя плитка в сетке — обычная, врезкой она становится только вдвоём */
+.call-stage.with-video .call-tile.self {
+  position: static;
+  width: auto;
+}
+
+/* Плашка идущего разговора над лентой */
+.ongoing-call {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(90deg, var(--accent-soft), transparent);
+}
+
+.ongoing-call > svg {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.ongoing-call-people {
+  display: flex;
+}
+
+/* Аватары внахлёст — компактно показывают, кто уже внутри */
+.ongoing-call-avatar {
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+  border: 2px solid var(--panel);
+  margin-left: -8px;
+}
+
+.ongoing-call-avatar:first-child {
+  margin-left: 0;
+}
+
+.ongoing-call-text {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-right: auto;
+}
+
+/* ---------- Быстрый переход (Ctrl+K) ---------- */
+
+/* Окно поиска встаёт в верхней трети — так его удобнее читать */
+.switcher-overlay {
+  align-items: flex-start;
+  padding-top: 12vh;
+}
+
+.switcher {
+  width: min(560px, 100%);
+  border-radius: var(--radius-lg);
+  background: var(--gradient-surface), var(--panel-raised);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  animation: modal-in 160ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.switcher-input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.switcher-input svg {
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+
+.switcher-input input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 15px;
+  outline: none;
+  padding: 0;
+}
+
+.switcher-list {
+  max-height: 46vh;
+  overflow-y: auto;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.switcher-row {
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  color: var(--text);
+}
+
+.switcher-row.active {
+  background: var(--accent-soft);
+}
+
+.switcher-icon {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+
+.switcher-avatar {
+  width: 26px;
+  height: 26px;
+  font-size: 12px;
+}
+
+.switcher-title {
+  font-size: 14px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.switcher-hint {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+
+.switcher-footer {
+  padding: 9px 16px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-faint);
 }

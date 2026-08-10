@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router';
 
 import { useFriends } from '../hooks/useFriends';
 import { useCreateGroupDm } from '../hooks/useDm';
+import Avatar from './Avatar';
 
 /** Создание групповой беседы: имя + выбор друзей (минимум двое) */
 export default function CreateGroupModal({ onClose }: { onClose: () => void }) {
@@ -65,9 +66,11 @@ export default function CreateGroupModal({ onClose }: { onClose: () => void }) {
                 className={`group-pick-row${selected.has(friend.id) ? ' selected' : ''}`}
                 onClick={() => toggle(friend.id)}
               >
-                <div className="avatar friend-avatar" aria-hidden>
-                  {friend.displayName.slice(0, 1).toUpperCase()}
-                </div>
+                <Avatar
+                  name={friend.displayName}
+                  url={friend.avatarUrl}
+                  className="friend-avatar"
+                />
                 <span className="friend-name">{friend.displayName}</span>
                 {selected.has(friend.id) && <Check size={16} />}
               </button>

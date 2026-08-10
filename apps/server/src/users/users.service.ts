@@ -3,16 +3,22 @@ import { combineMasks, hasPermission, Permissions } from '@voxa/shared';
 import type {
   MeDto,
   MemberDto,
+  PresenceStatus,
   ProfileRelation,
+  UpdatePresenceInput,
   UpdateProfileInput,
   UserProfileDto,
 } from '@voxa/shared';
 
+import { FilesService } from '../files/files.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly files: FilesService,
+  ) {}
 
   /** Есть ли у двоих хотя бы один общий сервер */
   async shareGuild(aId: string, bId: string): Promise<boolean> {
@@ -137,7 +143,10 @@ export class UsersService {
   }
 
   /** Участники сервера со статусом присутствия и ролями (по старшинству) */
-  async listMembers(guildId: string, onlineUserIds: ReadonlySet<string>): Promise<MemberDto[]> {
+  async listMembers(
+    guildId: string,
+    statusOf: (userId: string) => PresenceStatus,
+  ): Promise<MemberDto[]> {
     const members = await this.prisma.guildMember.findMany({
       where: { guildId },
       include: {
@@ -160,7 +169,8 @@ export class UsersService {
         displayName: member.user.displayName,
         nickname: member.nickname,
         avatarUrl: member.user.avatarUrl,
-        status: onlineUserIds.has(member.user.id) ? ('online' as const) : ('offline' as const),
+        status: statusOf(member.user.id),
+        statusText: member.user.statusText,
         roles: member.user.roles
           .map((ur) => ur.role)
           .sort((a, b) => b.position - a.position)
@@ -246,10 +256,57 @@ export class UsersService {
       displayName: user.displayName,
       avatarUrl: user.avatarUrl,
       isInstanceOwner: user.isInstanceOwner,
+      presenceMode: user.presenceMode,
+      statusText: user.statusText,
       bio: user.bio,
       accentColor: user.accentColor,
       createdAt: user.createdAt.toISOString(),
     };
+  }
+
+  /** Быстрая смена присутствия: режим и своя строчка статуса */
+  async updatePresence(userId: string, input: UpdatePresenceInput): Promise<MeDto> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(input.mode === undefined ? {} : { presenceMode: input.mode }),
+        ...(input.statusText === undefined
+          ? {}
+          : { statusText: input.statusText === '' ? null : input.statusText }),
+      },
+    });
+    return this.getMe(userId);
+  }
+
+  /**
+   * Замена аватара: картинка уходит в S3, прошлый файл удаляется, в базе
+   * остаётся стабильная ссылка на наш маршрут отдачи.
+   */
+  async setAvatar(userId: string, buffer: Buffer): Promise<MeDto> {
+    const before = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { avatarKey: true },
+    });
+    const key = await this.files.storeAvatar(userId, buffer);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { avatarKey: key, avatarUrl: `/api/${key}` },
+    });
+    if (before?.avatarKey) await this.files.removeObject(before.avatarKey);
+    return this.getMe(userId);
+  }
+
+  async removeAvatar(userId: string): Promise<MeDto> {
+    const before = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { avatarKey: true },
+    });
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { avatarKey: null, avatarUrl: null },
+    });
+    if (before?.avatarKey) await this.files.removeObject(before.avatarKey);
+    return this.getMe(userId);
   }
 
   /**
@@ -260,7 +317,7 @@ export class UsersService {
   async getProfile(
     meId: string,
     userId: string,
-    online: ReadonlySet<string>,
+    statusOf: (userId: string) => PresenceStatus,
   ): Promise<UserProfileDto> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('Пользователь не найден');
@@ -304,9 +361,10 @@ export class UsersService {
       displayName: user.displayName,
       avatarUrl: user.avatarUrl,
       bio: user.bio,
+      statusText: user.statusText,
       accentColor: user.accentColor,
       createdAt: user.createdAt.toISOString(),
-      status: online.has(user.id) ? 'online' : 'offline',
+      status: statusOf(user.id),
       isInstanceOwner: user.isInstanceOwner,
       relation,
       blocked: block !== null,

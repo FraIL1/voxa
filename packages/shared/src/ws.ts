@@ -54,6 +54,8 @@ export const WsEvents = {
   DmCallAccepted: 'dm.call.accepted',
   /** Звонок завершён/отклонён/не отвечен (обоим) */
   DmCallEnded: 'dm.call.ended',
+  /** Кто сейчас в разговоре (групповые беседы) */
+  DmCallState: 'dm.call.state',
   /** Адресное: пришла новая заявка в друзья */
   FriendRequestNew: 'friend.request.new',
   /** Адресное: состав друзей/заявок/блокировок изменился — перечитать списки */
@@ -77,6 +79,8 @@ export const WsClientEvents = {
   Typing: 'typing',
   /** Вход/выход/мьют в голосовом канале (см. voiceStateSchema) */
   VoiceState: 'voice.state',
+  /** Человек отошёл от компьютера или вернулся: { idle: boolean } */
+  PresenceIdle: 'presence.idle',
 } as const;
 
 export interface WsReadyPayload {
@@ -97,6 +101,16 @@ export interface DmCallIncomingPayload {
   conversationId: string;
   from: UserPublicDto;
   video: boolean;
+  /** Звонок в беседе: трубку могут взять несколько человек */
+  isGroup: boolean;
+  /** Название беседы — в группе важнее имени звонящего */
+  conversationName: string | null;
+}
+
+/** Состояние разговора в беседе: кто уже внутри */
+export interface DmCallStatePayload {
+  conversationId: string;
+  participants: UserPublicDto[];
 }
 
 export type DmCallEndReason = 'declined' | 'ended' | 'timeout' | 'busy';
@@ -154,6 +168,7 @@ export interface WsServerEvents {
   [WsEvents.DmCallIncoming]: DmCallIncomingPayload;
   [WsEvents.DmCallAccepted]: { conversationId: string };
   [WsEvents.DmCallEnded]: { conversationId: string; reason: DmCallEndReason };
+  [WsEvents.DmCallState]: DmCallStatePayload;
   [WsEvents.FriendRequestNew]: FriendRequestDto;
   [WsEvents.FriendsUpdated]: { reason: FriendsUpdateReason };
   [WsEvents.GuildMembersChanged]: { guildId: string };

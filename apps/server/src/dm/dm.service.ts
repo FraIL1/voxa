@@ -131,16 +131,33 @@ export class DmService {
     return { conversation, participantIds };
   }
 
-  /** id собеседника в 1-на-1; для групп звонки недоступны */
+  /** id собеседника в 1-на-1 (для групп собеседник один не определён) */
   async peerOf(meId: string, conversationId: string): Promise<string> {
     const { conversation, participantIds } = await this.assertParticipant(conversationId, meId);
     if (conversation.isGroup) {
-      throw new BadRequestException('Групповые звонки пока недоступны');
+      throw new BadRequestException('В беседе нет одного собеседника');
     }
     const peerId = participantIds.find((id) => id !== meId);
     if (!peerId) throw new NotFoundException('Собеседник не найден');
     await this.friends.assertNotBlocked(meId, peerId);
     return peerId;
+  }
+
+  /**
+   * Данные диалога для звонка: кто участвует и как он называется.
+   * Для 1-на-1 дополнительно проверяем блокировку — заблокированному
+   * человеку звонить нельзя, как и писать.
+   */
+  async callContext(
+    meId: string,
+    conversationId: string,
+  ): Promise<{ participantIds: string[]; isGroup: boolean; name: string | null }> {
+    const { conversation, participantIds } = await this.assertParticipant(conversationId, meId);
+    if (!conversation.isGroup) {
+      const peerId = participantIds.find((id) => id !== meId);
+      if (peerId) await this.friends.assertNotBlocked(meId, peerId);
+    }
+    return { participantIds, isGroup: conversation.isGroup, name: conversation.name };
   }
 
   private toMessageDto(message: DmMessageWithRelations): Promise<DmMessageDto> {

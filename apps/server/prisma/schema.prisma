@@ -10,22 +10,28 @@ datasource db {
 }
 
 model User {
-  id              String   @id @default(uuid(7))
+  id              String       @id @default(uuid(7))
   /// Неизменяемый уникальный логин (регистрация, вход, заявки в друзья)
   username        String
-  usernameLower   String   @unique @map("username_lower")
+  usernameLower   String       @unique @map("username_lower")
   /// Отображаемое имя — можно менять свободно
-  displayName     String   @map("display_name")
-  passwordHash    String   @map("password_hash")
-  avatarUrl       String?  @map("avatar_url")
+  displayName     String       @map("display_name")
+  passwordHash    String       @map("password_hash")
+  avatarUrl       String?      @map("avatar_url")
+  /// Ключ объекта аватара в S3 (нужен, чтобы удалить прошлый файл)
+  avatarKey       String?      @map("avatar_key")
   /// Короткий рассказ о себе в карточке профиля
   bio             String?
+  /// Выбранный режим присутствия; фактический статус считает PresenceService
+  presenceMode    PresenceMode @default(ONLINE) @map("presence_mode")
+  /// Своя строчка статуса под ником
+  statusText      String?      @map("status_text")
   /// Акцентный цвет профиля (#rrggbb) — шапка карточки и подсветка
-  accentColor     String?  @map("accent_color")
+  accentColor     String?      @map("accent_color")
   /// Владелец всего приложения (первый зарегистрированный): глобальная панель
-  isInstanceOwner Boolean  @default(false) @map("is_instance_owner")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  isInstanceOwner Boolean      @default(false) @map("is_instance_owner")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
 
   roles              UserRole[]
   sessions           RefreshSession[]
@@ -54,6 +60,14 @@ model User {
   instanceBansIssued InstanceBan[]        @relation("InstanceBanIssuer")
 
   @@map("users")
+}
+
+/// Как пользователь показывает себя другим
+enum PresenceMode {
+  ONLINE
+  IDLE
+  DND
+  INVISIBLE
 }
 
 /// Как попасть на сервер: только по инвайту / по заявке / свободно

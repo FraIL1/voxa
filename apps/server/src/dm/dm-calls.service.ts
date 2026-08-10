@@ -1,6 +1,11 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { WsEvents, type DmCallEndReason, type VoiceTokenDto } from '@voxa/shared';
+import {
+  WsEvents,
+  type DmCallEndReason,
+  type UserPublicDto,
+  type VoiceTokenDto,
+} from '@voxa/shared';
 import { AccessToken } from 'livekit-server-sdk';
 
 import type { Env } from '../config/env';
@@ -13,10 +18,14 @@ const TOKEN_TTL = '2h';
 const RING_TIMEOUT_MS = 45_000;
 
 interface ActiveCall {
-  callerId: string;
-  calleeId: string;
+  /** Кто начал разговор */
+  starterId: string;
+  isGroup: boolean;
   video: boolean;
-  accepted: boolean;
+  /** Кому звонили; в беседе — все остальные участники */
+  invitedIds: string[];
+  /** Кто уже внутри комнаты */
+  participants: Set<string>;
   ringTimer?: NodeJS.Timeout;
 }
 
@@ -26,8 +35,10 @@ export function dmRoomOf(conversationId: string): string {
 }
 
 /**
- * Сигналинг звонков 1-на-1: состояние живёт в памяти процесса (звонок —
- * короткая сессия, переживать рестарт не нужно). Медиа идёт через LiveKit.
+ * Сигналинг звонков в личке и беседах: состояние живёт в памяти процесса
+ * (звонок — короткая сессия, переживать рестарт не нужно). Медиа идёт
+ * через LiveKit. В беседе разговор держится, пока в нём есть хоть кто-то,
+ * и присоединиться можно в любой момент — не только по звонку.
  */
 @Injectable()
 export class DmCallsService {
@@ -72,69 +83,144 @@ export class DmCallsService {
     };
   }
 
-  /** Начать звонок: собеседнику летит входящий вызов, звонящему — токен */
+  private async publicUsers(ids: string[]): Promise<UserPublicDto[]> {
+    if (ids.length === 0) return [];
+    return this.prisma.user.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, username: true, displayName: true, avatarUrl: true },
+    });
+  }
+
+  /** Рассылает всем участникам беседы, кто сейчас в разговоре */
+  private async broadcastState(conversationId: string, audience: string[]): Promise<void> {
+    const call = this.calls.get(conversationId);
+    const participants = await this.publicUsers([...(call?.participants ?? [])]);
+    this.ws.emitToUsers(audience, WsEvents.DmCallState, { conversationId, participants });
+  }
+
+  /**
+   * Начать разговор. Звонок летит всем остальным участникам диалога;
+   * инициатор сразу оказывается в комнате.
+   */
   async start(
-    callerId: string,
-    calleeId: string,
+    starterId: string,
     conversationId: string,
+    participantIds: string[],
+    isGroup: boolean,
+    conversationName: string | null,
     video: boolean,
   ): Promise<VoiceTokenDto> {
     const existing = this.calls.get(conversationId);
     if (existing) {
-      // Уже звонит: повторный вызов от того же — просто отдаём токен
-      if (existing.callerId === callerId) return this.issueToken(callerId, conversationId);
-      throw new BadRequestException('В этом диалоге уже идёт звонок');
+      // Разговор уже идёт — это присоединение, а не новый звонок
+      return this.join(starterId, conversationId, participantIds);
     }
 
-    const caller = await this.prisma.user.findUniqueOrThrow({
-      where: { id: callerId },
+    const invitedIds = participantIds.filter((id) => id !== starterId);
+    if (invitedIds.length === 0) throw new BadRequestException('Звонить некому');
+
+    const starter = await this.prisma.user.findUniqueOrThrow({
+      where: { id: starterId },
       select: { id: true, username: true, displayName: true, avatarUrl: true },
     });
-    const grant = await this.issueToken(callerId, conversationId);
+    const grant = await this.issueToken(starterId, conversationId);
 
     const ringTimer = setTimeout(() => {
-      if (this.calls.get(conversationId)?.accepted === false) {
-        this.end(conversationId, 'timeout');
-      }
+      // Никто не взял трубку: в комнате остался только инициатор
+      const call = this.calls.get(conversationId);
+      if (call && call.participants.size <= 1) this.end(conversationId, 'timeout', participantIds);
     }, RING_TIMEOUT_MS);
 
-    this.calls.set(conversationId, { callerId, calleeId, video, accepted: false, ringTimer });
-    this.ws.emitToUsers([calleeId], WsEvents.DmCallIncoming, {
-      conversationId,
-      from: caller,
+    this.calls.set(conversationId, {
+      starterId,
+      isGroup,
       video,
+      invitedIds,
+      participants: new Set([starterId]),
+      ringTimer,
     });
-    this.logger.log(`Звонок ${callerId} → ${calleeId} (диалог ${conversationId})`);
+
+    this.ws.emitToUsers(invitedIds, WsEvents.DmCallIncoming, {
+      conversationId,
+      from: starter,
+      video,
+      isGroup,
+      conversationName,
+    });
+    await this.broadcastState(conversationId, participantIds);
+    this.logger.log(`Звонок ${starterId} → ${invitedIds.join(', ')} (диалог ${conversationId})`);
     return grant;
   }
 
-  /** Принять вызов: звонящему летит подтверждение, отвечающему — токен */
-  async accept(userId: string, conversationId: string): Promise<VoiceTokenDto> {
+  /** Войти в идущий разговор: по принятию вызова или кнопкой «присоединиться» */
+  async join(
+    userId: string,
+    conversationId: string,
+    participantIds: string[],
+  ): Promise<VoiceTokenDto> {
     const call = this.calls.get(conversationId);
     if (!call) throw new BadRequestException('Звонок уже завершён');
-    if (call.calleeId !== userId) throw new ForbiddenException('Этот вызов адресован не вам');
 
-    if (call.ringTimer) clearTimeout(call.ringTimer);
-    this.calls.set(conversationId, { ...call, accepted: true, ringTimer: undefined });
+    const first = call.participants.size <= 1;
+    call.participants.add(userId);
+    if (call.ringTimer) {
+      clearTimeout(call.ringTimer);
+      call.ringTimer = undefined;
+    }
 
     const grant = await this.issueToken(userId, conversationId);
-    this.ws.emitToUsers([call.callerId], WsEvents.DmCallAccepted, { conversationId });
+    // Инициатору важно знать, что трубку взяли: у него меняется экран
+    if (first) this.ws.emitToUsers([call.starterId], WsEvents.DmCallAccepted, { conversationId });
+    await this.broadcastState(conversationId, participantIds);
     return grant;
   }
 
-  /** Завершение звонка любым участником (отклонение, сброс, таймаут) */
-  end(conversationId: string, reason: DmCallEndReason): void {
+  /**
+   * Отклонить вызов. В беседе это личный отказ — разговор остальных
+   * продолжается; в диалоге один на один отказ завершает звонок.
+   */
+  decline(userId: string, conversationId: string, participantIds: string[]): void {
+    const call = this.calls.get(conversationId);
+    if (!call) return;
+    if (!call.isGroup) {
+      this.end(conversationId, 'declined', participantIds);
+      return;
+    }
+    call.invitedIds = call.invitedIds.filter((id) => id !== userId);
+    this.ws.emitToUsers([userId], WsEvents.DmCallEnded, { conversationId, reason: 'declined' });
+  }
+
+  /**
+   * Выйти из разговора. Последний вышедший гасит комнату для всех —
+   * иначе «звонок идёт» висел бы вечно.
+   */
+  async leave(userId: string, conversationId: string, participantIds: string[]): Promise<void> {
+    const call = this.calls.get(conversationId);
+    if (!call) return;
+    call.participants.delete(userId);
+
+    // Разговор вдвоём без одного из двоих не имеет смысла — гасим сразу
+    if (!call.isGroup || call.participants.size === 0) {
+      this.end(conversationId, 'ended', participantIds);
+      return;
+    }
+    // Ушедшему — закрыть экран, остальным — обновить список
+    this.ws.emitToUsers([userId], WsEvents.DmCallEnded, { conversationId, reason: 'ended' });
+    await this.broadcastState(conversationId, participantIds);
+  }
+
+  /** Завершение разговора для всех (таймаут, отказ в личке, последний вышел) */
+  end(conversationId: string, reason: DmCallEndReason, audience: string[]): void {
     const call = this.calls.get(conversationId);
     if (!call) return;
     this.clear(conversationId);
-    this.ws.emitToUsers([call.callerId, call.calleeId], WsEvents.DmCallEnded, {
-      conversationId,
-      reason,
-    });
+    this.ws.emitToUsers(audience, WsEvents.DmCallEnded, { conversationId, reason });
+    this.ws.emitToUsers(audience, WsEvents.DmCallState, { conversationId, participants: [] });
   }
 
-  /** Токен для того, кто уже в звонке (переподключение вкладки) */
-  token(userId: string, conversationId: string): Promise<VoiceTokenDto> {
-    return this.issueToken(userId, conversationId);
+  /** Кто сейчас в разговоре (для открытия диалога с идущим звонком) */
+  async stateOf(conversationId: string): Promise<UserPublicDto[]> {
+    const call = this.calls.get(conversationId);
+    return this.publicUsers([...(call?.participants ?? [])]);
   }
 }

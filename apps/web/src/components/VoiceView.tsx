@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { participantsOf, useVoiceStates } from '../hooks/useVoiceStates';
 import { useAuthStore } from '../stores/auth';
 import { screenVideoTrackOf, SELF_SCREEN, useVoiceStore } from '../stores/voice';
+import Avatar from './Avatar';
 
 export default function VoiceView({ channel }: { channel: ChannelDto }) {
   const { t } = useTranslation();
@@ -77,9 +78,7 @@ export default function VoiceView({ channel }: { channel: ChannelDto }) {
             key={p.userId}
             className={`voice-tile${voice.speaking[p.userId] ? ' speaking' : ''}`}
           >
-            <div className="avatar voice-avatar" aria-hidden>
-              {p.username.slice(0, 1).toUpperCase()}
-            </div>
+            <Avatar name={p.username} className="voice-avatar" />
             <span className="voice-tile-name">{p.username}</span>
             <span className="voice-tile-icons">
               {p.muted && <MicOff size={14} />}

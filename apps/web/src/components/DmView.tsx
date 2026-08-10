@@ -32,6 +32,7 @@ import { uploadFile } from '../api/uploads';
 import { useDmAck, useDmConversations, useDmMessages, useSendDm } from '../hooks/useDm';
 import { useCallStore } from '../stores/call';
 import CallPanel from './CallPanel';
+import OngoingCallBanner from './OngoingCallBanner';
 import { dmTitle } from '../api/dm-cache';
 import { GroupPanel, PeerProfilePanel, PinnedPanel, SearchPanel } from './DmHeaderPanels';
 import DmMessageItem from './DmMessageItem';
@@ -296,26 +297,38 @@ export default function DmView() {
         )}
 
         <div className="dm-header-actions">
-          {!isGroup && (
-            <>
-              <button
-                className="icon-button"
-                title={t('call.startVoice')}
-                disabled={!peer || callStatus !== 'idle'}
-                onClick={() => void startCall(conversationId, peer?.displayName ?? '', false)}
-              >
-                <Phone size={17} />
-              </button>
-              <button
-                className="icon-button"
-                title={t('call.startVideo')}
-                disabled={!peer || callStatus !== 'idle'}
-                onClick={() => void startCall(conversationId, peer?.displayName ?? '', true)}
-              >
-                <Video size={17} />
-              </button>
-            </>
-          )}
+          <button
+            className="icon-button"
+            title={t('call.startVoice')}
+            disabled={(!isGroup && !peer) || callStatus !== 'idle'}
+            onClick={() =>
+              void startCall(
+                conversationId,
+                isGroup ? title : (peer?.displayName ?? ''),
+                false,
+                peer?.avatarUrl,
+                isGroup,
+              )
+            }
+          >
+            <Phone size={17} />
+          </button>
+          <button
+            className="icon-button"
+            title={t('call.startVideo')}
+            disabled={(!isGroup && !peer) || callStatus !== 'idle'}
+            onClick={() =>
+              void startCall(
+                conversationId,
+                isGroup ? title : (peer?.displayName ?? ''),
+                true,
+                peer?.avatarUrl,
+                isGroup,
+              )
+            }
+          >
+            <Video size={17} />
+          </button>
           <button
             className={`icon-button${panel === 'pins' ? ' engaged' : ''}`}
             title={t('dm.pinnedTitle')}
@@ -352,6 +365,7 @@ export default function DmView() {
       </header>
 
       <CallPanel conversationId={conversationId} />
+      <OngoingCallBanner conversationId={conversationId} title={title} />
 
       {panel === 'pins' && (
         <PinnedPanel conversationId={conversationId} onClose={() => setPanel(null)} />

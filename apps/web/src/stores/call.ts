@@ -1,4 +1,9 @@
-import type { DmCallEndReason, DmCallIncomingPayload, VoiceTokenDto } from '@voxa/shared';
+import type {
+  DmCallEndReason,
+  DmCallIncomingPayload,
+  UserPublicDto,
+  VoiceTokenDto,
+} from '@voxa/shared';
 import {
   RemoteTrack,
   RemoteVideoTrack,
@@ -15,19 +20,20 @@ import { playJoinSound, playLeaveSound } from '../lib/sounds';
 
 /** Комната звонка живёт вне стора: LiveKit-объекты не для рендера */
 let room: Room | null = null;
-let remoteVideo: RemoteVideoTrack | null = null;
 let localVideo: LocalVideoTrack | null = null;
+/** Видео участников по их id — в беседе их может быть несколько */
+const remoteVideos = new Map<string, RemoteVideoTrack>();
 const audioElements = new Map<string, HTMLAudioElement>();
 
-export function remoteVideoTrack(): RemoteVideoTrack | null {
-  return remoteVideo;
+export function remoteVideoTrack(userId: string): RemoteVideoTrack | null {
+  return remoteVideos.get(userId) ?? null;
 }
 
 export function localVideoTrack(): LocalVideoTrack | null {
   return localVideo;
 }
 
-/** Приглушить/вернуть звук собеседника (режим «наушники выключены») */
+/** Приглушить/вернуть звук собеседников (режим «наушники выключены») */
 function applyDeafen(deafened: boolean): void {
   for (const element of audioElements.values()) element.muted = deafened;
 }
@@ -42,7 +48,7 @@ function attachAudio(track: RemoteTrack, identity: string): void {
 function cleanup(): void {
   for (const element of audioElements.values()) element.remove();
   audioElements.clear();
-  remoteVideo = null;
+  remoteVideos.clear();
   localVideo = null;
   room = null;
 }
@@ -55,15 +61,23 @@ interface CallState {
   conversationId: string | null;
   /** Данные входящего вызова (для модалки) */
   incoming: DmCallIncomingPayload | null;
-  /** Имя собеседника для панели звонка */
+  /** Заголовок разговора: имя собеседника или название беседы */
   peerName: string;
+  /** Аватар собеседника (в беседе не используется) */
+  peerAvatar: string | null;
+  /** Разговор в беседе: участников может быть больше двух */
+  isGroup: boolean;
+  /** Кто сейчас в разговоре (без меня) */
+  participants: UserPublicDto[];
+  /** Разговоры, идущие прямо сейчас: conversationId → участники */
+  ongoing: Record<string, UserPublicDto[]>;
   muted: boolean;
   /** Звук собеседника выключен (и микрофон вместе с ним, как в каналах) */
   deafened: boolean;
   cameraOn: boolean;
-  /** Собеседник включил камеру */
-  peerVideo: boolean;
-  /** Момент, когда собеседник ответил (для таймера длительности) */
+  /** Кто включил камеру (id участников) */
+  videoUserIds: string[];
+  /** Момент, когда разговор начался (для таймера длительности) */
   startedAt: number | null;
   /** Счётчик обновлений видеодорожек — чтобы компоненты перерисовались */
   videoVersion: number;
@@ -71,7 +85,15 @@ interface CallState {
   /** Чем закончился прошлый звонок (для короткого уведомления) */
   endedReason: DmCallEndReason | null;
 
-  startCall: (conversationId: string, peerName: string, video: boolean) => Promise<void>;
+  startCall: (
+    conversationId: string,
+    peerName: string,
+    video: boolean,
+    peerAvatar?: string | null,
+    isGroup?: boolean,
+  ) => Promise<void>;
+  /** Войти в идущий разговор беседы, не дожидаясь вызова */
+  joinCall: (conversationId: string, title: string) => Promise<void>;
   acceptIncoming: (peerName: string) => Promise<void>;
   declineIncoming: () => Promise<void>;
   hangUp: () => Promise<void>;
@@ -81,30 +103,50 @@ interface CallState {
   /** Обработчики WS-событий */
   onIncoming: (payload: DmCallIncomingPayload) => void;
   onAccepted: () => void;
+  onState: (conversationId: string, participants: UserPublicDto[]) => void;
   onEnded: (conversationId: string, reason: DmCallEndReason) => void;
   clearEndedReason: () => void;
 }
+
+/** Состояние, к которому возвращаемся после завершения разговора */
+const IDLE_STATE = {
+  status: 'idle' as CallStatus,
+  conversationId: null,
+  participants: [] as UserPublicDto[],
+  videoUserIds: [] as string[],
+  cameraOn: false,
+  muted: false,
+  deafened: false,
+  startedAt: null,
+};
 
 export const useCallStore = create<CallState>()((set, get) => ({
   status: 'idle',
   conversationId: null,
   incoming: null,
   peerName: '',
+  peerAvatar: null,
+  isGroup: false,
+  participants: [],
+  ongoing: {},
   muted: false,
   deafened: false,
   cameraOn: false,
-  peerVideo: false,
+  videoUserIds: [],
   startedAt: null,
   videoVersion: 0,
   error: null,
   endedReason: null,
 
-  startCall: async (conversationId, peerName, video) => {
+  startCall: async (conversationId, peerName, video, peerAvatar = null, isGroup = false) => {
     if (get().status !== 'idle') return;
     set({
       status: 'outgoing',
       conversationId,
       peerName,
+      peerAvatar,
+      isGroup,
+      participants: [],
       startedAt: null,
       error: null,
       endedReason: null,
@@ -118,8 +160,33 @@ export const useCallStore = create<CallState>()((set, get) => ({
     } catch (error) {
       cleanup();
       set({
-        status: 'idle',
-        conversationId: null,
+        ...IDLE_STATE,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  },
+
+  joinCall: async (conversationId, title) => {
+    if (get().status !== 'idle') return;
+    set({
+      status: 'active',
+      conversationId,
+      peerName: title,
+      peerAvatar: null,
+      isGroup: true,
+      startedAt: Date.now(),
+      error: null,
+      endedReason: null,
+    });
+    try {
+      const grant = await api<VoiceTokenDto>(`/dm/conversations/${conversationId}/call/accept`, {
+        method: 'POST',
+      });
+      await connect(grant, false, set, get);
+    } catch (error) {
+      cleanup();
+      set({
+        ...IDLE_STATE,
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -132,7 +199,9 @@ export const useCallStore = create<CallState>()((set, get) => ({
     set({
       status: 'active',
       conversationId,
-      peerName,
+      peerName: incoming.isGroup ? (incoming.conversationName ?? peerName) : peerName,
+      peerAvatar: incoming.from.avatarUrl,
+      isGroup: incoming.isGroup,
       incoming: null,
       startedAt: Date.now(),
       error: null,
@@ -145,8 +214,7 @@ export const useCallStore = create<CallState>()((set, get) => ({
     } catch (error) {
       cleanup();
       set({
-        status: 'idle',
-        conversationId: null,
+        ...IDLE_STATE,
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -167,15 +235,7 @@ export const useCallStore = create<CallState>()((set, get) => ({
     room = null;
     if (current) await current.disconnect();
     cleanup();
-    set({
-      status: 'idle',
-      conversationId: null,
-      peerVideo: false,
-      cameraOn: false,
-      muted: false,
-      deafened: false,
-      startedAt: null,
-    });
+    set(IDLE_STATE);
     playLeaveSound();
     if (conversationId) {
       await api<void>(`/dm/conversations/${conversationId}/call/end`, { method: 'POST' }).catch(
@@ -225,6 +285,17 @@ export const useCallStore = create<CallState>()((set, get) => ({
     if (get().status === 'outgoing') set({ status: 'active', startedAt: Date.now() });
   },
 
+  onState: (conversationId, participants) => {
+    set((s) => {
+      const ongoing = { ...s.ongoing };
+      if (participants.length === 0) delete ongoing[conversationId];
+      else ongoing[conversationId] = participants;
+
+      // Список для экрана обновляем только для своего разговора
+      return s.conversationId === conversationId ? { ongoing, participants } : { ongoing };
+    });
+  },
+
   onEnded: (conversationId, reason) => {
     const state = get();
     if (
@@ -236,23 +307,13 @@ export const useCallStore = create<CallState>()((set, get) => ({
     room = null;
     void current?.disconnect();
     cleanup();
-    set({
-      status: 'idle',
-      conversationId: null,
-      incoming: null,
-      peerVideo: false,
-      cameraOn: false,
-      muted: false,
-      deafened: false,
-      startedAt: null,
-      endedReason: reason,
-    });
+    set({ ...IDLE_STATE, incoming: null, endedReason: reason });
   },
 
   clearEndedReason: () => set({ endedReason: null }),
 }));
 
-/** Подключение к комнате звонка и подписка на дорожки собеседника */
+/** Подключение к комнате разговора и подписка на дорожки участников */
 async function connect(
   grant: VoiceTokenDto,
   video: boolean,
@@ -269,23 +330,30 @@ async function connect(
       return;
     }
     if (track.source === Track.Source.Camera) {
-      remoteVideo = track as RemoteVideoTrack;
-      set((s) => ({ peerVideo: true, videoVersion: s.videoVersion + 1 }));
+      remoteVideos.set(participant.identity, track as RemoteVideoTrack);
+      set((s) => ({
+        videoUserIds: [...new Set([...s.videoUserIds, participant.identity])],
+        videoVersion: s.videoVersion + 1,
+      }));
     }
   });
 
-  next.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack) => {
+  next.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack, _pub, participant) => {
     if (track.kind === Track.Kind.Audio) {
       track.detach().forEach((el) => el.remove());
+      audioElements.delete(participant.identity);
       return;
     }
-    if (track.source === Track.Source.Camera) {
-      remoteVideo = null;
-      set((s) => ({ peerVideo: false, videoVersion: s.videoVersion + 1 }));
+    if (track.source === Track.Source.ScreenShare || track.source === Track.Source.Camera) {
+      remoteVideos.delete(participant.identity);
+      set((s) => ({
+        videoUserIds: s.videoUserIds.filter((id) => id !== participant.identity),
+        videoVersion: s.videoVersion + 1,
+      }));
     }
   });
 
-  // Собеседник вошёл в комнату — звонок реально начался
+  // Кто-то вошёл в комнату — разговор реально начался
   next.on(RoomEvent.ParticipantConnected, () => {
     if (get().status !== 'idle')
       set({ status: 'active', startedAt: get().startedAt ?? Date.now() });
@@ -295,15 +363,7 @@ async function connect(
   next.on(RoomEvent.Disconnected, () => {
     if (room === next) {
       cleanup();
-      set({
-        status: 'idle',
-        conversationId: null,
-        peerVideo: false,
-        cameraOn: false,
-        muted: false,
-        deafened: false,
-        startedAt: null,
-      });
+      set(IDLE_STATE);
     }
   });
 
@@ -316,7 +376,7 @@ async function connect(
         LocalVideoTrack | undefined) ?? null;
   }
 
-  // Если собеседник уже в комнате (принял быстрее) — звонок активен
+  // Если собеседник уже в комнате (принял быстрее) — разговор активен
   const someoneElse = next.remoteParticipants.size > 0;
   set((s) => ({
     status: someoneElse ? 'active' : s.status,

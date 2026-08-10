@@ -158,6 +158,14 @@ export const updateProfileSchema = z.object({
   accentColor: accentColorSchema.optional(),
 });
 
+/** Быстрая смена присутствия из меню статуса */
+export const updatePresenceSchema = z.object({
+  mode: z.enum(['ONLINE', 'IDLE', 'DND', 'INVISIBLE']).optional(),
+  /** Своя строчка статуса; пустая строка снимает её */
+  statusText: z.string().trim().max(60, 'Максимум 60 символов').optional(),
+});
+export type UpdatePresenceInput = z.infer<typeof updatePresenceSchema>;
+
 /** Ник на сервере: пусто (null) — вернуть displayName */
 export const updateNicknameSchema = z.object({
   nickname: z.string().trim().max(32, 'Максимум 32 символа').or(z.literal('')),

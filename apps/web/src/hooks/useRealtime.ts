@@ -5,6 +5,7 @@ import {
   type DmMessageDto,
   type DmCallEndReason,
   type DmCallIncomingPayload,
+  type DmCallStatePayload,
   type DmReactionEventPayload,
   type GuildDto,
   type ReadStateDto,
@@ -267,6 +268,9 @@ export function useRealtime(): void {
         useCallStore.getState().onEnded(conversationId, reason);
       },
     );
+    socket.on(WsEvents.DmCallState, ({ conversationId, participants }: DmCallStatePayload) => {
+      useCallStore.getState().onState(conversationId, participants);
+    });
 
     socket.on(WsEvents.DmConversationRemoved, ({ id }: { id: string }) => {
       queryClient.setQueryData<DmConversationDto[]>(DM_CONVERSATIONS_KEY, (list) =>

@@ -14,6 +14,7 @@ import {
   voiceStateSchema,
   WsClientEvents,
   WsEvents,
+  type PresenceMode,
   type WsEventName,
   type WsServerEvents,
 } from '@voxa/shared';
@@ -129,7 +130,11 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         }),
         this.prisma.user.findUnique({
           where: { id: payload.sub },
-          select: { displayName: true, instanceBan: { select: { userId: true } } },
+          select: {
+            displayName: true,
+            presenceMode: true,
+            instanceBan: { select: { userId: true } },
+          },
         }),
       ]);
       if (!session || !user || user.instanceBan) throw new Error('session revoked or banned');
@@ -155,10 +160,13 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       };
       socket.emit(WsEvents.Ready, ready);
 
-      // Первый сокет пользователя — все видят его онлайн
-      const becameOnline = await this.presence.connected(payload.sub, socket.id);
+      // Первый сокет пользователя — все видят его в сети (с учётом режима)
+      const becameOnline = await this.presence.connected(payload.sub, socket.id, user.presenceMode);
       if (becameOnline) {
-        this.emitToAll(WsEvents.PresenceUpdate, { userId: payload.sub, status: 'online' });
+        this.emitToAll(WsEvents.PresenceUpdate, {
+          userId: payload.sub,
+          status: this.presence.statusOf(payload.sub),
+        });
       }
     } catch {
       socket.emit('auth_error', 'Авторизация не пройдена, переподключитесь с новым токеном');
@@ -179,6 +187,32 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const leftChannel = this.voiceStates.drop(data.userId);
       if (leftChannel) this.broadcastVoiceState(leftChannel);
     }
+  }
+
+  /**
+   * Клиент сообщает, что человек отошёл (нет действий несколько минут)
+   * или вернулся. Статус «отошёл» ставим только тем, кто в обычном режиме.
+   */
+  @SubscribeMessage(WsClientEvents.PresenceIdle)
+  handleIdle(@ConnectedSocket() socket: Socket, @MessageBody() body: unknown): void {
+    const data = socket.data as SocketData;
+    if (!data.userId) return;
+    const idle = typeof body === 'object' && body !== null && 'idle' in body && Boolean(body.idle);
+    const before = this.presence.statusOf(data.userId);
+    this.presence.setIdle(data.userId, idle);
+    const after = this.presence.statusOf(data.userId);
+    if (before !== after) {
+      this.emitToAll(WsEvents.PresenceUpdate, { userId: data.userId, status: after });
+    }
+  }
+
+  /** Смена режима из настроек: обновляем кэш и рассылаем новый статус */
+  broadcastPresenceMode(userId: string, mode: PresenceMode): void {
+    this.presence.setMode(userId, mode);
+    this.emitToAll(WsEvents.PresenceUpdate, {
+      userId,
+      status: this.presence.statusOf(userId),
+    });
   }
 
   /**

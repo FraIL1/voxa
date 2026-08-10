@@ -1,4 +1,4 @@
-import type { RemoteVideoTrack, LocalVideoTrack } from 'livekit-client';
+import type { UserPublicDto } from '@voxa/shared';
 import {
   Headphones,
   HeadphoneOff,
@@ -13,36 +13,44 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useAuthStore } from '../stores/auth';
 import { localVideoTrack, remoteVideoTrack, useCallStore } from '../stores/call';
+import Avatar from './Avatar';
 
-function VideoTile({
-  track,
-  label,
-  muted,
+/** Плитка участника: видео, если камера включена, иначе аватар */
+function CallTile({
+  userId,
+  name,
+  avatarUrl,
   self,
+  withVideo,
 }: {
-  track: RemoteVideoTrack | LocalVideoTrack | null;
-  label: string;
-  muted?: boolean;
+  userId: string;
+  name: string;
+  avatarUrl?: string | null;
   self?: boolean;
+  withVideo: boolean;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     const element = ref.current;
+    const track = self ? localVideoTrack() : remoteVideoTrack(userId);
     if (!element || !track) return;
     track.attach(element);
     return () => {
       track.detach(element);
     };
-  }, [track]);
-
-  if (!track) return null;
+  }, [userId, self, withVideo]);
 
   return (
-    <div className={`call-tile${self ? ' self' : ''}`}>
-      <video ref={ref} className="call-video" autoPlay playsInline muted={muted} />
-      <span className="call-tile-label">{label}</span>
+    <div className={`call-tile${self ? ' self' : ''}${withVideo ? ' video' : ''}`}>
+      {withVideo ? (
+        <video ref={ref} className="call-video" autoPlay playsInline muted={self} />
+      ) : (
+        <Avatar name={name} url={avatarUrl} className="call-tile-avatar" />
+      )}
+      <span className="call-tile-label">{name}</span>
     </div>
   );
 }
@@ -65,16 +73,20 @@ function useDuration(startedAt: number | null): string | null {
   return hours > 0 ? `${hours}:${minutes}:${seconds}` : `${minutes}:${seconds}`;
 }
 
-/** Экран активного звонка в диалоге: собеседник, видео и управление */
+/** Экран активного разговора: участники, видео и управление */
 export default function CallPanel({ conversationId }: { conversationId: string }) {
   const { t } = useTranslation();
+  const me = useAuthStore((s) => s.user);
   const status = useCallStore((s) => s.status);
   const activeConversation = useCallStore((s) => s.conversationId);
   const peerName = useCallStore((s) => s.peerName);
+  const peerAvatar = useCallStore((s) => s.peerAvatar);
+  const isGroup = useCallStore((s) => s.isGroup);
+  const participants = useCallStore((s) => s.participants);
   const muted = useCallStore((s) => s.muted);
   const deafened = useCallStore((s) => s.deafened);
   const cameraOn = useCallStore((s) => s.cameraOn);
-  const peerVideo = useCallStore((s) => s.peerVideo);
+  const videoUserIds = useCallStore((s) => s.videoUserIds);
   const startedAt = useCallStore((s) => s.startedAt);
   // Пересоздаём привязку видео, когда дорожки меняются
   const videoVersion = useCallStore((s) => s.videoVersion);
@@ -86,11 +98,15 @@ export default function CallPanel({ conversationId }: { conversationId: string }
 
   const [collapsed, setCollapsed] = useState(false);
   const duration = useDuration(startedAt);
-  const withVideo = peerVideo || cameraOn;
 
   if (activeConversation !== conversationId || (status !== 'active' && status !== 'outgoing')) {
     return null;
   }
+
+  const others: UserPublicDto[] = participants.filter((p) => p.id !== me?.id);
+  const anyVideo = cameraOn || videoUserIds.length > 0;
+  // Сетка нужна, когда собеседников больше одного или кто-то с камерой
+  const asGrid = anyVideo || others.length > 1;
 
   const statusText =
     status === 'outgoing'
@@ -99,7 +115,7 @@ export default function CallPanel({ conversationId }: { conversationId: string }
 
   return (
     <div
-      className={`call-stage${collapsed ? ' collapsed' : ''}${withVideo ? ' with-video' : ''}${
+      className={`call-stage${collapsed ? ' collapsed' : ''}${asGrid ? ' with-video' : ''}${
         status === 'outgoing' ? ' ringing' : ''
       }`}
     >
@@ -111,29 +127,50 @@ export default function CallPanel({ conversationId }: { conversationId: string }
         {collapsed ? <Maximize2 size={15} /> : <Minimize2 size={15} />}
       </button>
 
-      {withVideo ? (
+      {asGrid ? (
         <div className="call-tiles" key={videoVersion}>
-          {peerVideo && <VideoTile track={remoteVideoTrack()} label={peerName} />}
-          {cameraOn && <VideoTile track={localVideoTrack()} label={t('call.you')} muted self />}
+          {others.map((p) => (
+            <CallTile
+              key={p.id}
+              userId={p.id}
+              name={p.displayName}
+              avatarUrl={p.avatarUrl}
+              withVideo={videoUserIds.includes(p.id)}
+            />
+          ))}
+          <CallTile
+            userId={me?.id ?? 'me'}
+            name={t('call.you')}
+            avatarUrl={me?.avatarUrl}
+            withVideo={cameraOn}
+            self
+          />
         </div>
       ) : (
         <div className="call-hero">
           <div className="call-avatar-wrap">
             <span className="call-pulse" aria-hidden />
             <span className="call-pulse delayed" aria-hidden />
-            <div className="avatar call-avatar" aria-hidden>
-              {peerName.slice(0, 1).toUpperCase() || '?'}
-            </div>
+            <Avatar
+              name={others[0]?.displayName ?? peerName}
+              url={others[0]?.avatarUrl ?? peerAvatar}
+              className="call-avatar"
+            />
           </div>
           <div className="call-name">{peerName}</div>
           <div className="call-substatus">{statusText}</div>
         </div>
       )}
 
-      {withVideo && (
+      {asGrid && (
         <div className="call-overlay-status">
           <span className="call-name">{peerName}</span>
-          <span className="call-substatus">{statusText}</span>
+          <span className="call-substatus">
+            {statusText}
+            {isGroup &&
+              others.length > 0 &&
+              ` · ${t('call.participants', { count: others.length + 1 })}`}
+          </span>
         </div>
       )}
 

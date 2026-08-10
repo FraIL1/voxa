@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 
 import { useOpenDm } from '../hooks/useDm';
+import Avatar from './Avatar';
 import { EmptyBlock } from './Skeletons';
 import {
   useAcceptFriendRequest,
@@ -19,15 +20,6 @@ import {
 } from '../hooks/useFriends';
 
 type Tab = 'online' | 'all' | 'requests' | 'blocked' | 'add';
-
-function Avatar({ username, status }: { username: string; status?: FriendDto['status'] }) {
-  return (
-    <div className="avatar friend-avatar" aria-hidden>
-      {username.slice(0, 1).toUpperCase()}
-      {status && <span className={`status-dot ${status}`} />}
-    </div>
-  );
-}
 
 function FriendRows({ online }: { online: boolean }) {
   const { t } = useTranslation();
@@ -72,7 +64,12 @@ function FriendRows({ online }: { online: boolean }) {
       )}
       {shown.map((friend) => (
         <div key={friend.id} className="friend-row">
-          <Avatar username={friend.displayName} status={friend.status} />
+          <Avatar
+            name={friend.displayName}
+            url={friend.avatarUrl}
+            status={friend.status}
+            className="friend-avatar"
+          />
           <span className="friend-name">{friend.displayName}</span>
           <span className="friend-status">
             {friend.status === 'online' ? t('members.online') : t('members.offline')}
@@ -128,7 +125,11 @@ function RequestRows() {
       )}
       {incoming.map((request) => (
         <div key={request.id} className="friend-row">
-          <Avatar username={request.user.displayName} />
+          <Avatar
+            name={request.user.displayName}
+            url={request.user.avatarUrl}
+            className="friend-avatar"
+          />
           <span className="friend-name">{request.user.displayName}</span>
           <span className="friend-status">@{request.user.username}</span>
           <button
@@ -154,7 +155,11 @@ function RequestRows() {
       )}
       {outgoing.map((request) => (
         <div key={request.id} className="friend-row">
-          <Avatar username={request.user.displayName} />
+          <Avatar
+            name={request.user.displayName}
+            url={request.user.avatarUrl}
+            className="friend-avatar"
+          />
           <span className="friend-name">{request.user.displayName}</span>
           <span className="friend-status">@{request.user.username}</span>
           <button
@@ -185,7 +190,7 @@ function BlockedRows() {
       </div>
       {blocked.map((user) => (
         <div key={user.id} className="friend-row">
-          <Avatar username={user.displayName} />
+          <Avatar name={user.displayName} url={user.avatarUrl} className="friend-avatar" />
           <span className="friend-name">{user.displayName}</span>
           <span className="friend-status" />
           <button className="btn-secondary" onClick={() => unblock.mutate(user.id)}>

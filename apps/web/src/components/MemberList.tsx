@@ -7,6 +7,7 @@ import { useParams } from 'react-router';
 import { useMembers } from '../hooks/useMembers';
 import { useAuthStore } from '../stores/auth';
 import { openProfile } from '../stores/profileView';
+import Avatar from './Avatar';
 import MemberContextMenu, { type MenuState } from './MemberContextMenu';
 
 interface Group {
@@ -69,12 +70,19 @@ export default function MemberList() {
                   setMenu({ x: e.clientX, y: e.clientY, member });
                 }}
               >
-                <div className="avatar member-avatar" aria-hidden>
-                  {(member.nickname ?? member.displayName).slice(0, 1).toUpperCase()}
-                  <span className={`status-dot ${member.status}`} />
-                </div>
-                <span className="member-name" style={color ? { color } : undefined}>
-                  {member.nickname ?? member.displayName}
+                <Avatar
+                  name={member.nickname ?? member.displayName}
+                  url={member.avatarUrl}
+                  status={member.status}
+                  className="member-avatar"
+                />
+                <span className="member-text">
+                  <span className="member-name" style={color ? { color } : undefined}>
+                    {member.nickname ?? member.displayName}
+                  </span>
+                  {member.statusText && (
+                    <span className="member-status-text">{member.statusText}</span>
+                  )}
                 </span>
               </div>
             );

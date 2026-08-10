@@ -168,7 +168,7 @@ export class GuildsController {
     @Param('guildId') guildId: string,
   ): Promise<MemberDto[]> {
     await this.users.assertMember(guildId, user.id);
-    return this.users.listMembers(guildId, this.presence.onlineUserIds());
+    return this.users.listMembers(guildId, this.presence.snapshot());
   }
 
   @Patch(':guildId/members/me/nickname')

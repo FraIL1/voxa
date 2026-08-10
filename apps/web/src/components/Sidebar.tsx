@@ -12,6 +12,7 @@ import { useStructure } from '../hooks/useStructure';
 import { participantsOf, useVoiceStates } from '../hooks/useVoiceStates';
 import { useAuthStore } from '../stores/auth';
 import { useVoiceStore } from '../stores/voice';
+import Avatar from './Avatar';
 import ChannelSettingsModal from './ChannelSettingsModal';
 import CreateChannelModal from './CreateChannelModal';
 import MemberContextMenu, { type MenuState } from './MemberContextMenu';
@@ -36,9 +37,7 @@ function VoiceParticipants({
           className={`voice-participant${speaking[p.userId] ? ' speaking' : ''}`}
           onContextMenu={(e) => onContextMenu(e, p.userId, p.username)}
         >
-          <div className="avatar voice-participant-avatar" aria-hidden>
-            {p.username.slice(0, 1).toUpperCase()}
-          </div>
+          <Avatar name={p.username} className="voice-participant-avatar" />
           <span className="voice-participant-name">{p.username}</span>
           {p.muted && <MicOff size={12} />}
           {p.deafened && <HeadphoneOff size={12} />}
@@ -208,6 +207,7 @@ export default function Sidebar() {
       nickname: null,
       avatarUrl: null,
       status: 'online' as const,
+      statusText: null,
       roles: [],
       timedOutUntil: null,
       banned: false,
