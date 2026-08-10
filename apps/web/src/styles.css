@@ -51,6 +51,12 @@
   --transition: 160ms cubic-bezier(0.2, 0.8, 0.3, 1);
   --sidebar-width: 248px;
   --members-width: 216px;
+
+  /* Высоты управляющих элементов: кнопки и поля стоят в один рост */
+  --control-h: 36px;
+  --control-h-sm: 30px;
+  --control-h-lg: 44px;
+  --control-pad: 0 16px;
 }
 
 /* Светлая тема: та же геометрия и тот же циан, но на дневных поверхностях.
@@ -173,16 +179,24 @@ input,
 textarea,
 select {
   font: inherit;
+  font-size: 14px;
   color: var(--text);
   background: var(--panel-raised);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 10px 12px;
+  padding: 0 12px;
+  min-height: var(--control-h);
   outline: none;
   transition:
     border-color var(--transition),
     box-shadow var(--transition),
     background var(--transition);
+}
+
+textarea {
+  padding: 9px 12px;
+  line-height: 1.5;
+  resize: vertical;
 }
 
 input::placeholder,
@@ -273,6 +287,13 @@ h3 {
   gap: 6px;
 }
 
+/* Главная кнопка формы входа — крупная и во всю ширину карточки */
+.auth-card .btn-primary {
+  min-height: var(--control-h-lg);
+  width: 100%;
+  font-size: 15px;
+}
+
 .auth-error {
   color: var(--danger);
   font-size: 13px;
@@ -280,12 +301,32 @@ h3 {
   margin: 0;
 }
 
+/* Общая метрика кнопок: одинаковая высота, отступы и выравнивание.
+   Прозрачная рамка у главной кнопки — чтобы рядом со второстепенной
+   (у которой рамка есть) их габариты совпадали до пикселя. */
+.btn-primary,
+.btn-secondary {
+  min-height: var(--control-h);
+  padding: var(--control-pad);
+  border-radius: var(--radius);
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.btn-primary svg,
+.btn-secondary svg {
+  flex-shrink: 0;
+}
+
 .btn-primary {
   background: var(--gradient-accent);
   color: var(--accent-text);
   font-weight: 650;
-  padding: 10px 18px;
-  border-radius: var(--radius);
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.25) inset,
     0 6px 18px rgba(34, 211, 238, 0.22);
@@ -481,9 +522,13 @@ h3 {
 .friends-tab {
   background: transparent;
   color: var(--text-muted);
-  padding: 4px 12px;
+  height: var(--control-h-sm);
+  padding: 0 12px;
   font-size: 14px;
   border-radius: var(--radius);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .friends-tab:hover {
@@ -793,13 +838,18 @@ h3 {
   white-space: nowrap;
 }
 
+/* Квадрат фиксированного размера: иконки разной ширины не должны
+   растягивать кнопку и ломать ритм ряда */
 .icon-button {
   background: transparent;
   color: var(--text-muted);
-  padding: 7px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
   border-radius: var(--radius-sm);
   display: grid;
   place-items: center;
+  flex-shrink: 0;
 }
 
 .icon-button:hover:not(:disabled) {
@@ -1013,7 +1063,7 @@ h3 {
 .edit-box textarea {
   width: 100%;
   resize: none;
-  min-height: 38px;
+  min-height: 40px;
 }
 
 .edit-hint {
@@ -1043,7 +1093,6 @@ h3 {
   place-items: center;
   flex-shrink: 0;
   user-select: none;
-  overflow: hidden;
 }
 
 .message-body {
@@ -1390,15 +1439,19 @@ h3 {
   border: none;
   resize: none;
   padding: 8px 0;
+  min-height: 0;
   max-height: 40vh;
 }
 
 .send-button {
   background: var(--accent);
   color: var(--accent-text);
-  padding: 8px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
   display: grid;
   place-items: center;
+  flex-shrink: 0;
 }
 
 .send-button:hover {
@@ -1759,15 +1812,9 @@ h3 {
 
 .btn-secondary {
   background: var(--panel-raised);
-  border: 1px solid var(--border);
+  border-color: var(--border);
   color: var(--text);
-  font-size: 13px;
   font-weight: 500;
-  padding: 7px 14px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
 }
 
 .btn-secondary:hover:not(:disabled) {
@@ -1888,7 +1935,8 @@ h3 {
   background: transparent;
   color: var(--text-muted);
   text-align: left;
-  padding: 8px 10px;
+  min-height: var(--control-h);
+  padding: 0 10px;
   font-size: 14px;
 }
 
@@ -1950,11 +1998,13 @@ h3 {
 
 .settings-form select {
   font: inherit;
+  font-size: 14px;
   color: var(--text);
   background: var(--panel-raised);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 8px 10px;
+  height: var(--control-h);
+  padding: 0 10px;
 }
 
 .settings-form .btn-primary {
@@ -2023,12 +2073,13 @@ h3 {
 
 .status-dot {
   position: absolute;
-  right: -2px;
-  bottom: -2px;
-  width: 10px;
-  height: 10px;
+  right: 0;
+  bottom: 0;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   border: 2px solid var(--panel);
+  box-sizing: content-box;
 }
 
 .status-dot.online {
@@ -3347,25 +3398,20 @@ h3 {
   flex-shrink: 0;
 }
 
-/* Точка присутствия в углу аватара */
-.profile-avatar::after {
-  content: '';
-  position: absolute;
-  right: 2px;
-  bottom: 2px;
+/* Крупный аватар — крупная точка присутствия */
+.profile-avatar .status-dot {
   width: 15px;
   height: 15px;
-  border-radius: 50%;
-  border: 3px solid var(--panel-raised);
-  background: var(--text-faint);
-}
-
-.profile-avatar.status-online::after {
-  background: var(--success);
+  border-width: 3px;
+  border-color: var(--panel-raised);
+  right: 3px;
+  bottom: 3px;
 }
 
 .profile-titles {
-  padding-bottom: 6px;
+  /* Ниже кромки обложки: имя с меткой раньше налезало на цветную шапку */
+  padding-bottom: 2px;
+  padding-top: 34px;
   min-width: 0;
 }
 
@@ -3541,14 +3587,15 @@ h3 {
 
 /* ---------- Выбор оформления ---------- */
 
+/* Три равные карточки в ряд: при переносе третья растягивалась во всю
+   ширину и ряд выглядел кривым */
 .theme-choices {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 10px;
-  flex-wrap: wrap;
 }
 
 .theme-choice {
-  flex: 1 1 120px;
   padding: 10px;
   border-radius: var(--radius);
   border: 1px solid var(--border);
@@ -3689,6 +3736,8 @@ h3 {
   height: 100%;
   object-fit: cover;
   display: block;
+  /* Круглит саму картинку: на контейнере overflow резал точку присутствия */
+  border-radius: inherit;
 }
 
 .avatar[role='button'],
@@ -3736,10 +3785,11 @@ h3 {
 .me-avatar::after {
   content: '';
   position: absolute;
-  right: -1px;
-  bottom: -1px;
-  width: 12px;
-  height: 12px;
+  right: 0;
+  bottom: 0;
+  box-sizing: content-box;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   border: 2px solid var(--panel);
   background: var(--text-faint);
@@ -3946,8 +3996,8 @@ h3 {
 }
 
 .call-dock-button {
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   border-radius: var(--radius-pill);
   display: grid;
   place-items: center;

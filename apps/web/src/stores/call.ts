@@ -368,7 +368,11 @@ async function connect(
   });
 
   await next.connect(grant.url, grant.token);
-  await next.localParticipant.setMicrophoneEnabled(true);
+  // Мьют могли нажать ещё на дозвоне — подключаемся с тем состоянием,
+  // которое человек выбрал, а не с микрофоном наотмашь
+  const { muted, deafened } = get();
+  await next.localParticipant.setMicrophoneEnabled(!muted);
+  applyDeafen(deafened);
   if (video) {
     await next.localParticipant.setCameraEnabled(true).catch(() => undefined);
     localVideo =
@@ -381,8 +385,6 @@ async function connect(
   set((s) => ({
     status: someoneElse ? 'active' : s.status,
     startedAt: someoneElse ? (s.startedAt ?? Date.now()) : s.startedAt,
-    muted: false,
-    deafened: false,
     cameraOn: video,
     videoVersion: s.videoVersion + 1,
   }));
