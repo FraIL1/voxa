@@ -6,10 +6,23 @@ test.describe('Приветственная страница', () => {
     await page.goto('/');
 
     await expect(page.getByRole('heading', { level: 1 })).toContainText('Голос');
-    await expect(page.getByRole('link', { name: /Скачать для Windows/ }).first()).toBeVisible();
+    // Кнопка скачивания — ссылка, если адрес сборки задан, иначе обычная кнопка
+    await expect(page.getByText('Скачать для Windows').first()).toBeVisible();
     await expect(page.locator('#features')).toBeAttached();
     await expect(page.locator('#voice')).toBeAttached();
-    await expect(page.locator('#own')).toBeAttached();
+    await expect(page.locator('#steps')).toBeAttached();
+    await expect(page.locator('#faq')).toBeAttached();
+  });
+
+  test('в подвале указаны права и нет ссылок на исходники', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('.lp-footer')).toContainText('Все права защищены');
+
+    // Проект закрытый: ссылок на репозитории на витрине быть не должно
+    const links = await page
+      .locator('a[href]')
+      .evaluateAll((nodes) => nodes.map((n) => (n as HTMLAnchorElement).href.toLowerCase()));
+    expect(links.some((href) => href.includes('github') || href.includes('gitlab'))).toBe(false);
   });
 
   test('кнопка «Открыть в браузере» ведёт на вход', async ({ page }) => {
@@ -22,10 +35,15 @@ test.describe('Приветственная страница', () => {
     await expect(page.getByRole('button', { name: 'Войти' })).toBeVisible();
   });
 
-  test('блоки проявляются при прокрутке', async ({ page }) => {
+  test('блоки проявляются при прокрутке, вопросы раскрываются', async ({ page }) => {
     await page.goto('/');
     const features = page.locator('#features .reveal').first();
     await features.scrollIntoViewIfNeeded();
     await expect(features).toHaveClass(/shown/);
+
+    const faq = page.locator('.lp-faq').first();
+    await faq.scrollIntoViewIfNeeded();
+    await faq.getByRole('button').click();
+    await expect(faq).toHaveClass(/open/);
   });
 });

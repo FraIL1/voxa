@@ -219,6 +219,11 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           <button className="settings-tab danger" onClick={() => void logout()}>
             <LogOut size={15} /> {t('settings.logout')}
           </button>
+          <p className="settings-copyright">
+            Voxa © {new Date().getFullYear()}
+            <br />
+            {t('settings.rights')}
+          </p>
         </nav>
 
         <div className="settings-content">

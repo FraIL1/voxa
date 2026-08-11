@@ -1,5 +1,6 @@
 import {
   ArrowRight,
+  ChevronDown,
   Hash,
   Headphones,
   Lock,
@@ -10,25 +11,34 @@ import {
   Phone,
   Server,
   ShieldCheck,
+  Sparkles,
   Users,
   Zap,
 } from 'lucide-react';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, Navigate } from 'react-router';
 
 import { useAuthStore } from '../stores/auth';
 import '../landing.css';
 
-/** Где лежит установщик; задаётся при сборке, иначе — страница релизов */
-const DOWNLOAD_URL =
-  (import.meta.env.VITE_DOWNLOAD_URL as string | undefined) ??
-  'https://github.com/FraIL1/voxa/releases/latest';
+/** Где лежит установщик; задаётся при сборке (VITE_DOWNLOAD_URL) */
+const DOWNLOAD_URL = import.meta.env.VITE_DOWNLOAD_URL as string | undefined;
+
+const YEAR = new Date().getFullYear();
 
 /**
- * Блок, который проявляется при прокрутке. Наблюдатель ставит класс один
+ * Блок, который проявляется при прокрутке. Наблюдатель срабатывает один
  * раз: повторное появление не должно перезапускать анимацию.
  */
-function Reveal({ children, delay = 0 }: { children: ReactNode; delay?: number }) {
+function Reveal({
+  children,
+  delay = 0,
+  from = 'up',
+}: {
+  children: ReactNode;
+  delay?: number;
+  from?: 'up' | 'left' | 'right' | 'zoom';
+}) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -42,26 +52,87 @@ function Reveal({ children, delay = 0 }: { children: ReactNode; delay?: number }
           observer.unobserve(entry.target);
         }
       },
-      { rootMargin: '0px 0px -12% 0px' },
+      { rootMargin: '0px 0px -10% 0px' },
     );
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
 
   return (
-    <div className="reveal" ref={ref} style={{ transitionDelay: `${delay}ms` }}>
+    <div className={`reveal from-${from}`} ref={ref} style={{ transitionDelay: `${delay}ms` }}>
       {children}
     </div>
   );
 }
 
-/** Карточка возможности */
-function Feature({ icon, title, text }: { icon: ReactNode; title: string; text: string }) {
+/** Число, которое досчитывается до значения, когда попадает на экран */
+function Counter({ to, suffix = '' }: { to: number; suffix?: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [value, setValue] = useState(0);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) {
+      setValue(to);
+      return;
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((e) => e.isIntersecting)) return;
+      observer.disconnect();
+      const started = performance.now();
+      const DURATION = 1100;
+      const step = (now: number): void => {
+        const progress = Math.min(1, (now - started) / DURATION);
+        // Замедление к концу: счётчик «доезжает», а не обрывается
+        setValue(Math.round(to * (1 - Math.pow(1 - progress, 3))));
+        if (progress < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [to]);
+
   return (
-    <div className="lp-feature">
+    <span ref={ref}>
+      {value}
+      {suffix}
+    </span>
+  );
+}
+
+/** Карточка возможности с подсветкой под курсором */
+function Feature({ icon, title, text }: { icon: ReactNode; title: string; text: string }) {
+  const onMove = (e: React.MouseEvent<HTMLDivElement>): void => {
+    const box = e.currentTarget.getBoundingClientRect();
+    e.currentTarget.style.setProperty('--mx', `${e.clientX - box.left}px`);
+    e.currentTarget.style.setProperty('--my', `${e.clientY - box.top}px`);
+  };
+
+  return (
+    <div className="lp-feature" onMouseMove={onMove}>
       <span className="lp-feature-icon">{icon}</span>
       <h3>{title}</h3>
       <p>{text}</p>
+    </div>
+  );
+}
+
+/** Вопрос с раскрывающимся ответом */
+function Faq({ question, answer }: { question: string; answer: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={`lp-faq${open ? ' open' : ''}`}>
+      <button onClick={() => setOpen((v) => !v)}>
+        {question}
+        <ChevronDown size={18} />
+      </button>
+      <div className="lp-faq-answer">
+        <p>{answer}</p>
+      </div>
     </div>
   );
 }
@@ -73,52 +144,59 @@ function Feature({ icon, title, text }: { icon: ReactNode; title: string; text: 
 function AppPreview() {
   return (
     <div className="lp-preview" aria-hidden>
-      <div className="lp-preview-rail">
-        <span className="lp-rail-dot active" />
-        <span className="lp-rail-dot" />
-        <span className="lp-rail-dot" />
+      <div className="lp-preview-bar">
+        <span />
+        <span />
+        <span />
       </div>
-      <div className="lp-preview-side">
-        <div className="lp-side-title">Наш сервер</div>
-        <div className="lp-side-group">Текст</div>
-        <div className="lp-side-item active">
-          <Hash size={12} /> общий
+      <div className="lp-preview-body">
+        <div className="lp-preview-rail">
+          <span className="lp-rail-dot active" />
+          <span className="lp-rail-dot" />
+          <span className="lp-rail-dot" />
         </div>
-        <div className="lp-side-item">
-          <Hash size={12} /> мемы
-        </div>
-        <div className="lp-side-group">Голос</div>
-        <div className="lp-side-item voice">
-          <Headphones size={12} /> Посиделки
-          <span className="lp-side-badge">3</span>
-        </div>
-      </div>
-      <div className="lp-preview-main">
-        <div className="lp-msg">
-          <span className="lp-msg-avatar a">A</span>
-          <div>
-            <b>Артём</b>
-            <p>Собираемся в голосовом в девять?</p>
+        <div className="lp-preview-side">
+          <div className="lp-side-title">Наш сервер</div>
+          <div className="lp-side-group">Текст</div>
+          <div className="lp-side-item active">
+            <Hash size={12} /> общий
+          </div>
+          <div className="lp-side-item">
+            <Hash size={12} /> мемы
+          </div>
+          <div className="lp-side-group">Голос</div>
+          <div className="lp-side-item voice">
+            <Headphones size={12} /> Посиделки
+            <span className="lp-side-badge">3</span>
           </div>
         </div>
-        <div className="lp-msg">
-          <span className="lp-msg-avatar b">М</span>
-          <div>
-            <b>Марина</b>
-            <p>Я за. Захвачу фильм на вечер</p>
+        <div className="lp-preview-main">
+          <div className="lp-msg">
+            <span className="lp-msg-avatar a">А</span>
+            <div>
+              <b>Артём</b>
+              <p>Собираемся в голосовом в девять?</p>
+            </div>
           </div>
-        </div>
-        <div className="lp-msg">
-          <span className="lp-msg-avatar c">К</span>
-          <div>
-            <b>Кирилл</b>
-            <p>Уже там 🎧</p>
+          <div className="lp-msg">
+            <span className="lp-msg-avatar b">М</span>
+            <div>
+              <b>Марина</b>
+              <p>Я за. Захвачу фильм на вечер</p>
+            </div>
           </div>
-        </div>
-        <div className="lp-composer">
-          <Paperclip size={13} />
-          <span>Написать в #общий</span>
-          <span className="lp-send" />
+          <div className="lp-msg">
+            <span className="lp-msg-avatar c">К</span>
+            <div>
+              <b>Кирилл</b>
+              <p>Уже там 🎧</p>
+            </div>
+          </div>
+          <div className="lp-composer">
+            <Paperclip size={13} />
+            <span>Написать в #общий</span>
+            <span className="lp-send" />
+          </div>
         </div>
       </div>
     </div>
@@ -128,12 +206,57 @@ function AppPreview() {
 /** Приветственная страница: что такое Voxa и как начать */
 export default function LandingPage() {
   const status = useAuthStore((s) => s.status);
+  const heroRef = useRef<HTMLElement>(null);
+  const [scrolled, setScrolled] = useState(false);
+  const [downloadNote, setDownloadNote] = useState(false);
+
+  // Подсветка следует за курсором в первом экране
+  useEffect(() => {
+    const hero = heroRef.current;
+    if (!hero) return;
+    const onMove = (e: MouseEvent): void => {
+      const box = hero.getBoundingClientRect();
+      hero.style.setProperty('--gx', `${e.clientX - box.left}px`);
+      hero.style.setProperty('--gy', `${e.clientY - box.top}px`);
+    };
+    hero.addEventListener('mousemove', onMove);
+    return () => hero.removeEventListener('mousemove', onMove);
+  }, []);
+
+  // Плавающая кнопка появляется, когда шапка уходит вверх, и прячется у
+  // самого низа страницы — иначе она перекрывает строку о правах
+  useEffect(() => {
+    const onScroll = (): void => {
+      const bottomReached = window.scrollY + window.innerHeight > document.body.scrollHeight - 160;
+      setScrolled(window.scrollY > 520 && !bottomReached);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   // Вошедшего сразу пускаем внутрь: витрина ему уже не нужна
   if (status === 'authed') return <Navigate to="/home" replace />;
 
+  const downloadButton = (extra = ''): ReactNode =>
+    DOWNLOAD_URL ? (
+      <a className={`lp-btn primary ${extra}`} href={DOWNLOAD_URL} rel="noreferrer noopener">
+        <Monitor size={17} /> Скачать для Windows
+      </a>
+    ) : (
+      <button className={`lp-btn primary ${extra}`} onClick={() => setDownloadNote(true)}>
+        <Monitor size={17} /> Скачать для Windows
+      </button>
+    );
+
   return (
     <div className="lp">
+      {/* Живой фон: медленно плывущие световые пятна */}
+      <div className="lp-aurora" aria-hidden>
+        <span />
+        <span />
+        <span />
+      </div>
+
       <header className="lp-header">
         <div className="lp-wrap lp-header-inner">
           <span className="lp-logo">
@@ -143,7 +266,8 @@ export default function LandingPage() {
           <nav className="lp-nav">
             <a href="#features">Возможности</a>
             <a href="#voice">Голос</a>
-            <a href="#own">Свой сервер</a>
+            <a href="#steps">Как начать</a>
+            <a href="#faq">Вопросы</a>
           </nav>
           <Link className="lp-btn ghost" to="/login">
             Открыть Voxa
@@ -151,41 +275,76 @@ export default function LandingPage() {
         </div>
       </header>
 
-      <section className="lp-hero">
+      <section className="lp-hero" ref={heroRef}>
         <div className="lp-wrap">
-          <Reveal>
-            <p className="lp-eyebrow">Своё место для общения</p>
+          <div className="lp-hero-text">
+            <p className="lp-eyebrow rise" style={{ animationDelay: '60ms' }}>
+              <Sparkles size={14} /> Своё место для общения
+            </p>
             <h1>
-              Голос, чаты и звонки —<br />
-              на вашем собственном сервере
+              <span className="rise" style={{ animationDelay: '140ms' }}>
+                Голос, чаты и звонки
+              </span>
+              <span className="rise accent" style={{ animationDelay: '240ms' }}>
+                на вашем сервере
+              </span>
             </h1>
-            <p className="lp-lead">
+            <p className="lp-lead rise" style={{ animationDelay: '340ms' }}>
               Voxa — приложение для общения компанией: голосовые каналы, переписка, личные сообщения
-              и звонки. Работает на вашем сервере, поэтому переписка и записи остаются только у вас
+              и звонки. Всё живёт на вашем сервере, поэтому разговоры и файлы остаются только у вас
               — без рекламы, подписок и чужих глаз.
             </p>
-            <div className="lp-cta">
-              <a className="lp-btn primary" href={DOWNLOAD_URL} rel="noreferrer noopener">
-                <Monitor size={17} /> Скачать для Windows
-              </a>
+            <div className="lp-cta rise" style={{ animationDelay: '440ms' }}>
+              {downloadButton()}
               <Link className="lp-btn" to="/login">
                 Открыть в браузере <ArrowRight size={16} />
               </Link>
             </div>
-            <p className="lp-note">
+            {downloadNote && (
+              <p className="lp-note warn">Установщик появится после публикации сборки.</p>
+            )}
+            <p className="lp-note rise" style={{ animationDelay: '540ms' }}>
               Регистрация по приглашению — случайные люди на ваш сервер не попадут.
             </p>
-          </Reveal>
+          </div>
 
-          <Reveal delay={120}>
+          <div className="lp-preview-wrap rise" style={{ animationDelay: '620ms' }}>
             <AppPreview />
-          </Reveal>
+          </div>
+
+          <div className="lp-stats">
+            <Reveal delay={0}>
+              <div className="lp-stat">
+                <b>
+                  <Counter to={15} />
+                </b>
+                <span>человек в одном голосовом канале</span>
+              </div>
+            </Reveal>
+            <Reveal delay={80}>
+              <div className="lp-stat">
+                <b>
+                  <Counter to={20} />
+                </b>
+                <span>участников в групповой беседе</span>
+              </div>
+            </Reveal>
+            <Reveal delay={160}>
+              <div className="lp-stat">
+                <b>
+                  <Counter to={0} />
+                </b>
+                <span>рекламы и слежки за вами</span>
+              </div>
+            </Reveal>
+          </div>
         </div>
       </section>
 
       <section className="lp-section" id="features">
         <div className="lp-wrap">
           <Reveal>
+            <p className="lp-kicker">Возможности</p>
             <h2>Всё, что нужно компании</h2>
             <p className="lp-section-lead">
               Каналы для разговоров, роли для порядка и личка для того, что не для всех.
@@ -241,8 +400,9 @@ export default function LandingPage() {
 
       <section className="lp-section lp-voice" id="voice">
         <div className="lp-wrap lp-split">
-          <Reveal>
+          <Reveal from="left">
             <div>
+              <p className="lp-kicker">Голос</p>
               <h2>Разговор без задержки</h2>
               <p className="lp-section-lead">
                 Голос идёт напрямую между участниками, а сервер лишь соединяет их. Пятнадцать
@@ -261,7 +421,7 @@ export default function LandingPage() {
               </ul>
             </div>
           </Reveal>
-          <Reveal delay={120}>
+          <Reveal from="right" delay={120}>
             <div className="lp-voice-card">
               <div className="lp-voice-tiles">
                 <div className="lp-voice-tile speaking">
@@ -290,7 +450,7 @@ export default function LandingPage() {
 
       <section className="lp-section" id="own">
         <div className="lp-wrap lp-split reverse">
-          <Reveal>
+          <Reveal from="left">
             <div className="lp-own-card">
               <Lock size={22} />
               <p>
@@ -299,8 +459,9 @@ export default function LandingPage() {
               </p>
             </div>
           </Reveal>
-          <Reveal delay={120}>
+          <Reveal from="right" delay={120}>
             <div>
+              <p className="lp-kicker">Приватность</p>
               <h2>Сервер ваш — и данные тоже</h2>
               <p className="lp-section-lead">
                 Voxa разворачивается на любом сервере одной командой. Вы решаете, кто получит
@@ -322,17 +483,80 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="lp-final">
+      <section className="lp-section lp-steps" id="steps">
         <div className="lp-wrap">
           <Reveal>
+            <p className="lp-kicker">Как начать</p>
+            <h2>Три шага до первого разговора</h2>
+          </Reveal>
+          <div className="lp-steps-row">
+            <Reveal delay={0}>
+              <div className="lp-step">
+                <span className="lp-step-num">1</span>
+                <h3>Получите приглашение</h3>
+                <p>Владелец сервера выдаёт код — по нему создаётся аккаунт.</p>
+              </div>
+            </Reveal>
+            <Reveal delay={90}>
+              <div className="lp-step">
+                <span className="lp-step-num">2</span>
+                <h3>Откройте Voxa</h3>
+                <p>В браузере или приложением для Windows — интерфейс одинаковый.</p>
+              </div>
+            </Reveal>
+            <Reveal delay={180}>
+              <div className="lp-step">
+                <span className="lp-step-num">3</span>
+                <h3>Заходите в голосовой</h3>
+                <p>Один клик по каналу — и вы уже разговариваете с друзьями.</p>
+              </div>
+            </Reveal>
+          </div>
+        </div>
+      </section>
+
+      <section className="lp-section" id="faq">
+        <div className="lp-wrap lp-faq-wrap">
+          <Reveal>
+            <p className="lp-kicker">Вопросы</p>
+            <h2>Коротко о главном</h2>
+          </Reveal>
+          <Reveal delay={80}>
+            <div className="lp-faqs">
+              <Faq
+                question="Нужно ли что-то платить?"
+                answer="Нет. Voxa работает на вашем собственном сервере, подписок и внутренних покупок в приложении нет."
+              />
+              <Faq
+                question="Чем приложение отличается от версии в браузере?"
+                answer="Ничем по возможностям. Приложение дополнительно умеет сворачиваться в трей, запускаться вместе с системой и выключать микрофон горячими клавишами, даже когда окно неактивно."
+              />
+              <Faq
+                question="Кто видит мою переписку?"
+                answer="Только собеседники. Данные не уходят никуда за пределы вашего сервера, аналитики и рекламных модулей в приложении нет."
+              />
+              <Faq
+                question="Сколько человек выдержит голосовой канал?"
+                answer="Пятнадцать одновременно говорящих проверены нагрузочным тестом. Обычной компании этого хватает с запасом."
+              />
+              <Faq
+                question="Можно ли зарегистрироваться без приглашения?"
+                answer="Нет. Аккаунт создаётся только по коду от владельца — так на сервер не попадут посторонние."
+              />
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      <section className="lp-final">
+        <div className="lp-wrap">
+          <Reveal from="zoom">
             <h2>Соберите своих</h2>
             <p className="lp-section-lead">
               Установите приложение или откройте Voxa прямо в браузере — работает одинаково.
             </p>
             <div className="lp-cta center">
-              <a className="lp-btn primary" href={DOWNLOAD_URL} rel="noreferrer noopener">
-                <Monitor size={17} /> Скачать для Windows
-              </a>
+              {downloadButton()}
               <Link className="lp-btn" to="/login">
                 Открыть в браузере <ArrowRight size={16} />
               </Link>
@@ -347,16 +571,14 @@ export default function LandingPage() {
             <span className="lp-logo-mark">V</span>
             Voxa
           </span>
-          <span className="lp-footer-note">Открытый исходный код · Работает на вашем сервере</span>
-          <a
-            className="lp-footer-link"
-            href="https://github.com/FraIL1/voxa"
-            rel="noreferrer noopener"
-          >
-            Исходный код
-          </a>
+          <span className="lp-footer-note">© {YEAR} Voxa. Все права защищены.</span>
         </div>
       </footer>
+
+      {/* Кнопка догоняет читателя, когда шапка уже далеко вверху */}
+      <Link className={`lp-float${scrolled ? ' shown' : ''}`} to="/login">
+        Открыть Voxa <ArrowRight size={16} />
+      </Link>
     </div>
   );
 }

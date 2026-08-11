@@ -405,7 +405,8 @@
     "avatarHint": "PNG, JPEG или GIF до 8 МБ. Картинка обрежется в квадрат.",
     "statusText": "Строчка статуса",
     "statusTextPlaceholder": "Чем занят — увидят в профиле",
-    "bioLeft": "Осталось символов: {{count}}"
+    "bioLeft": "Осталось символов: {{count}}",
+    "rights": "Все права защищены"
   },
   "voice": {
     "join": "Подключиться",

@@ -4488,3 +4488,11 @@ h3 {
   top: auto;
   bottom: -6px;
 }
+
+/* Права на приложение — внизу колонки настроек */
+.settings-copyright {
+  margin: 14px 10px 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-faint);
+}

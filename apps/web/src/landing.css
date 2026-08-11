@@ -2,25 +2,109 @@
    с интерфейсом приложения, но пользуется теми же токенами темы. */
 
 .lp {
+  position: relative;
   min-height: 100%;
   background: var(--bg);
   color: var(--text);
   overflow-x: hidden;
+  overflow-y: clip;
 }
 
 .lp-wrap {
+  position: relative;
+  z-index: 1;
   width: min(1120px, 100% - 40px);
   margin: 0 auto;
 }
 
-/* ---------- Появление блоков при прокрутке ---------- */
+/* ---------- Живой фон ---------- */
+
+/* Медленно плывущие пятна света: страница дышит, но ничего не мельтешит */
+.lp-aurora {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1400px;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.lp-aurora span {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.5;
+  will-change: transform;
+}
+
+.lp-aurora span:nth-child(1) {
+  width: 520px;
+  height: 520px;
+  top: -140px;
+  left: -80px;
+  background: var(--accent);
+  animation: drift-a 22s ease-in-out infinite alternate;
+}
+
+.lp-aurora span:nth-child(2) {
+  width: 460px;
+  height: 460px;
+  top: 60px;
+  right: -120px;
+  background: #2dd4bf;
+  animation: drift-b 26s ease-in-out infinite alternate;
+}
+
+.lp-aurora span:nth-child(3) {
+  width: 380px;
+  height: 380px;
+  top: 620px;
+  left: 42%;
+  background: #a855f7;
+  opacity: 0.3;
+  animation: drift-c 30s ease-in-out infinite alternate;
+}
+
+@keyframes drift-a {
+  to {
+    transform: translate3d(120px, 80px, 0) scale(1.15);
+  }
+}
+
+@keyframes drift-b {
+  to {
+    transform: translate3d(-140px, 120px, 0) scale(1.1);
+  }
+}
+
+@keyframes drift-c {
+  to {
+    transform: translate3d(90px, -70px, 0) scale(1.2);
+  }
+}
+
+/* ---------- Появление блоков ---------- */
 
 .reveal {
   opacity: 0;
-  transform: translateY(22px);
   transition:
-    opacity 600ms cubic-bezier(0.2, 0.8, 0.3, 1),
-    transform 600ms cubic-bezier(0.2, 0.8, 0.3, 1);
+    opacity 640ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    transform 640ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.reveal.from-up {
+  transform: translateY(26px);
+}
+
+.reveal.from-left {
+  transform: translateX(-28px);
+}
+
+.reveal.from-right {
+  transform: translateX(28px);
+}
+
+.reveal.from-zoom {
+  transform: scale(0.94);
 }
 
 .reveal.shown {
@@ -28,12 +112,35 @@
   transform: none;
 }
 
-/* Тем, кому анимации мешают, показываем всё сразу */
+/* Первый экран показывается сразу, поэтому анимируется по таймеру */
+.rise {
+  opacity: 0;
+  animation: rise 720ms cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Тем, кому анимации мешают, показываем всё сразу и без движения */
 @media (prefers-reduced-motion: reduce) {
-  .reveal {
+  .reveal,
+  .rise {
     opacity: 1;
     transform: none;
     transition: none;
+    animation: none;
+  }
+
+  .lp-aurora span {
+    animation: none;
   }
 }
 
@@ -42,9 +149,9 @@
 .lp-header {
   position: sticky;
   top: 0;
-  z-index: 10;
-  backdrop-filter: blur(12px);
-  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  z-index: 20;
+  backdrop-filter: blur(14px);
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
   border-bottom: 1px solid var(--border);
 }
 
@@ -52,7 +159,7 @@
   display: flex;
   align-items: center;
   gap: 24px;
-  height: 64px;
+  height: 66px;
 }
 
 .lp-logo {
@@ -74,6 +181,7 @@
   color: var(--accent-text);
   font-size: 16px;
   font-weight: 800;
+  box-shadow: 0 6px 18px rgba(34, 211, 238, 0.28);
 }
 
 .lp-logo.small {
@@ -87,14 +195,35 @@
 }
 
 .lp-nav a {
+  position: relative;
   color: var(--text-muted);
   text-decoration: none;
   font-size: 14px;
   transition: color var(--transition);
 }
 
+/* Подчёркивание вырастает от середины */
+.lp-nav a::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  right: 50%;
+  bottom: -6px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--gradient-accent);
+  transition:
+    left var(--transition),
+    right var(--transition);
+}
+
 .lp-nav a:hover {
   color: var(--text);
+}
+
+.lp-nav a:hover::after {
+  left: 0;
+  right: 0;
 }
 
 /* ---------- Кнопки ---------- */
@@ -104,8 +233,8 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 44px;
-  padding: 0 20px;
+  min-height: 46px;
+  padding: 0 22px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--border-strong);
   background: var(--panel-raised);
@@ -114,6 +243,7 @@
   font-weight: 600;
   text-decoration: none;
   white-space: nowrap;
+  cursor: pointer;
   transition:
     transform var(--transition),
     background var(--transition),
@@ -121,19 +251,37 @@
 }
 
 .lp-btn:hover {
-  transform: translateY(-1px);
+  transform: translateY(-2px);
   background: var(--panel-hover);
 }
 
 .lp-btn.primary {
+  position: relative;
   background: var(--gradient-accent);
   border-color: transparent;
   color: var(--accent-text);
-  box-shadow: 0 10px 30px rgba(34, 211, 238, 0.22);
+  box-shadow: 0 12px 34px rgba(34, 211, 238, 0.26);
+  overflow: hidden;
+}
+
+/* Блик пробегает по главной кнопке при наведении */
+.lp-btn.primary::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40%;
+  left: -60%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  transition: left 600ms ease;
+}
+
+.lp-btn.primary:hover::after {
+  left: 120%;
 }
 
 .lp-btn.primary:hover {
-  filter: brightness(1.06);
+  filter: brightness(1.05);
 }
 
 .lp-btn.ghost {
@@ -143,44 +291,97 @@
   background: transparent;
 }
 
+/* Кнопка, догоняющая читателя при прокрутке */
+.lp-float {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 30;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 20px;
+  border-radius: var(--radius-pill);
+  background: var(--gradient-accent);
+  color: var(--accent-text);
+  font-weight: 650;
+  text-decoration: none;
+  box-shadow: 0 14px 36px rgba(34, 211, 238, 0.3);
+  opacity: 0;
+  transform: translateY(16px) scale(0.96);
+  pointer-events: none;
+  transition:
+    opacity var(--transition),
+    transform var(--transition);
+}
+
+.lp-float.shown {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
 /* ---------- Первый экран ---------- */
 
 .lp-hero {
   position: relative;
-  padding: 84px 0 96px;
+  padding: 92px 0 88px;
   text-align: center;
 }
 
-/* Мягкое сияние за заголовком — тот же приём, что на экране входа */
+/* Подсветка следует за курсором; до движения мыши стоит по центру */
 .lp-hero::before {
   content: '';
   position: absolute;
-  inset: -20% 0 auto;
-  height: 620px;
-  background: radial-gradient(60rem 26rem at 50% 0%, var(--accent-soft), transparent 70%);
+  inset: 0;
+  background: radial-gradient(
+    28rem 20rem at var(--gx, 50%) var(--gy, 30%),
+    var(--accent-soft),
+    transparent 70%
+  );
   pointer-events: none;
+  transition: background 200ms ease-out;
 }
 
 .lp-eyebrow {
-  margin: 0 0 14px;
-  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 18px;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--accent-line);
+  background: var(--accent-soft);
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--accent);
 }
 
 .lp-hero h1 {
-  margin: 0 0 18px;
-  font-size: clamp(34px, 5.4vw, 60px);
-  line-height: 1.08;
-  letter-spacing: -0.03em;
+  margin: 0 0 20px;
+  font-size: clamp(34px, 5.6vw, 64px);
+  line-height: 1.06;
+  letter-spacing: -0.035em;
   font-weight: 800;
 }
 
+.lp-hero h1 span {
+  display: block;
+}
+
+/* Вторая строка заголовка залита градиентом акцента */
+.lp-hero h1 .accent {
+  background: var(--gradient-accent);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
 .lp-lead {
-  max-width: 680px;
-  margin: 0 auto 30px;
+  max-width: 700px;
+  margin: 0 auto 32px;
   font-size: 17px;
   line-height: 1.6;
   color: var(--text-muted);
@@ -199,18 +400,86 @@
   color: var(--text-faint);
 }
 
+.lp-note.warn {
+  color: var(--warning);
+}
+
+/* ---------- Цифры под первым экраном ---------- */
+
+.lp-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+  margin-top: 64px;
+  text-align: left;
+}
+
+.lp-stat {
+  padding: 22px 24px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--gradient-surface), var(--panel);
+}
+
+.lp-stat b {
+  display: block;
+  font-size: 40px;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  background: var(--gradient-accent);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.lp-stat span {
+  display: block;
+  margin-top: 8px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
 /* ---------- Макет приложения ---------- */
 
+.lp-preview-wrap {
+  perspective: 1400px;
+  margin-top: 60px;
+}
+
 .lp-preview {
-  display: flex;
-  height: 340px;
-  margin-top: 56px;
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-strong);
   background: var(--panel);
   box-shadow: var(--shadow-lg);
   overflow: hidden;
   text-align: left;
+  transform: rotateX(6deg);
+  transition: transform 500ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.lp-preview:hover {
+  transform: rotateX(0deg) translateY(-4px);
+}
+
+/* Полоска окна: макет читается как приложение, а не как кусок вёрстки */
+.lp-preview-bar {
+  display: flex;
+  gap: 7px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-raised);
+}
+
+.lp-preview-bar span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--border-strong);
+}
+
+.lp-preview-body {
+  display: flex;
+  height: 330px;
 }
 
 .lp-preview-rail {
@@ -365,14 +634,24 @@
 /* ---------- Секции ---------- */
 
 .lp-section {
-  padding: 88px 0;
+  position: relative;
+  padding: 96px 0;
   border-top: 1px solid var(--border);
+}
+
+.lp-kicker {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
 }
 
 .lp-section h2 {
   margin: 0 0 12px;
-  font-size: clamp(26px, 3.4vw, 38px);
-  letter-spacing: -0.025em;
+  font-size: clamp(26px, 3.6vw, 40px);
+  letter-spacing: -0.028em;
   font-weight: 800;
 }
 
@@ -388,45 +667,69 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 18px;
-  margin-top: 40px;
+  margin-top: 44px;
 }
 
 .lp-feature {
+  position: relative;
   height: 100%;
-  padding: 24px;
+  padding: 26px;
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   background: var(--gradient-surface), var(--panel);
+  overflow: hidden;
   transition:
     transform var(--transition),
     border-color var(--transition),
     box-shadow var(--transition);
 }
 
+/* Пятно света под курсором внутри карточки */
+.lp-feature::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    14rem 14rem at var(--mx, 50%) var(--my, 0%),
+    var(--accent-soft),
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity var(--transition);
+  pointer-events: none;
+}
+
 .lp-feature:hover {
-  transform: translateY(-3px);
+  transform: translateY(-4px);
   border-color: var(--accent-line);
   box-shadow: var(--shadow-md);
 }
 
+.lp-feature:hover::before {
+  opacity: 1;
+}
+
 .lp-feature-icon {
+  position: relative;
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   border-radius: var(--radius);
   background: var(--accent-soft);
   color: var(--accent);
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 
 .lp-feature h3 {
+  position: relative;
   margin: 0 0 8px;
   font-size: 17px;
   letter-spacing: -0.01em;
 }
 
 .lp-feature p {
+  position: relative;
   margin: 0;
   font-size: 14px;
   line-height: 1.6;
@@ -437,12 +740,12 @@
 .lp-split {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 44px;
+  gap: 48px;
   align-items: center;
 }
 
 .lp-list {
-  margin: 22px 0 0;
+  margin: 24px 0 0;
   padding: 0;
   list-style: none;
   display: flex;
@@ -465,7 +768,7 @@
 
 /* Наглядный блок голосового канала */
 .lp-voice-card {
-  padding: 26px;
+  padding: 28px;
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-strong);
   background: radial-gradient(90% 70% at 50% 0%, var(--accent-soft), transparent 70%), var(--panel);
@@ -497,21 +800,34 @@
   font-size: 17px;
 }
 
+/* Говорящий подсвечен и мягко пульсирует */
 .lp-voice-tile.speaking {
   border-color: var(--success);
-  box-shadow: 0 0 0 1px var(--success);
+  animation: talk 2.4s ease-in-out infinite;
+}
+
+@keyframes talk {
+  0%,
+  100% {
+    box-shadow: 0 0 0 1px var(--success);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px var(--success),
+      0 0 26px rgba(52, 211, 153, 0.35);
+  }
 }
 
 .lp-voice-controls {
   display: flex;
   justify-content: center;
   gap: 10px;
-  margin-top: 22px;
+  margin-top: 24px;
 }
 
 .lp-voice-btn {
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   background: var(--panel-raised);
   border: 1px solid var(--border-strong);
@@ -528,7 +844,7 @@
 }
 
 .lp-own-card {
-  padding: 32px;
+  padding: 34px;
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   background: var(--gradient-surface), var(--panel);
@@ -547,10 +863,135 @@
   color: var(--text-muted);
 }
 
+/* ---------- Шаги ---------- */
+
+.lp-steps-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 18px;
+  margin-top: 44px;
+}
+
+.lp-step {
+  height: 100%;
+  padding: 26px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--gradient-surface), var(--panel);
+  transition:
+    transform var(--transition),
+    border-color var(--transition);
+}
+
+.lp-step:hover {
+  transform: translateY(-4px);
+  border-color: var(--accent-line);
+}
+
+.lp-step-num {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 16px;
+  border-radius: 50%;
+  background: var(--gradient-accent);
+  color: var(--accent-text);
+  font-weight: 800;
+  font-size: 17px;
+}
+
+.lp-step h3 {
+  margin: 0 0 8px;
+  font-size: 17px;
+}
+
+.lp-step p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+/* ---------- Вопросы ---------- */
+
+.lp-faq-wrap {
+  max-width: 780px;
+}
+
+.lp-faqs {
+  margin-top: 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lp-faq {
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--panel);
+  overflow: hidden;
+  transition: border-color var(--transition);
+}
+
+.lp-faq.open {
+  border-color: var(--accent-line);
+}
+
+.lp-faq > button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 18px 20px;
+  background: transparent;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.lp-faq > button svg {
+  color: var(--text-faint);
+  flex-shrink: 0;
+  transition: transform var(--transition);
+}
+
+.lp-faq.open > button svg {
+  transform: rotate(180deg);
+  color: var(--accent);
+}
+
+/* Раскрытие через grid-строку: работает без известной высоты содержимого */
+.lp-faq-answer {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 260ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.lp-faq.open .lp-faq-answer {
+  grid-template-rows: 1fr;
+}
+
+.lp-faq-answer p {
+  overflow: hidden;
+  margin: 0;
+  padding: 0 20px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.lp-faq.open .lp-faq-answer p {
+  padding-bottom: 18px;
+}
+
 /* ---------- Финальный призыв и подвал ---------- */
 
 .lp-final {
-  padding: 96px 0;
+  position: relative;
+  padding: 104px 0;
   text-align: center;
   border-top: 1px solid var(--border);
   background: radial-gradient(50rem 22rem at 50% 100%, var(--accent-soft), transparent 70%);
@@ -558,13 +999,13 @@
 
 .lp-final h2 {
   margin: 0 0 12px;
-  font-size: clamp(28px, 4vw, 42px);
-  letter-spacing: -0.03em;
+  font-size: clamp(28px, 4.2vw, 46px);
+  letter-spacing: -0.035em;
   font-weight: 800;
 }
 
 .lp-final .lp-section-lead {
-  margin: 0 auto 28px;
+  margin: 0 auto 30px;
 }
 
 .lp-cta.center {
@@ -572,7 +1013,7 @@
 }
 
 .lp-footer {
-  padding: 26px 0;
+  padding: 28px 0;
   border-top: 1px solid var(--border);
 }
 
@@ -584,19 +1025,9 @@
 }
 
 .lp-footer-note {
+  margin-left: auto;
   font-size: 13px;
   color: var(--text-faint);
-}
-
-.lp-footer-link {
-  margin-left: auto;
-  font-size: 14px;
-  color: var(--text-muted);
-  text-decoration: none;
-}
-
-.lp-footer-link:hover {
-  color: var(--accent);
 }
 
 /* ---------- Узкие экраны ---------- */
@@ -606,12 +1037,16 @@
     display: none;
   }
 
-  .lp-preview {
+  .lp-preview-body {
     height: 300px;
   }
 
   .lp-preview-side {
     display: none;
+  }
+
+  .lp-preview {
+    transform: none;
   }
 
   .lp-hero {
@@ -620,11 +1055,24 @@
 
   .lp-section,
   .lp-final {
-    padding: 64px 0;
+    padding: 68px 0;
+  }
+
+  .lp-stats {
+    margin-top: 44px;
   }
 
   /* На узком экране картинка уходит под текст, а не над ним */
   .lp-split.reverse .lp-own-card {
     order: 0;
+  }
+
+  .lp-float {
+    right: 16px;
+    bottom: 16px;
+  }
+
+  .lp-footer-note {
+    margin-left: 0;
   }
 }
