@@ -34,7 +34,7 @@ import { useCallStore } from '../stores/call';
 import CallPanel from './CallPanel';
 import OngoingCallBanner from './OngoingCallBanner';
 import { dmTitle } from '../api/dm-cache';
-import { GroupPanel, PeerProfilePanel, PinnedPanel, SearchPanel } from './DmHeaderPanels';
+import { GroupPanel, PeerProfileAside, PinnedPanel, SearchPanel } from './DmHeaderPanels';
 import DmMessageItem from './DmMessageItem';
 import { EmptyBlock, MessagesSkeleton } from './Skeletons';
 
@@ -373,15 +373,19 @@ export default function DmView() {
       {panel === 'search' && (
         <SearchPanel conversationId={conversationId} onClose={() => setPanel(null)} />
       )}
-      {panel === 'profile' && peer && (
-        <PeerProfilePanel peer={peer} onClose={() => setPanel(null)} />
-      )}
       {panel === 'group' && conversation && (
         <GroupPanel conversation={conversation} onClose={() => setPanel(null)} />
       )}
 
-      <DmMessages conversationId={conversationId} />
-      <DmComposer conversationId={conversationId} peerName={title} />
+      <div className="dm-body">
+        <div className="dm-main">
+          <DmMessages conversationId={conversationId} />
+          <DmComposer conversationId={conversationId} peerName={title} />
+        </div>
+        {panel === 'profile' && peer && (
+          <PeerProfileAside peer={peer} onClose={() => setPanel(null)} />
+        )}
+      </div>
     </div>
   );
 }

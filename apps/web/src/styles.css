@@ -1263,7 +1263,6 @@ h3 {
 
 .attach-button {
   align-self: flex-end;
-  padding: 8px;
 }
 
 .spin {
@@ -1429,11 +1428,13 @@ h3 {
 .composer-inner {
   display: flex;
   align-items: flex-end;
-  gap: 8px;
+  gap: 6px;
   background: var(--panel-raised);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 6px 6px 6px 14px;
+  /* Отступы одинаковые со всех сторон: скрепка и отправка на равном
+     расстоянии от краёв, иначе строка выглядит перекошенной */
+  padding: 6px;
   box-shadow: var(--shadow-sm);
   transition:
     border-color var(--transition),
@@ -1450,9 +1451,15 @@ h3 {
   background: transparent;
   border: none;
   resize: none;
-  padding: 8px 0;
-  min-height: 0;
+  padding: 6px 4px;
+  min-height: 32px;
+  line-height: 20px;
   max-height: 40vh;
+}
+
+/* Своя рамка фокуса не нужна: подсвечивается вся строка ввода */
+.composer textarea:focus-visible {
+  box-shadow: none;
 }
 
 .send-button {
@@ -3513,10 +3520,51 @@ h3 {
   gap: 10px;
 }
 
-/* Профиль внутри выпадающей панели диалога — без второй рамки */
-.dm-panel .profile-card {
+/* Профиль колонкой справа: карточка занимает её целиком, без своей рамки */
+.dm-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.dm-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.dm-profile-aside {
+  position: relative;
+  width: 320px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  background: var(--panel);
+  overflow-y: auto;
+  animation: aside-in 180ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+@keyframes aside-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}
+
+.dm-profile-aside .profile-card {
   border: none;
+  border-radius: 0;
   background: transparent;
+}
+
+/* Обложка в колонке выше: карточка тут главная, а не всплывающая */
+.dm-profile-aside .profile-cover {
+  height: 96px;
+}
+
+.dm-profile-aside .profile-actions button {
+  flex: 1 1 100%;
 }
 
 /* Имя автора и аватар в чате открывают карточку */

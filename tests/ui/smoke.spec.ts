@@ -56,6 +56,31 @@ test.describe('Карточка профиля', () => {
   });
 });
 
+test.describe('Профиль в личке', () => {
+  test('открывается колонкой справа, а не полосой во всю ширину', async ({ owner }) => {
+    await owner.getByRole('button', { name: 'Все', exact: true }).click();
+    await owner.getByTitle('Написать').first().click();
+    await owner.waitForURL(/\/dm\//);
+
+    await owner.locator('.dm-header-actions').getByTitle('Профиль').click();
+    const aside = owner.locator('.dm-profile-aside');
+    await expect(aside).toBeVisible();
+    await expect(aside.getByText('@uitest_friend')).toBeVisible();
+
+    // Колонка узкая и стоит справа от переписки
+    const asideBox = await aside.boundingBox();
+    const viewport = owner.viewportSize();
+    expect(asideBox && viewport).toBeTruthy();
+    expect(asideBox!.width).toBeLessThan(420);
+    expect(asideBox!.x).toBeGreaterThan(viewport!.width / 2);
+
+    // Лента остаётся видимой рядом
+    await expect(owner.locator('.dm-main .composer')).toBeVisible();
+    await aside.getByTitle('Закрыть').click();
+    await expect(aside).toBeHidden();
+  });
+});
+
 test.describe('Оформление', () => {
   test('светлая тема переключается и запоминается', async ({ owner }) => {
     await owner.locator('.user-card').getByTitle('Настройки').first().click();

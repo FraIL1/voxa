@@ -106,8 +106,11 @@ export function SearchPanel({
   );
 }
 
-/** Карточка профиля собеседника (для 1-на-1) */
-export function PeerProfilePanel({
+/**
+ * Профиль собеседника колонкой справа от переписки. Выпадающей полосой во
+ * всю ширину карточка выглядела растянутой, а её шапка налезала на заголовок.
+ */
+export function PeerProfileAside({
   peer,
   onClose,
 }: {
@@ -116,15 +119,12 @@ export function PeerProfilePanel({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="dm-panel">
-      <div className="dm-panel-head">
-        <span>{t('dm.profileTitle')}</span>
-        <button className="icon-button" onClick={onClose} title={t('settings.close')}>
-          <X size={16} />
-        </button>
-      </div>
+    <aside className="dm-profile-aside">
+      <button className="icon-button profile-close" onClick={onClose} title={t('settings.close')}>
+        <X size={16} />
+      </button>
       <ProfileBody userId={peer.id} onNavigate={onClose} />
-    </div>
+    </aside>
   );
 }
 
