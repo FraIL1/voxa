@@ -25,8 +25,8 @@ export class PresenceService implements OnApplicationShutdown {
   private readonly sockets = new Map<string, Set<string>>();
   /** Выбор пользователя; подтягивается из БД при подключении */
   private readonly modes = new Map<string, PresenceMode>();
-  /** Клиент сообщил, что человек отошёл от компьютера */
-  private readonly idle = new Set<string>();
+  /** Простаивающие сокеты по пользователям: userId → id сокетов */
+  private readonly idleSockets = new Map<string, Set<string>>();
   private readonly refreshTimer: NodeJS.Timeout;
 
   constructor(@Inject(REDIS) private readonly redis: Redis) {
@@ -51,6 +51,8 @@ export class PresenceService implements OnApplicationShutdown {
       this.sockets.set(userId, set);
     }
     set.add(socketId);
+    // Новое окно всегда активно: свёрнутый десктоп не должен помечать его
+    this.idleSockets.get(userId)?.delete(socketId);
     this.modes.set(userId, mode);
     await this.redis.set(presenceKey(userId), '1', 'EX', PRESENCE_TTL_S);
     return becameOnline;
@@ -61,11 +63,12 @@ export class PresenceService implements OnApplicationShutdown {
     const set = this.sockets.get(userId);
     if (!set) return false;
     set.delete(socketId);
+    this.idleSockets.get(userId)?.delete(socketId);
     if (set.size > 0) return false;
 
     this.sockets.delete(userId);
     this.modes.delete(userId);
-    this.idle.delete(userId);
+    this.idleSockets.delete(userId);
     await this.redis.del(presenceKey(userId));
     return true;
   }
@@ -75,10 +78,28 @@ export class PresenceService implements OnApplicationShutdown {
     if (this.sockets.has(userId)) this.modes.set(userId, mode);
   }
 
-  /** Клиент сообщает о простое: «отошёл» ставится и снимается автоматически */
-  setIdle(userId: string, value: boolean): void {
-    if (value) this.idle.add(userId);
-    else this.idle.delete(userId);
+  /**
+   * Клиент сообщает о простое. Учитываем каждое окно отдельно: человек
+   * отошёл, только когда простаивают ВСЕ его клиенты. Иначе свёрнутый
+   * десктоп помечал бы «отошёл» и активную вкладку в браузере.
+   */
+  setIdle(userId: string, socketId: string, value: boolean): void {
+    let idle = this.idleSockets.get(userId);
+    if (!idle) {
+      idle = new Set();
+      this.idleSockets.set(userId, idle);
+    }
+    if (value) idle.add(socketId);
+    else idle.delete(socketId);
+  }
+
+  /** Все ли окна пользователя простаивают */
+  private isIdle(userId: string): boolean {
+    const sockets = this.sockets.get(userId);
+    if (!sockets || sockets.size === 0) return false;
+    const idle = this.idleSockets.get(userId);
+    if (!idle || idle.size === 0) return false;
+    return [...sockets].every((id) => idle.has(id));
   }
 
   /** Есть ли живые сокеты (для счётчиков панели владельца) */
@@ -95,7 +116,7 @@ export class PresenceService implements OnApplicationShutdown {
     const mode = this.modes.get(userId) ?? 'ONLINE';
     if (mode === 'INVISIBLE') return 'offline';
     if (mode === 'DND') return 'dnd';
-    if (mode === 'IDLE' || this.idle.has(userId)) return 'idle';
+    if (mode === 'IDLE' || this.isIdle(userId)) return 'idle';
     return 'online';
   }
 

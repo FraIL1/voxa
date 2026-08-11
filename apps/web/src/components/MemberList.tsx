@@ -19,7 +19,8 @@ interface Group {
 function groupMembers(members: MemberDto[], offlineLabel: string): Group[] {
   const groups = new Map<string, Group>();
   for (const member of members) {
-    const online = member.status === 'online';
+    // «Отошёл» и «не беспокоить» — это присутствие, а не офлайн
+    const online = member.status !== 'offline';
     const topRole = member.roles[0];
     const label = online ? (topRole?.name ?? '—') : offlineLabel;
     const position = online ? (topRole?.position ?? 0) : -1;

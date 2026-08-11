@@ -13,10 +13,11 @@ import { useTranslation } from 'react-i18next';
 
 import { useAudioSession } from '../hooks/useAudioSession';
 import { useAuthStore } from '../stores/auth';
+import { usePresenceStore } from '../stores/presence';
 import { useVoiceStore } from '../stores/voice';
 import Avatar from './Avatar';
 import SettingsModal from './SettingsModal';
-import ProfileMenu, { dotOf } from './ProfileMenu';
+import ProfileMenu from './ProfileMenu';
 
 /** Карточка пользователя внизу боковой панели: голос, микрофон, настройки.
  *  Клик по нику/аватару открывает настройки (профиль). Общая для дома и сервера.
@@ -25,6 +26,7 @@ export default function UserCard() {
   const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const connecting = useVoiceStore((s) => s.connecting);
+  const myStatus = usePresenceStore((s) => s.myStatus);
   const audio = useAudioSession();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
@@ -64,12 +66,12 @@ export default function UserCard() {
           <Avatar
             name={user?.displayName ?? user?.username ?? '?'}
             url={user?.avatarUrl}
-            className={`me-avatar dot-${dotOf(user?.presenceMode ?? 'ONLINE')}`}
+            className={`me-avatar dot-${myStatus}`}
           />
           <span className="user-card-names">
             <span className="username">{user?.displayName ?? user?.username}</span>
             <span className="user-card-status">
-              {user?.statusText || t(`presence.${user?.presenceMode ?? 'ONLINE'}`)}
+              {user?.statusText || t(`presence.${myStatus}`)}
             </span>
           </span>
         </button>

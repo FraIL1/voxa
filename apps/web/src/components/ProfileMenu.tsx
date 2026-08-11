@@ -7,6 +7,7 @@ import { useSubmenuFlip } from '../hooks/useMenuPlacement';
 import { logout } from '../api/auth';
 import { api } from '../api/client';
 import { useAuthStore } from '../stores/auth';
+import { usePresenceStore } from '../stores/presence';
 import Avatar from './Avatar';
 
 /** Порядок в подменю: от «я тут» к «меня нет» */
@@ -34,6 +35,7 @@ export default function ProfileMenu({
   const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
+  const myStatus = usePresenceStore((s) => s.myStatus);
   const ref = useRef<HTMLDivElement>(null);
   const [statusOpen, setStatusOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -78,7 +80,7 @@ export default function ProfileMenu({
         <Avatar
           name={user?.displayName ?? '?'}
           url={user?.avatarUrl}
-          className={`profile-menu-avatar dot-${dotOf(mode)}`}
+          className={`profile-menu-avatar dot-${myStatus}`}
         />
         <div className="profile-menu-name">{user?.displayName}</div>
         <button className="profile-menu-handle" onClick={() => void copyHandle()}>

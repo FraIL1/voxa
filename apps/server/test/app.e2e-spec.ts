@@ -14,6 +14,7 @@ import {
   type MessagesPageDto,
   type ReadStateDto,
   type ReadStateUpdatedPayload,
+  type PresenceUpdatePayload,
   type TypingPayload,
   type UserProfileDto,
 } from '@voxa/shared';
@@ -552,6 +553,49 @@ describe('Voxa: критический поток (e2e)', () => {
     expect(member?.status).toBe('offline');
     expect(owner?.roles[0]?.name).toBe('Владелец');
     expect(member?.roles[0]?.name).toBe('Участник');
+  });
+
+  it('простой считается по каждому окну: активная вкладка держит статус «в сети»', async () => {
+    const ownerMe = await request(httpServer)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    const ownerId = (ownerMe.body as MeDto).id;
+
+    const statusOf = async (): Promise<string | undefined> => {
+      const res = await request(httpServer)
+        .get(`/api/guilds/${guildId}/members`)
+        .set('Authorization', `Bearer ${ownerAccess}`)
+        .expect(200);
+      return (res.body as MemberDto[]).find((m) => m.id === ownerId)?.status;
+    };
+
+    // Второе окно того же человека — как десктоп рядом с браузером
+    const second = io(baseUrl, { auth: { token: ownerAccess }, transports: ['websocket'] });
+    await new Promise((resolve, reject) => {
+      second.once(WsEvents.Ready, resolve);
+      second.once('auth_error', () => reject(new Error('WS-авторизация не прошла')));
+    });
+
+    // Свернули только второе окно — первое активно, значит человек на месте
+    second.emit(WsClientEvents.PresenceIdle, { idle: true });
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(await statusOf()).toBe('online');
+
+    // Простаивают оба — вот теперь «отошёл»
+    const wentIdle = new Promise<PresenceUpdatePayload>((resolve) => {
+      second.once(WsEvents.PresenceUpdate, resolve);
+    });
+    socket?.emit(WsClientEvents.PresenceIdle, { idle: true });
+    expect((await wentIdle).status).toBe('idle');
+    expect(await statusOf()).toBe('idle');
+
+    // Вернулись в первое окно — статус возвращается сразу
+    socket?.emit(WsClientEvents.PresenceIdle, { idle: false });
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(await statusOf()).toBe('online');
+
+    second.disconnect();
   });
 
   it('упоминание увеличивает счётчик; ack сбрасывает и рассылает readstate.update', async () => {

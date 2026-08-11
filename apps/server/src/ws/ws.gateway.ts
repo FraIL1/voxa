@@ -178,8 +178,14 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const data = socket.data as SocketData;
     if (!data.userId) return;
 
-    // Последний сокет закрыт — пользователь ушёл в офлайн
+    // Закрытие активного окна может сделать человека отошедшим: остальные
+    // его окна свёрнуты — тогда статус меняется и без ухода в офлайн
+    const before = this.presence.statusOf(data.userId);
     const wentOffline = await this.presence.disconnected(data.userId, socket.id);
+    const after = this.presence.statusOf(data.userId);
+    if (!wentOffline && before !== after) {
+      this.emitToAll(WsEvents.PresenceUpdate, { userId: data.userId, status: after });
+    }
     if (wentOffline) {
       this.emitToAll(WsEvents.PresenceUpdate, { userId: data.userId, status: 'offline' });
 
@@ -199,7 +205,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!data.userId) return;
     const idle = typeof body === 'object' && body !== null && 'idle' in body && Boolean(body.idle);
     const before = this.presence.statusOf(data.userId);
-    this.presence.setIdle(data.userId, idle);
+    this.presence.setIdle(data.userId, socket.id, idle);
     const after = this.presence.statusOf(data.userId);
     if (before !== after) {
       this.emitToAll(WsEvents.PresenceUpdate, { userId: data.userId, status: after });

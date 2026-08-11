@@ -47,6 +47,7 @@ import { GUILDS_KEY } from './useGuilds';
 import { MEMBERS_KEY } from './useMembers';
 import { VOICE_STATES_KEY } from './useVoiceStates';
 import { useAuthStore } from '../stores/auth';
+import { usePresenceStore } from '../stores/presence';
 import { useCallStore } from '../stores/call';
 import { useChatStore } from '../stores/chat';
 import { currentVoiceState, useVoiceStore } from '../stores/voice';
@@ -153,6 +154,10 @@ export function useRealtime(): void {
     });
 
     socket.on(WsEvents.PresenceUpdate, (p: PresenceUpdatePayload) => {
+      // Своё состояние показываем в карточке внизу — оно же уходит другим
+      if (p.userId === useAuthStore.getState().user?.id) {
+        usePresenceStore.getState().setMyStatus(p.status);
+      }
       queryClient.setQueryData<MemberDto[]>(MEMBERS_KEY, (members) =>
         members?.map((m) => (m.id === p.userId ? { ...m, status: p.status } : m)),
       );
