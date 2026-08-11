@@ -89,6 +89,12 @@ test.describe('Присутствие', () => {
 
     // Статус — подменю: раскрываем и выбираем
     await menu.locator('.menu-sub .menu-item').first().click();
+    const sub = menu.locator('.menu-sub-list');
+    const subBox = await sub.boundingBox();
+    const viewport = owner.viewportSize();
+    expect(subBox && viewport).toBeTruthy();
+    expect(subBox!.y + subBox!.height).toBeLessThanOrEqual(viewport!.height);
+
     await menu.locator('.status-menu-item', { hasText: 'Не беспокоить' }).click();
     await expect(owner.locator('.user-card-status')).toHaveText('Не беспокоить');
     await expect(owner.locator('.me-avatar')).toHaveClass(/dot-dnd/);
@@ -132,6 +138,25 @@ test.describe('Присутствие', () => {
     // Упоминание попадает в поле ввода
     await menu.getByText('Упомянуть').click();
     await expect(owner.locator('.composer textarea')).toHaveValue(/@uitest_friend/);
+  });
+});
+
+test.describe('Меню сервера', () => {
+  test('выпадающее меню держится внутри боковой панели', async ({ owner }) => {
+    await owner.locator('.rail-icon.server').first().click();
+    await owner.waitForURL(/\/guilds\//);
+
+    await owner.locator('.server-header').click();
+    const dropdown = owner.locator('.server-dropdown');
+    await expect(dropdown).toBeVisible();
+    await expect(dropdown.getByText('Настройки сервера')).toBeVisible();
+
+    // Меню не должно вылезать за боковую панель — раньше растягивалось на экран
+    const menuBox = await dropdown.boundingBox();
+    const sidebarBox = await owner.locator('.sidebar').boundingBox();
+    expect(menuBox && sidebarBox).toBeTruthy();
+    expect(menuBox!.width).toBeLessThanOrEqual(sidebarBox!.width);
+    expect(menuBox!.x).toBeGreaterThanOrEqual(sidebarBox!.x - 1);
   });
 });
 

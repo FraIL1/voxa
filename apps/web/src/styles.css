@@ -630,6 +630,7 @@ h3 {
 /* Левая колонка */
 
 .sidebar {
+  position: relative;
   background: var(--panel);
   border-right: 1px solid var(--border);
   display: flex;
@@ -2214,28 +2215,21 @@ h3 {
   gap: 2px;
 }
 
-.server-dropdown .menu-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  background: transparent;
-  color: var(--text);
-  text-align: left;
-  font-size: 14px;
-}
-
 .server-dropdown .menu-item:hover {
   background: var(--accent);
   color: var(--accent-text);
 }
 
-.server-dropdown .menu-item.danger {
-  color: var(--danger);
+.server-dropdown .menu-item:hover svg {
+  color: var(--accent-text);
 }
 
 .server-dropdown .menu-item.danger:hover {
   background: var(--danger);
+  color: #fff;
+}
+
+.server-dropdown .menu-item.danger:hover svg {
   color: #fff;
 }
 
@@ -2852,12 +2846,17 @@ h3 {
   box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.12);
 }
 
-/* Выпадающее меню сервера и контекстные меню */
-.server-dropdown,
+/* Выпадающее меню сервера — как остальные меню приложения */
+.server-dropdown {
+  background: var(--gradient-surface), var(--panel-raised);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-lg);
+  animation: modal-in 120ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
 /* Пилюли-вкладки внутри модалок */
 .friends-tab {
   border-radius: var(--radius-pill);
-  padding: 6px 14px;
 }
 
 /* Карточки выбора режима (доступ, уведомления) */
@@ -4390,4 +4389,10 @@ h3 {
   background: var(--panel-hover);
   color: var(--text-muted);
   font-size: 13px;
+}
+
+/* Подменю у нижней кромки окна раскрывается вверх */
+.menu-sub-list.up {
+  top: auto;
+  bottom: -6px;
 }

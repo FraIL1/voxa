@@ -14,7 +14,7 @@ import {
   UserRound,
   UserX,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router';
 
@@ -23,6 +23,7 @@ import { useUnban } from '../hooks/useAdmin';
 import { useOpenDm } from '../hooks/useDm';
 import { useAssignRole, useGuildRoles, useSetNickname } from '../hooks/useGuildAdmin';
 import { useMyGuildPermissions } from '../hooks/useGuilds';
+import { useAnchoredMenu, useSubmenuFlip } from '../hooks/useMenuPlacement';
 import { useModeration } from '../hooks/useModeration';
 import { useAuthStore } from '../stores/auth';
 import { useCallStore } from '../stores/call';
@@ -46,7 +47,6 @@ export default function MemberContextMenu({
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const ref = useRef<HTMLDivElement>(null);
   const { guildId } = useParams<{ guildId: string }>();
   const myId = useAuthStore((s) => s.user?.id);
 
@@ -74,8 +74,9 @@ export default function MemberContextMenu({
   const isSelf = member.id === myId;
   const isTimedOut = Boolean(member.timedOutUntil && new Date(member.timedOutUntil) > new Date());
   const myRoleIds = new Set(member.roles.map((r) => r.id));
-  // Меню у правого края: подменю ролей и сроков раскрываем влево
-  const flipLeft = menu.x > window.innerWidth - 480;
+  const { ref, style, flipLeft } = useAnchoredMenu(menu.x, menu.y);
+  const rolesSub = useSubmenuFlip(rolesOpen);
+  const timeoutSub = useSubmenuFlip(timeoutOpen);
 
   useEffect(() => {
     const onDown = (e: MouseEvent): void => {
@@ -90,7 +91,7 @@ export default function MemberContextMenu({
       document.removeEventListener('mousedown', onDown);
       document.removeEventListener('keydown', onKey);
     };
-  }, [onClose]);
+  }, [onClose, ref]);
 
   const run = (action: Promise<unknown>): void => {
     onClose();
@@ -127,11 +128,7 @@ export default function MemberContextMenu({
       <div
         className={`context-menu${flipLeft ? ' flip-left' : ''}`}
         ref={ref}
-        style={{
-          left: flipLeft ? undefined : menu.x,
-          right: flipLeft ? 12 : undefined,
-          top: menu.y,
-        }}
+        style={style}
         onContextMenu={(e) => e.preventDefault()}
       >
         <div className="menu-title">{member.nickname ?? member.displayName}</div>
@@ -216,7 +213,7 @@ export default function MemberContextMenu({
                 <ChevronRight size={15} className="menu-chevron" />
               </button>
               {rolesOpen && (
-                <div className="menu-sub-list">
+                <div className={`menu-sub-list${rolesSub.up ? ' up' : ''}`} ref={rolesSub.ref}>
                   {(roles ?? [])
                     .filter((role) => !role.isOwnerRole)
                     .map((role) => {
@@ -263,7 +260,7 @@ export default function MemberContextMenu({
               <ChevronRight size={15} className="menu-chevron" />
             </button>
             {timeoutOpen && (
-              <div className="menu-sub-list">
+              <div className={`menu-sub-list${timeoutSub.up ? ' up' : ''}`} ref={timeoutSub.ref}>
                 {timeoutOptions.map((option) => (
                   <button
                     key={option.key}

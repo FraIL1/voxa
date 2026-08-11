@@ -3,6 +3,7 @@ import { Check, ChevronRight, Copy, LogOut, Pencil, Sparkles } from 'lucide-reac
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useSubmenuFlip } from '../hooks/useMenuPlacement';
 import { logout } from '../api/auth';
 import { api } from '../api/client';
 import { useAuthStore } from '../stores/auth';
@@ -36,6 +37,7 @@ export default function ProfileMenu({
   const ref = useRef<HTMLDivElement>(null);
   const [statusOpen, setStatusOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const submenu = useSubmenuFlip(statusOpen);
 
   // Закрытие по клику мимо и по Escape — как у остальных всплывающих меню
   useEffect(() => {
@@ -110,7 +112,7 @@ export default function ProfileMenu({
           </button>
 
           {statusOpen && (
-            <div className="menu-sub-list">
+            <div className={`menu-sub-list${submenu.up ? ' up' : ''}`} ref={submenu.ref}>
               {MODES.map((item) => (
                 <button
                   key={item}

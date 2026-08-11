@@ -14,7 +14,7 @@ import {
   UserMinus,
   UserRound,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 
@@ -27,6 +27,7 @@ import {
   useToggleConversationPin,
 } from '../hooks/useDm';
 import { useRemoveFriend } from '../hooks/useFriends';
+import { useAnchoredMenu, useSubmenuFlip } from '../hooks/useMenuPlacement';
 import { useSetUserNote } from '../hooks/useProfile';
 import { useCallStore } from '../stores/call';
 import { openProfile } from '../stores/profileView';
@@ -58,7 +59,6 @@ export default function DmContextMenu({
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const ref = useRef<HTMLDivElement>(null);
   const [muteOpen, setMuteOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
   const [aliasOpen, setAliasOpen] = useState(false);
@@ -78,8 +78,8 @@ export default function DmContextMenu({
   const title = dmTitle(conversation);
   const muted = Boolean(conversation.mutedUntil && new Date(conversation.mutedUntil) > new Date());
 
-  // Меню у правого края экрана: подменю раскрываем влево
-  const flipLeft = menu.x > window.innerWidth - 480;
+  const { ref, style, flipLeft } = useAnchoredMenu(menu.x, menu.y);
+  const submenu = useSubmenuFlip(muteOpen);
 
   useEffect(() => {
     const onDown = (e: MouseEvent): void => {
@@ -94,7 +94,7 @@ export default function DmContextMenu({
       document.removeEventListener('mousedown', onDown);
       document.removeEventListener('keydown', onKey);
     };
-  }, [onClose]);
+  }, [onClose, ref]);
 
   const act =
     (fn: () => void): (() => void) =>
@@ -108,11 +108,7 @@ export default function DmContextMenu({
       <div
         className={`context-menu${flipLeft ? ' flip-left' : ''}`}
         ref={ref}
-        style={{
-          left: flipLeft ? undefined : menu.x,
-          right: flipLeft ? 12 : undefined,
-          top: menu.y,
-        }}
+        style={style}
         onContextMenu={(e) => e.preventDefault()}
       >
         <div className="menu-title">{title}</div>
@@ -181,7 +177,7 @@ export default function DmContextMenu({
               <ChevronRight size={15} className="menu-chevron" />
             </button>
             {muteOpen && (
-              <div className="menu-sub-list">
+              <div className={`menu-sub-list${submenu.up ? ' up' : ''}`} ref={submenu.ref}>
                 {MUTE_OPTIONS.map((option) => (
                   <button
                     key={option.key}
