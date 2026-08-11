@@ -1490,8 +1490,8 @@ h3 {
   flex-wrap: wrap;
   align-content: center;
   justify-content: center;
-  gap: 16px;
-  padding: 24px;
+  gap: 20px;
+  padding: 32px;
   overflow-y: auto;
 }
 
@@ -1499,28 +1499,39 @@ h3 {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  background: var(--panel);
+  gap: 10px;
+  background: var(--gradient-surface), var(--panel);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 24px 32px;
-  min-width: 140px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: 28px 32px 22px;
+  min-width: 200px;
+  transition:
+    border-color var(--transition),
+    box-shadow var(--transition);
 }
 
 .voice-tile.speaking {
   border-color: var(--success);
-  box-shadow: 0 0 0 1px var(--success);
+  box-shadow:
+    0 0 0 1px var(--success),
+    0 0 24px rgba(52, 211, 153, 0.18);
 }
 
 .voice-avatar {
-  width: 64px;
-  height: 64px;
-  font-size: 26px;
+  width: 96px;
+  height: 96px;
+  font-size: 38px;
 }
 
 .voice-tile-name {
-  font-weight: 600;
-  font-size: 14px;
+  font-weight: 650;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .voice-tile-icons {
@@ -1532,23 +1543,56 @@ h3 {
 
 .voice-controls {
   display: flex;
+  align-items: center;
   justify-content: center;
-  gap: 10px;
-  padding: 14px;
+  gap: 12px;
+  padding: 16px;
   border-top: 1px solid var(--border);
+  background: var(--gradient-surface), var(--panel);
 }
 
-.voice-control {
+/* Размер задаём явно: базовый .icon-button держит квадрат 32×32,
+   а иконки здесь крупнее и не помещались */
+.voice-control.icon-button {
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border-radius: var(--radius-pill);
   background: var(--panel-raised);
-  padding: 12px;
-  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  transition:
+    transform var(--transition),
+    background var(--transition),
+    color var(--transition);
 }
 
-.voice-control.danger {
+.voice-control.icon-button:hover:not(:disabled) {
+  background: var(--panel-hover);
+  transform: translateY(-1px);
+}
+
+.voice-control.icon-button.engaged {
+  background: var(--danger-soft);
+  border-color: var(--danger);
   color: var(--danger);
 }
 
-.voice-control.sharing {
+/* Отбой — заливкой, как на экране звонка в личке */
+.voice-control.icon-button.danger {
+  background: var(--danger);
+  border-color: transparent;
+  color: #fff;
+}
+
+.voice-control.icon-button.danger:hover {
+  filter: brightness(1.08);
+  background: var(--danger);
+}
+
+.voice-control.icon-button.sharing {
+  background: rgba(52, 211, 153, 0.14);
+  border-color: var(--success);
   color: var(--success);
 }
 

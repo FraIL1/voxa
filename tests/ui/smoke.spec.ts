@@ -211,6 +211,12 @@ test.describe('Звонок в личных сообщениях', () => {
     await expect(stage.locator('.call-avatar')).toBeVisible();
     await expect(stage.locator('.call-control')).toHaveCount(4);
 
+    // Круглые кнопки не должны сжиматься до размера обычной иконки:
+    // общий .icon-button однажды уже зажал их и иконки полезли за края
+    const controlBox = await stage.locator('.call-control').first().boundingBox();
+    expect(controlBox!.width).toBeGreaterThanOrEqual(44);
+    expect(controlBox!.height).toBeGreaterThanOrEqual(44);
+
     const stageMic = stage.getByTitle('Выключить микрофон');
     const cardMic = owner.locator('.user-card').getByTitle('Выключить микрофон');
     await expect(cardMic).toBeEnabled();
