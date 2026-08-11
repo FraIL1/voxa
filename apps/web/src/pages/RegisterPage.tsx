@@ -49,6 +49,10 @@ export default function RegisterPage() {
 
   return (
     <div className="auth-screen">
+      <Link className="auth-home" to="/">
+        <span className="auth-home-mark">V</span>
+        Voxa
+      </Link>
       <form className="auth-card" onSubmit={(e) => void onSubmit(e)}>
         <h1>
           <span className="brand">{t('app.name')}</span> — {t('auth.registerTitle')}

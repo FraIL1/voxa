@@ -5,10 +5,15 @@ import {
   Headphones,
   Lock,
   MessageSquare,
+  Mic,
   Monitor,
+  MonitorUp,
   Palette,
   Paperclip,
   Phone,
+  PhoneOff,
+  Plus,
+  Send,
   Server,
   ShieldCheck,
   Sparkles,
@@ -151,9 +156,13 @@ function AppPreview() {
       </div>
       <div className="lp-preview-body">
         <div className="lp-preview-rail">
-          <span className="lp-rail-dot active" />
-          <span className="lp-rail-dot" />
-          <span className="lp-rail-dot" />
+          <span className="lp-rail-dot home">
+            <MessageSquare size={15} />
+          </span>
+          <span className="lp-rail-dot active">Н</span>
+          <span className="lp-rail-dot add">
+            <Plus size={14} />
+          </span>
         </div>
         <div className="lp-preview-side">
           <div className="lp-side-title">Наш сервер</div>
@@ -195,7 +204,9 @@ function AppPreview() {
           <div className="lp-composer">
             <Paperclip size={13} />
             <span>Написать в #общий</span>
-            <span className="lp-send" />
+            <span className="lp-send">
+              <Send size={13} />
+            </span>
           </div>
         </div>
       </div>
@@ -249,7 +260,7 @@ export default function LandingPage() {
     );
 
   return (
-    <div className="lp">
+    <div className="lp" id="top">
       {/* Живой фон: медленно плывущие световые пятна */}
       <div className="lp-aurora" aria-hidden>
         <span />
@@ -259,10 +270,10 @@ export default function LandingPage() {
 
       <header className="lp-header">
         <div className="lp-wrap lp-header-inner">
-          <span className="lp-logo">
+          <a className="lp-logo" href="#top">
             <span className="lp-logo-mark">V</span>
             Voxa
-          </span>
+          </a>
           <nav className="lp-nav">
             <a href="#features">Возможности</a>
             <a href="#voice">Голос</a>
@@ -438,10 +449,18 @@ export default function LandingPage() {
                 </div>
               </div>
               <div className="lp-voice-controls">
-                <span className="lp-voice-btn" />
-                <span className="lp-voice-btn" />
-                <span className="lp-voice-btn" />
-                <span className="lp-voice-btn danger" />
+                <span className="lp-voice-btn">
+                  <Mic size={17} />
+                </span>
+                <span className="lp-voice-btn">
+                  <Headphones size={17} />
+                </span>
+                <span className="lp-voice-btn">
+                  <MonitorUp size={17} />
+                </span>
+                <span className="lp-voice-btn danger">
+                  <PhoneOff size={17} />
+                </span>
               </div>
             </div>
           </Reveal>
@@ -567,10 +586,10 @@ export default function LandingPage() {
 
       <footer className="lp-footer">
         <div className="lp-wrap lp-footer-inner">
-          <span className="lp-logo small">
+          <a className="lp-logo small" href="#top">
             <span className="lp-logo-mark">V</span>
             Voxa
-          </span>
+          </a>
           <span className="lp-footer-note">© {YEAR} Voxa. Все права защищены.</span>
         </div>
       </footer>

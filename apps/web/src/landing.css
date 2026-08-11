@@ -17,6 +17,13 @@
   margin: 0 auto;
 }
 
+/* Шапка и подвал шире содержимого: логотип стоит у самого края и в обоих
+   местах на одной вертикали */
+.lp-header-inner,
+.lp-footer-inner {
+  width: min(1560px, 100% - 48px);
+}
+
 /* ---------- Живой фон ---------- */
 
 /* Медленно плывущие пятна света: страница дышит, но ничего не мельтешит */
@@ -169,6 +176,13 @@
   font-size: 19px;
   font-weight: 800;
   letter-spacing: -0.02em;
+  color: var(--text);
+  text-decoration: none;
+  transition: opacity var(--transition);
+}
+
+.lp-logo:hover {
+  opacity: 0.85;
 }
 
 .lp-logo-mark {
@@ -498,13 +512,28 @@
   width: 34px;
   height: 34px;
   border-radius: 11px;
+  display: grid;
+  place-items: center;
   background: var(--panel-raised);
   border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .lp-rail-dot.active {
   background: var(--gradient-accent);
   border-color: transparent;
+  color: var(--accent-text);
+}
+
+.lp-rail-dot.home {
+  color: var(--accent);
+}
+
+.lp-rail-dot.add {
+  border-style: dashed;
+  color: var(--success);
 }
 
 .lp-preview-side {
@@ -628,7 +657,10 @@
   width: 26px;
   height: 26px;
   border-radius: 50%;
+  display: grid;
+  place-items: center;
   background: var(--accent);
+  color: var(--accent-text);
 }
 
 /* ---------- Секции ---------- */
@@ -829,13 +861,17 @@
   width: 42px;
   height: 42px;
   border-radius: 50%;
+  display: grid;
+  place-items: center;
   background: var(--panel-raised);
   border: 1px solid var(--border-strong);
+  color: var(--text);
 }
 
 .lp-voice-btn.danger {
   background: var(--danger);
   border-color: transparent;
+  color: #fff;
 }
 
 /* Блок про свой сервер */
@@ -1024,10 +1060,20 @@
   flex-wrap: wrap;
 }
 
+/* Логотип слева, права ровно по центру полосы */
+.lp-footer-inner {
+  position: relative;
+  justify-content: flex-start;
+  min-height: 40px;
+}
+
 .lp-footer-note {
-  margin-left: auto;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
   font-size: 13px;
   color: var(--text-faint);
+  white-space: nowrap;
 }
 
 /* ---------- Узкие экраны ---------- */
@@ -1072,7 +1118,16 @@
     bottom: 16px;
   }
 
+  /* На узком экране права уходят под логотип, а не наезжают на него */
+  .lp-footer-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
   .lp-footer-note {
-    margin-left: 0;
+    position: static;
+    transform: none;
+    white-space: normal;
   }
 }

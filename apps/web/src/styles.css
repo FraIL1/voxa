@@ -232,6 +232,7 @@ h3 {
 /* ---------- Экран аутентификации ---------- */
 
 .auth-screen {
+  position: relative;
   height: 100%;
   display: grid;
   place-items: center;
@@ -4495,4 +4496,37 @@ h3 {
   font-size: 11px;
   line-height: 1.5;
   color: var(--text-faint);
+}
+
+/* Возврат на главную с экранов входа и регистрации */
+.auth-home {
+  position: absolute;
+  top: 22px;
+  left: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  text-decoration: none;
+  transition: opacity var(--transition);
+}
+
+.auth-home:hover {
+  opacity: 0.85;
+}
+
+.auth-home-mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  background: var(--gradient-accent);
+  color: var(--accent-text);
+  font-size: 16px;
+  font-weight: 800;
+  box-shadow: 0 6px 18px rgba(34, 211, 238, 0.28);
 }

@@ -25,6 +25,19 @@ test.describe('Приветственная страница', () => {
     expect(links.some((href) => href.includes('github') || href.includes('gitlab'))).toBe(false);
   });
 
+  test('логотипы сверху и снизу ведут на главную и стоят на одной вертикали', async ({ page }) => {
+    await page.goto('/');
+    const header = await page.locator('.lp-header .lp-logo').boundingBox();
+    await page.locator('.lp-footer').scrollIntoViewIfNeeded();
+    const footer = await page.locator('.lp-footer .lp-logo').boundingBox();
+    expect(Math.abs(header!.x - footer!.x)).toBeLessThanOrEqual(1);
+
+    // Со страницы входа можно вернуться на главную
+    await page.goto('/login');
+    await page.locator('.auth-home').click();
+    await page.waitForURL((url) => url.pathname === '/');
+  });
+
   test('кнопка «Открыть в браузере» ведёт на вход', async ({ page }) => {
     await page.goto('/');
     await page
