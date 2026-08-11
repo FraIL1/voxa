@@ -16,9 +16,11 @@ import { Throttle } from '@nestjs/throttler';
 import {
   updatePresenceSchema,
   updateProfileSchema,
+  userNoteSchema,
   type MeDto,
   type UpdatePresenceInput,
   type UpdateProfileInput,
+  type UserNoteInput,
   type UserProfileDto,
 } from '@voxa/shared';
 
@@ -83,6 +85,16 @@ export class UsersController {
     const me = await this.usersService.removeAvatar(user.id);
     await this.ws.handleUserRenamed(me);
     return me;
+  }
+
+  /** Личная заметка и своё имя для человека — видит только автор */
+  @Patch(':userId/note')
+  setNote(
+    @CurrentUser() user: RequestUser,
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Body(new ZodValidationPipe(userNoteSchema)) body: UserNoteInput,
+  ): Promise<{ note: string | null; alias: string | null }> {
+    return this.usersService.setNote(user.id, userId, body);
   }
 
   /** Карточка профиля другого участника */

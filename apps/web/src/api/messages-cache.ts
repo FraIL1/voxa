@@ -26,6 +26,18 @@ export function addMessage(queryClient: QueryClient, message: ChatMessage): void
   queryClient.setQueryData<MessagesData>(messagesKey(message.channelId), (data) => {
     if (!data || data.pages.length === 0) return data;
     if (data.pages.some((p) => p.items.some((m) => m.id === message.id))) return data;
+
+    // Своё сообщение может прийти по WS раньше ответа на отправку: тогда
+    // заменяем оптимистичную копию, иначе в ленте на миг видно две одинаковых
+    const pendingTwin = (data.pages.flatMap((p) => p.items) as ChatMessage[]).find(
+      (m) => m.pending && m.author?.id === message.author?.id && m.content === message.content,
+    );
+    if (pendingTwin) {
+      return mapPages(data, (items) =>
+        items.map((m) => (m.id === pendingTwin.id ? message : m)),
+      ) as MessagesData;
+    }
+
     const [first, ...rest] = data.pages;
     return {
       ...data,

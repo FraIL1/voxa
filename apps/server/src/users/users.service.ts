@@ -6,6 +6,7 @@ import type {
   PresenceStatus,
   ProfileRelation,
   UpdatePresenceInput,
+  UserNoteInput,
   UpdateProfileInput,
   UserProfileDto,
 } from '@voxa/shared';
@@ -322,7 +323,7 @@ export class UsersService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('Пользователь не найден');
 
-    const [friendship, block, mutualGuilds, mutualFriends] = await Promise.all([
+    const [friendship, block, mutualGuilds, mutualFriends, myNote] = await Promise.all([
       meId === userId
         ? null
         : this.prisma.friendship.findFirst({
@@ -346,6 +347,10 @@ export class UsersService {
         orderBy: { name: 'asc' },
       }),
       meId === userId ? 0 : this.countMutualFriends(meId, userId),
+      this.prisma.userNote.findUnique({
+        where: { ownerId_targetId: { ownerId: meId, targetId: userId } },
+        select: { note: true, alias: true },
+      }),
     ]);
 
     let relation: ProfileRelation = 'none';
@@ -362,6 +367,8 @@ export class UsersService {
       avatarUrl: user.avatarUrl,
       bio: user.bio,
       statusText: user.statusText,
+      myNote: myNote?.note ?? null,
+      myAlias: myNote?.alias ?? null,
       accentColor: user.accentColor,
       createdAt: user.createdAt.toISOString(),
       status: statusOf(user.id),
@@ -371,6 +378,45 @@ export class UsersService {
       mutualGuilds,
       mutualFriends,
     };
+  }
+
+  /**
+   * Заметка о человеке и своё имя для него. Видит только автор: это личные
+   * пометки, а не изменение чужого профиля. Пустая строка снимает значение.
+   */
+  async setNote(
+    ownerId: string,
+    targetId: string,
+    input: UserNoteInput,
+  ): Promise<{ note: string | null; alias: string | null }> {
+    if (ownerId === targetId) throw new ForbiddenException('Заметка о себе не нужна');
+    const target = await this.prisma.user.findUnique({
+      where: { id: targetId },
+      select: { id: true },
+    });
+    if (!target) throw new NotFoundException('Пользователь не найден');
+
+    const data = {
+      ...(input.note === undefined ? {} : { note: input.note === '' ? null : input.note }),
+      ...(input.alias === undefined ? {} : { alias: input.alias === '' ? null : input.alias }),
+    };
+    const row = await this.prisma.userNote.upsert({
+      where: { ownerId_targetId: { ownerId, targetId } },
+      create: { ownerId, targetId, ...data },
+      update: data,
+      select: { note: true, alias: true },
+    });
+    return row;
+  }
+
+  /** Мои имена для перечисленных людей: userId → как я его называю */
+  async aliasesOf(ownerId: string, targetIds: string[]): Promise<Map<string, string>> {
+    if (targetIds.length === 0) return new Map();
+    const rows = await this.prisma.userNote.findMany({
+      where: { ownerId, targetId: { in: targetIds }, alias: { not: null } },
+      select: { targetId: true, alias: true },
+    });
+    return new Map(rows.map((r) => [r.targetId, r.alias as string]));
   }
 
   /** Сколько друзей у нас общих (по принятым дружбам обеих сторон) */

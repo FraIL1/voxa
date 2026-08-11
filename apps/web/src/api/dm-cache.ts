@@ -28,6 +28,18 @@ export function addDmMessage(queryClient: QueryClient, message: DmChatMessage): 
   queryClient.setQueryData<DmData>(dmMessagesKey(message.conversationId), (data) => {
     if (!data || data.pages.length === 0) return data;
     if (data.pages.some((p) => p.items.some((m) => m.id === message.id))) return data;
+
+    // Своё сообщение по WS может опередить ответ на отправку — заменяем
+    // оптимистичную копию, а не добавляем вторую такую же
+    const pendingTwin = (data.pages.flatMap((p) => p.items) as DmChatMessage[]).find(
+      (m) => m.pending && m.author?.id === message.author?.id && m.content === message.content,
+    );
+    if (pendingTwin) {
+      return mapPages(data, (items) =>
+        items.map((m) => (m.id === pendingTwin.id ? message : m)),
+      ) as DmData;
+    }
+
     const [first, ...rest] = data.pages;
     return {
       ...data,

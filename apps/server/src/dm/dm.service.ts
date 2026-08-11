@@ -194,6 +194,7 @@ export class DmService {
   private async toConversationDto(
     meId: string,
     conv: ConversationForDto,
+    mutedUntil?: Date | null,
   ): Promise<DmConversationDto> {
     const members: UserPublicDto[] = conv.participants.map((p) => ({
       id: p.user.id,
@@ -221,7 +222,47 @@ export class DmService {
       unreadCount: await this.unreadCount(conv.id, meId, state?.lastReadMessageId ?? null),
       lastMessageAt: conv.lastMessageAt.toISOString(),
       pinned: state?.pinned ?? false,
+      mutedUntil: mutedUntil?.toISOString() ?? null,
     };
+  }
+
+  /**
+   * Закрыть диалог: он пропадает из моего списка и вернётся сам, когда
+   * придёт новое сообщение. Переписка при этом никуда не девается.
+   */
+  async hideConversation(meId: string, conversationId: string): Promise<void> {
+    await this.assertParticipant(conversationId, meId);
+    await this.prisma.dmParticipant.update({
+      where: { conversationId_userId: { conversationId, userId: meId } },
+      data: { hiddenAt: new Date() },
+    });
+  }
+
+  /** Заглушить уведомления диалога: на срок или до ручного включения */
+  async muteConversation(
+    meId: string,
+    conversationId: string,
+    minutes: number | null,
+  ): Promise<{ mutedUntil: string | null }> {
+    await this.assertParticipant(conversationId, meId);
+    // null трактуем как «пока не включу»: дата в далёком будущем
+    const until =
+      minutes === null
+        ? new Date('2999-01-01T00:00:00.000Z')
+        : new Date(Date.now() + minutes * 60_000);
+    await this.prisma.dmParticipant.update({
+      where: { conversationId_userId: { conversationId, userId: meId } },
+      data: { mutedUntil: until },
+    });
+    return { mutedUntil: until.toISOString() };
+  }
+
+  async unmuteConversation(meId: string, conversationId: string): Promise<void> {
+    await this.assertParticipant(conversationId, meId);
+    await this.prisma.dmParticipant.update({
+      where: { conversationId_userId: { conversationId, userId: meId } },
+      data: { mutedUntil: null },
+    });
   }
 
   /** Открыть (или создать) 1-на-1 диалог; возвращает id */
@@ -402,12 +443,29 @@ export class DmService {
   /** Список диалогов пользователя (свежие сверху), с превью и непрочитанными */
   async listConversations(meId: string): Promise<DmConversationDto[]> {
     const conversations = await this.prisma.dmConversation.findMany({
-      where: { participants: { some: { userId: meId } } },
+      where: {
+        participants: {
+          some: {
+            userId: meId,
+            // Закрытый диалог возвращается сам: отправка снимает скрытие у всех
+            hiddenAt: null,
+          },
+        },
+      },
       orderBy: { lastMessageAt: 'desc' },
       include: conversationInclude(meId),
     });
 
-    const list = await Promise.all(conversations.map((c) => this.toConversationDto(meId, c)));
+    // Свои настройки диалогов одним запросом: заглушение показывается в списке
+    const mine = await this.prisma.dmParticipant.findMany({
+      where: { userId: meId, conversationId: { in: conversations.map((c) => c.id) } },
+      select: { conversationId: true, mutedUntil: true },
+    });
+    const mutedBy = new Map(mine.map((p) => [p.conversationId, p.mutedUntil]));
+
+    const list = await Promise.all(
+      conversations.map((c) => this.toConversationDto(meId, c, mutedBy.get(c.id))),
+    );
     // Закреплённые диалоги — всегда сверху, внутри групп по свежести
     return list.sort((a, b) => Number(b.pinned) - Number(a.pinned));
   }
@@ -475,6 +533,11 @@ export class DmService {
     await this.prisma.dmConversation.update({
       where: { id: conversationId },
       data: { lastMessageAt: new Date() },
+    });
+    // Новое сообщение возвращает диалог тем, кто его закрыл
+    await this.prisma.dmParticipant.updateMany({
+      where: { conversationId, hiddenAt: { not: null } },
+      data: { hiddenAt: null },
     });
 
     const full = await this.prisma.dmMessage.findUniqueOrThrow({

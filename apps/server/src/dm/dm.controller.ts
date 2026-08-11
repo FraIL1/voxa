@@ -15,6 +15,7 @@ import { Throttle } from '@nestjs/throttler';
 import {
   ackSchema,
   dmSearchSchema,
+  muteConversationSchema,
   startDmCallSchema,
   editDmSchema,
   messagesQuerySchema,
@@ -26,6 +27,7 @@ import {
   type DmMessagesPageDto,
   type DmSearchInput,
   type EditDmInput,
+  type MuteConversationInput,
   type StartDmCallInput,
   type UserPublicDto,
   type VoiceTokenDto,
@@ -243,6 +245,29 @@ export class DmController {
     @Query(new ZodValidationPipe(dmSearchSchema)) query: DmSearchInput,
   ): Promise<DmMessageDto[]> {
     return this.dm.search(user.id, id, query.q);
+  }
+
+  /** Закрыть диалог: скрывается из списка до нового сообщения */
+  @Post('conversations/:id/hide')
+  @HttpCode(204)
+  hide(@CurrentUser() user: RequestUser, @Param('id', ParseUUIDPipe) id: string): Promise<void> {
+    return this.dm.hideConversation(user.id, id);
+  }
+
+  /** Заглушить уведомления диалога на срок или до ручного включения */
+  @Patch('conversations/:id/mute')
+  mute(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(muteConversationSchema)) body: MuteConversationInput,
+  ): Promise<{ mutedUntil: string | null }> {
+    return this.dm.muteConversation(user.id, id, body.minutes);
+  }
+
+  @Delete('conversations/:id/mute')
+  @HttpCode(204)
+  unmute(@CurrentUser() user: RequestUser, @Param('id', ParseUUIDPipe) id: string): Promise<void> {
+    return this.dm.unmuteConversation(user.id, id);
   }
 
   // ---------- Звонки в личке и беседах ----------

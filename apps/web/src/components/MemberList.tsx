@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router';
 
 import { useMembers } from '../hooks/useMembers';
-import { useAuthStore } from '../stores/auth';
 import { openProfile } from '../stores/profileView';
 import Avatar from './Avatar';
 import MemberContextMenu, { type MenuState } from './MemberContextMenu';
@@ -35,7 +34,6 @@ export default function MemberList() {
   const { t } = useTranslation();
   const { guildId } = useParams<{ guildId: string }>();
   const { data: members } = useMembers(guildId);
-  const myId = useAuthStore((s) => s.user?.id);
   const [menu, setMenu] = useState<MenuState | null>(null);
 
   if (!members) {
@@ -65,7 +63,6 @@ export default function MemberList() {
                   if (e.key === 'Enter' || e.key === ' ') openProfile(member.id);
                 }}
                 onContextMenu={(e) => {
-                  if (member.id === myId) return;
                   e.preventDefault();
                   setMenu({ x: e.clientX, y: e.clientY, member });
                 }}

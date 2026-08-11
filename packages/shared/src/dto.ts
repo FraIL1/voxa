@@ -39,6 +39,10 @@ export type ProfileRelation = 'self' | 'friends' | 'incoming' | 'outgoing' | 'no
 export interface UserProfileDto extends UserPublicDto {
   bio: string | null;
   statusText: string | null;
+  /** Моя заметка об этом человеке — видна только мне */
+  myNote: string | null;
+  /** Как я его называю; null — обычное отображаемое имя */
+  myAlias: string | null;
   accentColor: string | null;
   /** Дата регистрации в приложении */
   createdAt: string;
@@ -351,6 +355,8 @@ export interface DmConversationDto {
   lastMessageAt: string;
   /** Закреплён ли диалог лично у меня (такие идут сверху списка) */
   pinned: boolean;
+  /** Уведомления заглушены до этого момента; null — звучит как обычно */
+  mutedUntil: string | null;
 }
 
 /** Друг (принятая дружба) со статусом присутствия */

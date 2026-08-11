@@ -189,6 +189,59 @@ export function useToggleConversationPin() {
   });
 }
 
+/** Закрыть диалог: пропадает из списка до нового сообщения */
+export function useHideConversation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (conversationId: string) =>
+      api<void>(`/dm/conversations/${conversationId}/hide`, { method: 'POST' }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: DM_CONVERSATIONS_KEY }),
+  });
+}
+
+/** Заглушить диалог на срок; minutes undefined — снять заглушение */
+export function useMuteConversation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      conversationId,
+      minutes,
+    }: {
+      conversationId: string;
+      minutes?: number | null;
+    }) => {
+      if (minutes === undefined) {
+        await api<void>(`/dm/conversations/${conversationId}/mute`, { method: 'DELETE' });
+        return;
+      }
+      await api<{ mutedUntil: string | null }>(`/dm/conversations/${conversationId}/mute`, {
+        method: 'PATCH',
+        body: { minutes },
+      });
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: DM_CONVERSATIONS_KEY }),
+  });
+}
+
+/** Пометить диалог прочитанным: отметка ставится по последнему сообщению */
+export function useMarkConversationRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (conversationId: string) => {
+      const page = await api<DmMessagesPageDto>(
+        `/dm/conversations/${conversationId}/messages?limit=1`,
+      );
+      const last = page.items[0];
+      if (!last) return;
+      await api<void>(`/dm/conversations/${conversationId}/ack`, {
+        method: 'POST',
+        body: { messageId: last.id },
+      });
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: DM_CONVERSATIONS_KEY }),
+  });
+}
+
 /** Поиск по переписке (запускается только при непустом запросе) */
 export function useDmSearch(conversationId: string, query: string) {
   return useQuery({

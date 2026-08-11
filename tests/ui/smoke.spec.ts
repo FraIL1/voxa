@@ -80,18 +80,58 @@ test.describe('Оформление', () => {
 });
 
 test.describe('Присутствие', () => {
-  test('меню статуса меняет режим и подпись под ником', async ({ owner }) => {
+  test('меню профиля меняет режим и подпись под ником', async ({ owner }) => {
     await owner.locator('.user-card-identity').click();
-    await expect(owner.locator('.status-menu')).toBeVisible();
+    const menu = owner.locator('.profile-menu');
+    await expect(menu).toBeVisible();
+    // Шапка меню показывает, кто я
+    await expect(menu.getByText('@uitest_owner')).toBeVisible();
 
-    await owner.locator('.status-menu-item', { hasText: 'Не беспокоить' }).click();
+    // Статус — подменю: раскрываем и выбираем
+    await menu.locator('.menu-sub .menu-item').first().click();
+    await menu.locator('.status-menu-item', { hasText: 'Не беспокоить' }).click();
     await expect(owner.locator('.user-card-status')).toHaveText('Не беспокоить');
     await expect(owner.locator('.me-avatar')).toHaveClass(/dot-dnd/);
 
     // Возвращаем обычный режим, чтобы не влиять на другие сценарии
     await owner.locator('.user-card-identity').click();
-    await owner.locator('.status-menu-item', { hasText: 'В сети' }).click();
+    await menu.locator('.menu-sub .menu-item').first().click();
+    await menu.locator('.status-menu-item', { hasText: 'В сети' }).click();
     await expect(owner.locator('.user-card-status')).toHaveText('В сети');
+  });
+
+  test('правый клик по диалогу открывает меню действий', async ({ owner }) => {
+    await owner.getByRole('button', { name: 'Все', exact: true }).click();
+    await owner.getByTitle('Написать').first().click();
+    await owner.waitForURL(/\/dm\//);
+
+    await owner.locator('.dm-link').first().click({ button: 'right' });
+    const menu = owner.locator('.context-menu');
+    await expect(menu).toBeVisible();
+    await expect(menu.getByText('Профиль', { exact: true })).toBeVisible();
+    await expect(menu.getByText('Начать звонок')).toBeVisible();
+    await expect(menu.getByText('Добавить заметку')).toBeVisible();
+    await expect(menu.getByText('Закрыть диалог')).toBeVisible();
+
+    // Подменю сроков заглушения раскрывается
+    await menu.locator('.menu-sub .menu-item').first().click();
+    await expect(menu.getByText('Пока не включу')).toBeVisible();
+    await owner.keyboard.press('Escape');
+  });
+
+  test('меню участника сервера: профиль, упоминание, роли', async ({ owner }) => {
+    await owner.locator('.rail-icon.server').first().click();
+    await owner.waitForURL(/\/guilds\//);
+
+    await owner.locator('.member', { hasText: 'uitest_friend' }).first().click({ button: 'right' });
+    const menu = owner.locator('.context-menu');
+    await expect(menu).toBeVisible();
+    await expect(menu.getByText('Упомянуть')).toBeVisible();
+    await expect(menu.getByText('Роли')).toBeVisible();
+
+    // Упоминание попадает в поле ввода
+    await menu.getByText('Упомянуть').click();
+    await expect(owner.locator('.composer textarea')).toHaveValue(/@uitest_friend/);
   });
 });
 

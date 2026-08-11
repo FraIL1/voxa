@@ -104,7 +104,7 @@ export function ProfileBody({ userId, onNavigate }: { userId: string; onNavigate
         />
         <div className="profile-titles">
           <div className="profile-name">
-            {profile.displayName}
+            {profile.myAlias ?? profile.displayName}
             {profile.isInstanceOwner && (
               <span className="profile-badge owner" title={t('profile.ownerBadge')}>
                 <Crown size={12} /> {t('profile.ownerBadge')}
@@ -116,7 +116,10 @@ export function ProfileBody({ userId, onNavigate }: { userId: string; onNavigate
               </span>
             )}
           </div>
-          <div className="profile-username">@{profile.username}</div>
+          <div className="profile-username">
+            @{profile.username}
+            {profile.myAlias && ` · ${profile.displayName}`}
+          </div>
           {profile.statusText && <p className="profile-status-text">{profile.statusText}</p>}
         </div>
       </div>
@@ -126,6 +129,13 @@ export function ProfileBody({ userId, onNavigate }: { userId: string; onNavigate
           <section className="profile-section">
             <h4>{t('profile.about')}</h4>
             <p className="profile-bio">{profile.bio}</p>
+          </section>
+        )}
+
+        {profile.myNote && (
+          <section className="profile-section">
+            <h4>{t('profile.note')}</h4>
+            <p className="profile-bio profile-note">{profile.myNote}</p>
           </section>
         )}
 

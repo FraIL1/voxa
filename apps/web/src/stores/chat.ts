@@ -12,6 +12,11 @@ interface ChatState {
   replyTo: MessageDto | null;
   setReplyTo: (message: MessageDto | null) => void;
 
+  /** Текст для вставки в поле ввода (упоминание из меню участника) */
+  insertText: string | null;
+  requestInsert: (text: string) => void;
+  consumeInsert: () => string | null;
+
   /** Только что выданный таймаут — модалка по центру (null — скрыта) */
   timeoutNotice: string | null;
   setTimeoutNotice: (until: string | null) => void;
@@ -27,9 +32,17 @@ interface ChatState {
 
 const TYPING_TTL_MS = 4000;
 
-export const useChatStore = create<ChatState>()((set) => ({
+export const useChatStore = create<ChatState>()((set, get) => ({
   replyTo: null,
   setReplyTo: (message) => set({ replyTo: message }),
+
+  insertText: null,
+  requestInsert: (text) => set({ insertText: text }),
+  consumeInsert: () => {
+    const { insertText } = get();
+    if (insertText !== null) set({ insertText: null });
+    return insertText;
+  },
 
   timeoutNotice: null,
   setTimeoutNotice: (until) => set({ timeoutNotice: until }),

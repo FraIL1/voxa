@@ -68,7 +68,12 @@
   },
   "members": {
     "online": "В сети",
-    "offline": "Не в сети"
+    "offline": "Не в сети",
+    "mention": "Упомянуть",
+    "copyHandle": "Скопировать логин",
+    "changeNickname": "Изменить ник на сервере",
+    "nicknameLabel": "Пусто — вернуть обычное имя",
+    "roles": "Роли"
   },
   "nav": {
     "home": "Личные сообщения",
@@ -238,7 +243,24 @@
     "groupRename": "Переименовать группу",
     "groupLeave": "Выйти из группы",
     "groupLeaveConfirm": "Выйти из этой группы?",
-    "groupNoFriends": "Все друзья уже в группе"
+    "groupNoFriends": "Все друзья уже в группе",
+    "markRead": "Пометить как прочитанное",
+    "startCallShort": "Начать звонок",
+    "addNote": "Добавить заметку",
+    "addAlias": "Задать своё имя",
+    "noteTitle": "Заметка о {{name}}",
+    "noteLabel": "Видна только вам",
+    "aliasTitle": "Своё имя для {{name}}",
+    "aliasLabel": "Так вы будете его видеть; пусто — обычное имя",
+    "closeChat": "Закрыть диалог",
+    "mute": "Заглушить {{name}}",
+    "unmute": "Включить уведомления",
+    "mute15m": "На 15 минут",
+    "mute1h": "На час",
+    "mute3h": "На 3 часа",
+    "mute8h": "На 8 часов",
+    "mute24h": "На сутки",
+    "muteForever": "Пока не включу"
   },
   "call": {
     "startVoice": "Голосовой звонок",
@@ -318,7 +340,9 @@
     "banReason": "Причина бана (можно оставить пустым):",
     "youAreTimedOut": "Ты в таймауте до {{until}} — писать и говорить пока нельзя",
     "timeoutModalTitle": "Выдан таймаут",
-    "understood": "Понятно"
+    "understood": "Понятно",
+    "timeout": "Таймаут",
+    "timeout7d": "На неделю"
   },
   "community": {
     "title": "Сообщество",
@@ -417,7 +441,11 @@
     "block": "Заблокировать",
     "unblock": "Разблокировать",
     "ownerBadge": "Владелец",
-    "friendBadge": "Друг"
+    "friendBadge": "Друг",
+    "editProfile": "Редактировать профиль",
+    "setStatusText": "Задать свой статус",
+    "openMenu": "Профиль и статус",
+    "note": "Заметка (видите только вы)"
   },
   "presence": {
     "change": "Изменить статус",

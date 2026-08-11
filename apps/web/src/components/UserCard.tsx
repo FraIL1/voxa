@@ -16,7 +16,7 @@ import { useAuthStore } from '../stores/auth';
 import { useVoiceStore } from '../stores/voice';
 import Avatar from './Avatar';
 import SettingsModal from './SettingsModal';
-import StatusMenu, { dotOf } from './StatusMenu';
+import ProfileMenu, { dotOf } from './ProfileMenu';
 
 /** Карточка пользователя внизу боковой панели: голос, микрофон, настройки.
  *  Клик по нику/аватару открывает настройки (профиль). Общая для дома и сервера.
@@ -50,10 +50,15 @@ export default function UserCard() {
       )}
 
       <div className="user-card">
-        {statusOpen && <StatusMenu onClose={() => setStatusOpen(false)} />}
+        {statusOpen && (
+          <ProfileMenu
+            onClose={() => setStatusOpen(false)}
+            onEditProfile={() => setSettingsOpen(true)}
+          />
+        )}
         <button
           className="user-card-identity"
-          title={t('presence.change')}
+          title={t('profile.openMenu')}
           onClick={() => setStatusOpen((v) => !v)}
         >
           <Avatar

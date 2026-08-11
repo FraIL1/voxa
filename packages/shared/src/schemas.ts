@@ -166,6 +166,24 @@ export const updatePresenceSchema = z.object({
 });
 export type UpdatePresenceInput = z.infer<typeof updatePresenceSchema>;
 
+/** Заметка о человеке и своё имя для него: пустая строка снимает */
+export const userNoteSchema = z.object({
+  note: z.string().trim().max(500, 'Максимум 500 символов').optional(),
+  alias: z.string().trim().max(32, 'Максимум 32 символа').optional(),
+});
+export type UserNoteInput = z.infer<typeof userNoteSchema>;
+
+/** Заглушить диалог: минуты или null — «пока не включу» */
+export const muteConversationSchema = z.object({
+  minutes: z
+    .number()
+    .int()
+    .min(1)
+    .max(60 * 24 * 30)
+    .nullable(),
+});
+export type MuteConversationInput = z.infer<typeof muteConversationSchema>;
+
 /** Ник на сервере: пусто (null) — вернуть displayName */
 export const updateNicknameSchema = z.object({
   nickname: z.string().trim().max(32, 'Максимум 32 символа').or(z.literal('')),

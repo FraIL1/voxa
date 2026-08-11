@@ -46,12 +46,22 @@ export default function Composer({
   const setReplyTo = useChatStore((s) => s.setReplyTo);
   const lastTypingAt = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { guildId } = useParams<{ guildId: string }>();
   const myId = useAuthStore((s) => s.user?.id);
   const { data: members } = useMembers(guildId);
   // Таймаут действует на конкретном сервере — берём его из своего членства
   const timedOutUntil = members?.find((m) => m.id === myId)?.timedOutUntil ?? null;
   const [, setTick] = useState(0);
+
+  // Упоминание из меню участника дописывается к тексту и ставит курсор в конец
+  const insertText = useChatStore((s) => s.insertText);
+  useEffect(() => {
+    if (insertText === null) return;
+    useChatStore.getState().consumeInsert();
+    setValue((current) => (current ? `${current.trimEnd()} ${insertText} ` : `${insertText} `));
+    textareaRef.current?.focus();
+  }, [insertText]);
 
   // Черновик, ответ и файлы не переносятся между каналами
   useEffect(() => {
@@ -206,6 +216,7 @@ export default function Composer({
           <Paperclip size={18} />
         </button>
         <textarea
+          ref={textareaRef}
           rows={1}
           value={value}
           placeholder={t('chat.placeholder', { channel: channelName })}

@@ -49,7 +49,7 @@
   --nav-bg: linear-gradient(180deg, var(--panel), #0c1119);
 
   --transition: 160ms cubic-bezier(0.2, 0.8, 0.3, 1);
-  --sidebar-width: 248px;
+  --sidebar-width: 264px;
   --members-width: 216px;
 
   /* Высоты управляющих элементов: кнопки и поля стоят в один рост */
@@ -616,10 +616,10 @@ h3 {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
   background: transparent;
-  padding: 4px;
+  padding: 3px 4px;
   border-radius: var(--radius);
 }
 
@@ -823,14 +823,25 @@ h3 {
 
 .user-card {
   border-top: 1px solid var(--border);
-  padding: 10px 12px;
+  padding: 8px 8px 8px 10px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
+}
+
+/* Кнопки в карточке компактнее общих: иначе имени не остаётся места */
+.user-card .icon-button {
+  width: 26px;
+  height: 26px;
+}
+
+.user-card-identity .avatar {
+  width: 32px;
+  height: 32px;
+  font-size: 14px;
 }
 
 .user-card .username {
-  flex: 1;
   font-weight: 600;
   font-size: 14px;
   overflow: hidden;
@@ -1652,46 +1663,6 @@ h3 {
 }
 
 /* Контекст-меню модерации */
-.context-menu {
-  position: fixed;
-  z-index: 60;
-  min-width: 200px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 5px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-}
-
-.menu-title {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text-faint);
-  padding: 5px 9px 7px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 4px;
-}
-
-.menu-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  background: transparent;
-  color: var(--text);
-  text-align: left;
-  font-size: 13px;
-  padding: 7px 9px;
-}
-
-.menu-item:hover {
-  background: var(--panel-raised);
-}
-
-.menu-item.danger {
-  color: var(--danger);
-}
-
 /* Модалка «выдан таймаут» по центру */
 .timeout-modal {
   display: flex;
@@ -2883,32 +2854,6 @@ h3 {
 
 /* Выпадающее меню сервера и контекстные меню */
 .server-dropdown,
-.context-menu {
-  background: var(--panel-raised);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-lg);
-  padding: 6px;
-  animation: modal-in 140ms cubic-bezier(0.2, 0.8, 0.3, 1);
-}
-
-.menu-item {
-  border-radius: var(--radius-sm);
-  transition:
-    background var(--transition),
-    color var(--transition);
-}
-
-.menu-item:hover {
-  background: var(--panel-hover);
-  color: var(--text);
-}
-
-.menu-item.danger:hover {
-  background: var(--danger-soft);
-  color: var(--danger);
-}
-
 /* Пилюли-вкладки внутри модалок */
 .friends-tab {
   border-radius: var(--radius-pill);
@@ -3810,6 +3755,7 @@ h3 {
 .user-card-names {
   flex: 1;
   min-width: 0;
+  margin-right: 2px;
   display: flex;
   flex-direction: column;
   line-height: 1.25;
@@ -3822,73 +3768,6 @@ h3 {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* Меню статуса всплывает над карточкой пользователя */
-.user-card {
-  position: relative;
-}
-
-.status-menu {
-  position: absolute;
-  left: 8px;
-  right: 8px;
-  bottom: calc(100% + 6px);
-  z-index: 30;
-  background: var(--gradient-surface), var(--panel-raised);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-lg);
-  padding: 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  animation: modal-in 140ms cubic-bezier(0.2, 0.8, 0.3, 1);
-}
-
-.status-menu-item {
-  background: transparent;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 9px;
-  border-radius: var(--radius-sm);
-  text-align: left;
-  color: var(--text);
-  transition: background var(--transition);
-}
-
-.status-menu-item:hover {
-  background: var(--panel-hover);
-}
-
-.status-menu-item.active {
-  background: var(--accent-soft);
-}
-
-/* Точка в меню статуса стоит в потоке, а не в углу аватара */
-.status-menu-item .status-dot {
-  position: static;
-  width: 10px;
-  height: 10px;
-  border: none;
-  flex-shrink: 0;
-}
-
-.status-menu-text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.status-menu-title {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.status-menu-hint {
-  font-size: 11px;
-  color: var(--text-faint);
 }
 
 /* Строчка статуса в списке участников — второй строкой под именем */
@@ -4201,4 +4080,314 @@ h3 {
   border-top: 1px solid var(--border);
   font-size: 11px;
   color: var(--text-faint);
+}
+
+/* ---------- Меню своего профиля ---------- */
+
+/* Точка отсчёта для меню профиля: без неё оно улетает к краю страницы */
+.user-card {
+  position: relative;
+}
+
+/* Без overflow:hidden — иначе подменю статуса обрезается по краю меню */
+.profile-menu {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: calc(100% + 6px);
+  z-index: 30;
+  background: var(--gradient-surface), var(--panel-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  animation: modal-in 140ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+/* Шапка: кто я — крупно, как в карточке профиля */
+.profile-menu-head {
+  padding: 14px 14px 12px;
+  background: linear-gradient(160deg, var(--accent-soft), transparent 70%);
+  border-bottom: 1px solid var(--border);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.profile-menu-avatar {
+  width: 52px;
+  height: 52px;
+  font-size: 20px;
+  margin-bottom: 8px;
+}
+
+/* Точка выбранного режима — та же логика, что у аватара в карточке */
+.profile-menu-avatar::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  box-sizing: content-box;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 3px solid var(--panel-raised);
+  background: var(--text-faint);
+}
+
+.profile-menu-avatar.dot-online::after {
+  background: var(--success);
+}
+
+.profile-menu-avatar.dot-idle::after {
+  background: var(--warning);
+}
+
+.profile-menu-avatar.dot-dnd::after {
+  background: var(--danger);
+}
+
+.profile-menu-name {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-menu-handle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  padding: 2px 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.profile-menu-handle:hover {
+  color: var(--accent);
+}
+
+.profile-menu-status {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-faint);
+  overflow-wrap: anywhere;
+}
+
+.profile-menu-group {
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.profile-menu-group + .profile-menu-group {
+  border-top: 1px solid var(--border);
+}
+
+/* ---------- Подменю в списках действий ---------- */
+
+.menu-sub {
+  position: relative;
+}
+
+.menu-chevron {
+  margin-left: auto;
+  color: var(--text-faint);
+}
+
+/* Раскрывается вбок; при нехватке места справа его сдвигает flip-left */
+.menu-sub-list {
+  position: absolute;
+  left: calc(100% + 6px);
+  top: -6px;
+  min-width: 230px;
+  z-index: 2;
+  background: var(--gradient-surface), var(--panel-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Невидимый мостик под курсором: без него щель до подменю рвёт наведение */
+.menu-sub-list::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+}
+
+/* В контекстных меню у правого края экрана подменю уходит влево */
+.context-menu.flip-left .menu-sub-list {
+  left: auto;
+  right: calc(100% + 6px);
+}
+
+.context-menu.flip-left .menu-sub-list::before {
+  left: auto;
+  right: -8px;
+}
+
+/* Пункт с иконкой и стрелкой: общий вид для всех меню */
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.menu-item:hover {
+  background: var(--panel-hover);
+}
+
+.menu-item.danger {
+  color: var(--danger);
+}
+
+.menu-item.danger:hover {
+  background: var(--danger-soft);
+}
+
+.menu-item svg {
+  flex-shrink: 0;
+  color: var(--text-faint);
+}
+
+.menu-item.danger svg {
+  color: var(--danger);
+}
+
+/* Точка присутствия в пунктах меню стоит в потоке */
+.menu-item .status-dot,
+.status-menu-item .status-dot {
+  position: static;
+  width: 10px;
+  height: 10px;
+  border: none;
+  flex-shrink: 0;
+}
+
+/* ---------- Контекстное меню диалога ---------- */
+
+.context-menu {
+  position: fixed;
+  z-index: 60;
+  min-width: 232px;
+  max-width: 280px;
+  background: var(--gradient-surface), var(--panel-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: modal-in 120ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.menu-title {
+  padding: 6px 10px 8px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu-divider {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--border);
+}
+
+/* Пункт со значением справа (срок заглушения) */
+.menu-value {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+/* Пункт выбора статуса: название и пояснение в две строки */
+.status-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 9px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  text-align: left;
+  color: var(--text);
+  transition: background var(--transition);
+}
+
+.status-menu-item:hover {
+  background: var(--panel-hover);
+}
+
+.status-menu-item.active {
+  background: var(--accent-soft);
+}
+
+.status-menu-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.status-menu-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.status-menu-hint {
+  font-size: 11px;
+  color: var(--text-faint);
+  white-space: normal;
+}
+
+/* Заглушённый диалог бледнее и со значком колокольчика */
+.dm-link.muted .channel-name {
+  opacity: 0.6;
+}
+
+.dm-muted-mark {
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+
+/* Кружок цвета роли в подменю ролей */
+.role-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  flex-shrink: 0;
+}
+
+/* Личная заметка о человеке — отличается от его собственного «о себе» */
+.profile-note {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--panel-hover);
+  color: var(--text-muted);
+  font-size: 13px;
 }

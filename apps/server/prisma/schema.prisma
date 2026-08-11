@@ -57,6 +57,8 @@ model User {
   blocksReceived     UserBlock[]          @relation("Blocked")
   instanceBan        InstanceBan?         @relation("InstanceBanned")
   regInvitesCreated  RegistrationInvite[] @relation("RegInviteCreator")
+  notesWritten       UserNote[]           @relation("NoteOwner")
+  notesAbout         UserNote[]           @relation("NoteTarget")
   instanceBansIssued InstanceBan[]        @relation("InstanceBanIssuer")
 
   @@map("users")
@@ -453,11 +455,32 @@ model DmConversation {
 }
 
 /// Участник диалога/группы
+/// Личная заметка и своё имя для другого человека — видит только автор
+model UserNote {
+  ownerId   String   @map("owner_id")
+  owner     User     @relation("NoteOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  targetId  String   @map("target_id")
+  target    User     @relation("NoteTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  /// Заметка о человеке
+  note      String?
+  /// Как я его называю: показывается вместо отображаемого имени
+  alias     String?
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@id([ownerId, targetId])
+  @@index([targetId])
+  @@map("user_notes")
+}
+
 model DmParticipant {
   conversationId String         @map("conversation_id")
   conversation   DmConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   userId         String         @map("user_id")
   user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Диалог закрыт лично мной: скрыт из списка до нового сообщения
+  hiddenAt       DateTime?      @map("hidden_at")
+  /// Уведомления заглушены до этого момента (далёкая дата — «пока не включу»)
+  mutedUntil     DateTime?      @map("muted_until")
   joinedAt       DateTime       @default(now()) @map("joined_at")
 
   @@id([conversationId, userId])
