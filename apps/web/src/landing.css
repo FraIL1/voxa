@@ -1,0 +1,630 @@
+/* Приветственная страница. Живёт отдельным файлом: её вёрстка не пересекается
+   с интерфейсом приложения, но пользуется теми же токенами темы. */
+
+.lp {
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  overflow-x: hidden;
+}
+
+.lp-wrap {
+  width: min(1120px, 100% - 40px);
+  margin: 0 auto;
+}
+
+/* ---------- Появление блоков при прокрутке ---------- */
+
+.reveal {
+  opacity: 0;
+  transform: translateY(22px);
+  transition:
+    opacity 600ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    transform 600ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.reveal.shown {
+  opacity: 1;
+  transform: none;
+}
+
+/* Тем, кому анимации мешают, показываем всё сразу */
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* ---------- Шапка ---------- */
+
+.lp-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(12px);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  border-bottom: 1px solid var(--border);
+}
+
+.lp-header-inner {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  height: 64px;
+}
+
+.lp-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.lp-logo-mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  background: var(--gradient-accent);
+  color: var(--accent-text);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.lp-logo.small {
+  font-size: 16px;
+}
+
+.lp-nav {
+  display: flex;
+  gap: 22px;
+  margin-left: auto;
+}
+
+.lp-nav a {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 14px;
+  transition: color var(--transition);
+}
+
+.lp-nav a:hover {
+  color: var(--text);
+}
+
+/* ---------- Кнопки ---------- */
+
+.lp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-strong);
+  background: var(--panel-raised);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    transform var(--transition),
+    background var(--transition),
+    box-shadow var(--transition);
+}
+
+.lp-btn:hover {
+  transform: translateY(-1px);
+  background: var(--panel-hover);
+}
+
+.lp-btn.primary {
+  background: var(--gradient-accent);
+  border-color: transparent;
+  color: var(--accent-text);
+  box-shadow: 0 10px 30px rgba(34, 211, 238, 0.22);
+}
+
+.lp-btn.primary:hover {
+  filter: brightness(1.06);
+}
+
+.lp-btn.ghost {
+  min-height: 38px;
+  padding: 0 16px;
+  font-size: 14px;
+  background: transparent;
+}
+
+/* ---------- Первый экран ---------- */
+
+.lp-hero {
+  position: relative;
+  padding: 84px 0 96px;
+  text-align: center;
+}
+
+/* Мягкое сияние за заголовком — тот же приём, что на экране входа */
+.lp-hero::before {
+  content: '';
+  position: absolute;
+  inset: -20% 0 auto;
+  height: 620px;
+  background: radial-gradient(60rem 26rem at 50% 0%, var(--accent-soft), transparent 70%);
+  pointer-events: none;
+}
+
+.lp-eyebrow {
+  margin: 0 0 14px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.lp-hero h1 {
+  margin: 0 0 18px;
+  font-size: clamp(34px, 5.4vw, 60px);
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  font-weight: 800;
+}
+
+.lp-lead {
+  max-width: 680px;
+  margin: 0 auto 30px;
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.lp-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+}
+
+.lp-note {
+  margin: 18px 0 0;
+  font-size: 13px;
+  color: var(--text-faint);
+}
+
+/* ---------- Макет приложения ---------- */
+
+.lp-preview {
+  display: flex;
+  height: 340px;
+  margin-top: 56px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-strong);
+  background: var(--panel);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  text-align: left;
+}
+
+.lp-preview-rail {
+  width: 56px;
+  flex-shrink: 0;
+  padding: 14px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  background: var(--rail-bg);
+  border-right: 1px solid var(--border);
+}
+
+.lp-rail-dot {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+}
+
+.lp-rail-dot.active {
+  background: var(--gradient-accent);
+  border-color: transparent;
+}
+
+.lp-preview-side {
+  width: 190px;
+  flex-shrink: 0;
+  padding: 14px 10px;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lp-side-title {
+  padding: 0 8px 10px;
+  font-weight: 700;
+  font-size: 14px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 6px;
+}
+
+.lp-side-group {
+  padding: 8px 8px 2px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.lp-side-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.lp-side-item.active {
+  background: var(--panel-hover);
+  color: var(--text);
+}
+
+.lp-side-item.voice {
+  color: var(--accent);
+}
+
+.lp-side-badge {
+  margin-left: auto;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.lp-preview-main {
+  flex: 1;
+  min-width: 0;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.lp-msg {
+  display: flex;
+  gap: 10px;
+}
+
+.lp-msg b {
+  font-size: 13px;
+}
+
+.lp-msg p {
+  margin: 2px 0 0;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.lp-msg-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-text);
+}
+
+.lp-msg-avatar.a {
+  background: linear-gradient(140deg, #22d3ee, #2dd4bf);
+}
+
+.lp-msg-avatar.b {
+  background: linear-gradient(140deg, #a855f7, #f472b6);
+}
+
+.lp-msg-avatar.c {
+  background: linear-gradient(140deg, #fbbf24, #fb7185);
+}
+
+.lp-composer {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-lg);
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  color: var(--text-faint);
+  font-size: 13px;
+}
+
+.lp-send {
+  margin-left: auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* ---------- Секции ---------- */
+
+.lp-section {
+  padding: 88px 0;
+  border-top: 1px solid var(--border);
+}
+
+.lp-section h2 {
+  margin: 0 0 12px;
+  font-size: clamp(26px, 3.4vw, 38px);
+  letter-spacing: -0.025em;
+  font-weight: 800;
+}
+
+.lp-section-lead {
+  margin: 0 0 8px;
+  max-width: 640px;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.lp-features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 18px;
+  margin-top: 40px;
+}
+
+.lp-feature {
+  height: 100%;
+  padding: 24px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--gradient-surface), var(--panel);
+  transition:
+    transform var(--transition),
+    border-color var(--transition),
+    box-shadow var(--transition);
+}
+
+.lp-feature:hover {
+  transform: translateY(-3px);
+  border-color: var(--accent-line);
+  box-shadow: var(--shadow-md);
+}
+
+.lp-feature-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  color: var(--accent);
+  margin-bottom: 14px;
+}
+
+.lp-feature h3 {
+  margin: 0 0 8px;
+  font-size: 17px;
+  letter-spacing: -0.01em;
+}
+
+.lp-feature p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+/* Две колонки: текст и наглядный блок рядом */
+.lp-split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 44px;
+  align-items: center;
+}
+
+.lp-list {
+  margin: 22px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lp-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  color: var(--text-muted);
+}
+
+.lp-list svg {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+/* Наглядный блок голосового канала */
+.lp-voice-card {
+  padding: 26px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-strong);
+  background: radial-gradient(90% 70% at 50% 0%, var(--accent-soft), transparent 70%), var(--panel);
+  box-shadow: var(--shadow-lg);
+}
+
+.lp-voice-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.lp-voice-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 8px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--panel-raised);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.lp-voice-tile .lp-msg-avatar {
+  width: 44px;
+  height: 44px;
+  font-size: 17px;
+}
+
+.lp-voice-tile.speaking {
+  border-color: var(--success);
+  box-shadow: 0 0 0 1px var(--success);
+}
+
+.lp-voice-controls {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.lp-voice-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--panel-raised);
+  border: 1px solid var(--border-strong);
+}
+
+.lp-voice-btn.danger {
+  background: var(--danger);
+  border-color: transparent;
+}
+
+/* Блок про свой сервер */
+.lp-split.reverse .lp-own-card {
+  order: -1;
+}
+
+.lp-own-card {
+  padding: 32px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--gradient-surface), var(--panel);
+  box-shadow: var(--shadow-md);
+}
+
+.lp-own-card svg {
+  color: var(--accent);
+  margin-bottom: 14px;
+}
+
+.lp-own-card p {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.65;
+  color: var(--text-muted);
+}
+
+/* ---------- Финальный призыв и подвал ---------- */
+
+.lp-final {
+  padding: 96px 0;
+  text-align: center;
+  border-top: 1px solid var(--border);
+  background: radial-gradient(50rem 22rem at 50% 100%, var(--accent-soft), transparent 70%);
+}
+
+.lp-final h2 {
+  margin: 0 0 12px;
+  font-size: clamp(28px, 4vw, 42px);
+  letter-spacing: -0.03em;
+  font-weight: 800;
+}
+
+.lp-final .lp-section-lead {
+  margin: 0 auto 28px;
+}
+
+.lp-cta.center {
+  justify-content: center;
+}
+
+.lp-footer {
+  padding: 26px 0;
+  border-top: 1px solid var(--border);
+}
+
+.lp-footer-inner {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.lp-footer-note {
+  font-size: 13px;
+  color: var(--text-faint);
+}
+
+.lp-footer-link {
+  margin-left: auto;
+  font-size: 14px;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.lp-footer-link:hover {
+  color: var(--accent);
+}
+
+/* ---------- Узкие экраны ---------- */
+
+@media (max-width: 860px) {
+  .lp-nav {
+    display: none;
+  }
+
+  .lp-preview {
+    height: 300px;
+  }
+
+  .lp-preview-side {
+    display: none;
+  }
+
+  .lp-hero {
+    padding: 56px 0 64px;
+  }
+
+  .lp-section,
+  .lp-final {
+    padding: 64px 0;
+  }
+
+  /* На узком экране картинка уходит под текст, а не над ним */
+  .lp-split.reverse .lp-own-card {
+    order: 0;
+  }
+}

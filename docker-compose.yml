@@ -17,6 +17,7 @@ services:
       - '443:443/udp' # HTTP/3
     environment:
       DOMAIN: ${DOMAIN}
+      HSTS_MAX_AGE: ${HSTS_MAX_AGE:-0}
     volumes:
       - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

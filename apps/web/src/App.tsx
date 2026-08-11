@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { createBrowserRouter, Navigate, RouterProvider } from 'react-router';
+import { createBrowserRouter, RouterProvider } from 'react-router';
 
 import AppShell from './components/AppShell';
 import ChannelRedirect from './components/ChannelRedirect';
@@ -9,6 +9,7 @@ import DmView from './components/DmView';
 import FriendsView from './components/FriendsView';
 import HomeLayout from './components/HomeLayout';
 import ServerLayout from './components/ServerLayout';
+import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ServerInvitePage from './pages/ServerInvitePage';
@@ -21,16 +22,16 @@ const queryClient = new QueryClient({
 });
 
 const router = createBrowserRouter([
+  // Корень — витрина для гостя; вошедшего она сама уводит на домашний экран
+  { path: '/', Component: LandingPage },
   { path: '/login', Component: LoginPage },
   { path: '/register', Component: RegisterPage },
   { path: '/register/:code', Component: RegisterPage },
   { path: '/invite/:code', Component: ServerInvitePage },
   {
-    path: '/',
+    // Безадресный слой: проверка входа и общая оболочка для всех экранов
     Component: AppShell,
     children: [
-      // Вход открывает домашний экран (как в Discord)
-      { index: true, element: <Navigate to="/home" replace /> },
       {
         Component: HomeLayout,
         children: [

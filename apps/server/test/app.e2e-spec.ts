@@ -2175,6 +2175,82 @@ describe('Voxa: критический поток (e2e)', () => {
     expect((forBanned.body as { id: string }[]).some((g) => g.id === testGuildId)).toBe(false);
   });
 
+  it('безопасность: чужое не отдаётся, инъекции и мусор не проходят', async () => {
+    // Без токена наружу не отдаётся ничего
+    await request(httpServer).get('/api/guilds').expect(401);
+    await request(httpServer).get(`/api/guilds/${guildId}/members`).expect(401);
+
+    // Подделанный токен не принимается
+    await request(httpServer)
+      .get('/api/guilds')
+      .set('Authorization', 'Bearer aaaa.bbbb.cccc')
+      .expect(401);
+
+    // Кавычки и служебные символы в поиске — это просто текст, а не запрос
+    const memberMe = await request(httpServer)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(200);
+    const opened = await request(httpServer)
+      .post('/api/dm/conversations')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ userId: (memberMe.body as MeDto).id })
+      .expect(201);
+    const conversationId = opened.body.id as string;
+    const injection = await request(httpServer)
+      .get(`/api/dm/conversations/${conversationId}/search`)
+      .query({ q: "' OR 1=1; DROP TABLE users; --" })
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    expect(Array.isArray(injection.body)).toBe(true);
+    // Таблица на месте: следующий запрос к пользователям всё ещё работает
+    await request(httpServer)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+
+    // Разметка сообщения хранится как текст — экранирование на клиенте
+    const xss = '<img src=x onerror=alert(1)> <script>alert(2)</script>';
+    const posted = await request(httpServer)
+      .post(`/api/channels/${generalChannelId}/messages`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ content: xss })
+      .expect(201);
+    expect((posted.body as MessageDto).content).toBe(xss);
+
+    // Чужое сообщение не изменить и не удалить
+    await request(httpServer)
+      .patch(`/api/channels/${generalChannelId}/messages/${(posted.body as MessageDto).id}`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ content: 'подмена' })
+      .expect(403);
+
+    // Права сервера не обойти: участник не выдаёт себе роли и не зовёт по инвайту
+    await request(httpServer)
+      .post(`/api/guilds/${guildId}/invites`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ maxUses: 1 })
+      .expect(403);
+
+    // Мусор в теле запроса отбивается валидацией, а не падает 500
+    await request(httpServer)
+      .patch('/api/users/me')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ displayName: 'x'.repeat(500) })
+      .expect(400);
+    await request(httpServer)
+      .post(`/api/channels/${generalChannelId}/messages`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ content: 'x'.repeat(5000) })
+      .expect(400);
+
+    // Чужой профиль по несуществующему id — 404, а не утечка чего-то ещё
+    await request(httpServer)
+      .get('/api/users/00000000-0000-7000-8000-000000000000/profile')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(404);
+  });
+
   it('параметры уведомлений: режим сервера и мьют канала', async () => {
     // По умолчанию уведомляем обо всём
     const before = await request(httpServer)

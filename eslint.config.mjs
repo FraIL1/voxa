@@ -12,6 +12,8 @@ export default tseslint.config(
       '**/src-tauri/**',
       '**/*.tsbuildinfo',
       // Отчёты и трассировки Playwright — сгенерированные артефакты прогона
+      // Отдаётся как есть в браузер, вне сборки и модульной системы
+      'apps/web/public/**',
       'tests/ui/report/**',
       'tests/ui/artifacts/**',
       'tests/ui/.auth/**',

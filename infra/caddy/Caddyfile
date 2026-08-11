@@ -9,9 +9,23 @@
 		X-Content-Type-Options nosniff
 		Referrer-Policy strict-origin-when-cross-origin
 		-Server
-		# HSTS включим на реальном домене (этап 5): выставленный на localhost,
-		# он заставит браузер навсегда упреждающе переводить ВСЕ порты localhost
-		# на https и сломает локальную разработку (vite на http://localhost:5173).
+
+		# Чужой сайт не сможет открыть Voxa в невидимом фрейме и подсунуть
+		# пользователю клик по кнопке внутри приложения
+		X-Frame-Options DENY
+
+		# Что странице разрешено загружать и куда обращаться. Скрипты только
+		# свои (встроенных нет — тема выставляется файлом /theme.js), картинки
+		# и медиа дополнительно с поддомена файлов, сокеты — к себе и LiveKit.
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://files.{$DOMAIN}; media-src 'self' blob: https://files.{$DOMAIN}; font-src 'self' data:; connect-src 'self' wss://{$DOMAIN} wss://livekit.{$DOMAIN} https://files.{$DOMAIN}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+
+		# Микрофон и камера нужны самому приложению, остальное запрещаем
+		Permissions-Policy "microphone=(self), camera=(self), display-capture=(self), geolocation=(), payment=(), usb=()"
+
+		# HSTS: на localhost держим 0, иначе браузер навсегда переведёт ВСЕ
+		# порты localhost на https и сломает разработку. На реальном домене
+		# поставь HSTS_MAX_AGE=31536000 в .env
+		Strict-Transport-Security "max-age={$HSTS_MAX_AGE:0}"
 	}
 
 	handle /api/* {
