@@ -25,6 +25,7 @@ import {
   useUnban,
 } from '../hooks/useAdmin';
 import { useMyGuildPermissions } from '../hooks/useGuilds';
+import Select from './Select';
 
 const timeFormat = new Intl.DateTimeFormat('ru', {
   day: '2-digit',
@@ -98,13 +99,18 @@ export function Invites() {
           value={maxUses}
           onChange={(e) => setMaxUses(e.target.value)}
         />
-        <select value={expires} onChange={(e) => setExpires(e.target.value)}>
-          <option value="">{t('community.expiresNever')}</option>
-          <option value="1">1 {t('community.hour')}</option>
-          <option value="24">24 {t('community.hour')}</option>
-          <option value="168">7 {t('community.days')}</option>
-          <option value="720">30 {t('community.days')}</option>
-        </select>
+        <Select
+          className="invite-expires"
+          value={expires}
+          options={[
+            { value: '', label: t('community.expiresNever') },
+            { value: '1', label: `1 ${t('community.hour')}` },
+            { value: '24', label: `24 ${t('community.hour')}` },
+            { value: '168', label: `7 ${t('community.days')}` },
+            { value: '720', label: `30 ${t('community.days')}` },
+          ]}
+          onChange={setExpires}
+        />
         <button className="btn-primary" disabled={createInvite.isPending} onClick={create}>
           {t('community.createInvite')}
         </button>

@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { ApiError } from '../api/client';
 import { useMuteChannel, useReadStates } from '../hooks/useReadStates';
 import { useDeleteChannel, useUpdateChannel } from '../hooks/useGuildAdmin';
+import ConfirmModal from './ConfirmModal';
 
 /** Настройки канала: переименование и удаление */
 export default function ChannelSettingsModal({
@@ -37,10 +38,7 @@ export default function ChannelSettingsModal({
     );
   };
 
-  const remove = (): void => {
-    if (!window.confirm(t('channels.deleteConfirm', { name: channel.name }))) return;
-    deleteChannel.mutate(channel.id, { onSuccess: onClose });
-  };
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   return (
     <div className="settings-overlay" onClick={onClose}>
@@ -74,7 +72,11 @@ export default function ChannelSettingsModal({
           </label>
           {error && <p className="friends-add-error">{error}</p>}
           <div className="modal-actions">
-            <button type="button" className="btn-secondary danger-text" onClick={remove}>
+            <button
+              type="button"
+              className="btn-secondary danger-text"
+              onClick={() => setConfirmDelete(true)}
+            >
               {t('channels.delete')}
             </button>
             <button className="btn-primary" disabled={updateChannel.isPending || !name.trim()}>
@@ -83,6 +85,17 @@ export default function ChannelSettingsModal({
           </div>
         </form>
       </div>
+
+      {confirmDelete && (
+        <ConfirmModal
+          title={t('channels.deleteTitle')}
+          message={t('channels.deleteConfirm', { name: channel.name })}
+          confirmLabel={t('chat.delete')}
+          danger
+          onConfirm={() => deleteChannel.mutate(channel.id, { onSuccess: onClose })}
+          onClose={() => setConfirmDelete(false)}
+        />
+      )}
     </div>
   );
 }

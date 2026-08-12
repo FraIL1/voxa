@@ -29,6 +29,7 @@ import { useAuthStore } from '../stores/auth';
 import { useCallStore } from '../stores/call';
 import { useChatStore } from '../stores/chat';
 import { openProfile } from '../stores/profileView';
+import ConfirmModal from './ConfirmModal';
 import PromptModal from './PromptModal';
 
 export interface MenuState {
@@ -62,6 +63,9 @@ export default function MemberContextMenu({
   const [timeoutOpen, setTimeoutOpen] = useState(false);
   const [nickOpen, setNickOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  // Кик и бан спрашивают причину в своём окне; ошибка тоже показывается своим
+  const [reasonFor, setReasonFor] = useState<'kick' | 'ban' | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const mask = useMyGuildPermissions(guildId);
   const canMute = hasPermission(mask, Permissions.MUTE_MEMBERS);
@@ -95,19 +99,9 @@ export default function MemberContextMenu({
 
   const run = (action: Promise<unknown>): void => {
     onClose();
-    action.catch((error: unknown) => {
-      window.alert(error instanceof ApiError ? error.message : t('auth.genericError'));
+    action.catch((err: unknown) => {
+      setError(err instanceof ApiError ? err.message : t('auth.genericError'));
     });
-  };
-
-  const withReason = (message: string, fn: (reason?: string) => Promise<unknown>): void => {
-    const reason = window.prompt(message) ?? undefined;
-    // Отмена диалога — отмена действия; пустая строка — действие без причины
-    if (reason === undefined) {
-      onClose();
-      return;
-    }
-    run(fn(reason.trim() || undefined));
   };
 
   const copyHandle = async (): Promise<void> => {
@@ -283,26 +277,12 @@ export default function MemberContextMenu({
         )}
 
         {canKick && !isSelf && (
-          <button
-            className="menu-item danger"
-            onClick={() =>
-              withReason(t('moderation.kickReason'), (reason) =>
-                kick.mutateAsync({ userId: member.id, reason }),
-              )
-            }
-          >
+          <button className="menu-item danger" onClick={() => setReasonFor('kick')}>
             <UserX size={15} /> {t('moderation.kick')}
           </button>
         )}
         {canBan && !isSelf && !member.banned && (
-          <button
-            className="menu-item danger"
-            onClick={() =>
-              withReason(t('moderation.banReason'), (reason) =>
-                ban.mutateAsync({ userId: member.id, reason }),
-              )
-            }
-          >
+          <button className="menu-item danger" onClick={() => setReasonFor('ban')}>
             <ShieldBan size={15} /> {t('moderation.ban')}
           </button>
         )}
@@ -312,6 +292,35 @@ export default function MemberContextMenu({
           </button>
         )}
       </div>
+
+      {reasonFor && (
+        <PromptModal
+          title={reasonFor === 'kick' ? t('moderation.kick') : t('moderation.ban')}
+          label={reasonFor === 'kick' ? t('moderation.kickReason') : t('moderation.banReason')}
+          allowEmpty
+          maxLength={200}
+          confirmLabel={reasonFor === 'kick' ? t('moderation.kick') : t('moderation.ban')}
+          onClose={() => setReasonFor(null)}
+          onSubmit={(reason) =>
+            run(
+              reasonFor === 'kick'
+                ? kick.mutateAsync({ userId: member.id, reason: reason || undefined })
+                : ban.mutateAsync({ userId: member.id, reason: reason || undefined }),
+            )
+          }
+        />
+      )}
+
+      {error && (
+        <ConfirmModal
+          title={t('common.errorTitle')}
+          message={error}
+          confirmLabel={t('common.gotIt')}
+          hideCancel
+          onConfirm={() => undefined}
+          onClose={() => setError(null)}
+        />
+      )}
 
       {nickOpen && (
         <PromptModal

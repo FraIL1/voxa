@@ -28,6 +28,9 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import Avatar from './Avatar';
+import ConfirmModal from './ConfirmModal';
+import PromptModal from './PromptModal';
+import Select from './Select';
 
 import {
   useCleanupStorage,
@@ -100,11 +103,7 @@ function Users() {
   const unban = useInstanceUnban();
   const logout = useInstanceLogout();
 
-  const doBan = (user: InstanceUserDto): void => {
-    const reason = window.prompt(t('instance.banReason', { name: user.displayName }));
-    if (reason === null) return;
-    ban.mutate({ userId: user.id, reason: reason.trim() || undefined });
-  };
+  const [banning, setBanning] = useState<InstanceUserDto | null>(null);
 
   return (
     <>
@@ -162,7 +161,7 @@ function Users() {
                 <button
                   className="icon-button danger"
                   title={t('instance.ban')}
-                  onClick={() => doBan(user)}
+                  onClick={() => setBanning(user)}
                 >
                   <Ban size={15} />
                 </button>
@@ -175,6 +174,19 @@ function Users() {
           )}
         </div>
       ))}
+
+      {banning && (
+        <PromptModal
+          title={t('instance.banTitle')}
+          label={t('instance.banReason', { name: banning.displayName })}
+          placeholder={t('instance.banLabel')}
+          allowEmpty
+          maxLength={200}
+          confirmLabel={t('instance.ban')}
+          onClose={() => setBanning(null)}
+          onSubmit={(reason) => ban.mutate({ userId: banning.id, reason: reason || undefined })}
+        />
+      )}
     </>
   );
 }
@@ -216,6 +228,7 @@ function Guilds() {
   const { t } = useTranslation();
   const { data: guilds } = useInstanceGuilds(true);
   const remove = useInstanceDeleteGuild();
+  const [deleting, setDeleting] = useState<{ id: string; name: string } | null>(null);
 
   return (
     <>
@@ -240,16 +253,23 @@ function Guilds() {
           <button
             className="icon-button danger"
             title={t('instance.deleteGuild')}
-            onClick={() => {
-              if (window.confirm(t('instance.deleteGuildConfirm', { name: guild.name }))) {
-                remove.mutate(guild.id);
-              }
-            }}
+            onClick={() => setDeleting({ id: guild.id, name: guild.name })}
           >
             <Trash2 size={15} />
           </button>
         </div>
       ))}
+
+      {deleting && (
+        <ConfirmModal
+          title={t('instance.deleteGuildTitle')}
+          message={t('instance.deleteGuildConfirm', { name: deleting.name })}
+          confirmLabel={t('instance.deleteGuild')}
+          danger
+          onConfirm={() => remove.mutate(deleting.id)}
+          onClose={() => setDeleting(null)}
+        />
+      )}
     </>
   );
 }
@@ -341,12 +361,17 @@ function RegistrationInvites() {
           value={maxUses}
           onChange={(e) => setMaxUses(e.target.value)}
         />
-        <select value={expires} onChange={(e) => setExpires(e.target.value)}>
-          <option value="">{t('community.expiresNever')}</option>
-          <option value="24">24 {t('community.hour')}</option>
-          <option value="168">7 {t('community.days')}</option>
-          <option value="720">30 {t('community.days')}</option>
-        </select>
+        <Select
+          className="invite-expires"
+          value={expires}
+          options={[
+            { value: '', label: t('community.expiresNever') },
+            { value: '24', label: `24 ${t('community.hour')}` },
+            { value: '168', label: `7 ${t('community.days')}` },
+            { value: '720', label: `30 ${t('community.days')}` },
+          ]}
+          onChange={setExpires}
+        />
         <button className="btn-primary" disabled={create.isPending} onClick={doCreate}>
           {t('instance.regCreate')}
         </button>

@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router';
 
 import { useOpenDm } from '../hooks/useDm';
 import Avatar from './Avatar';
+import ConfirmModal from './ConfirmModal';
 import { EmptyBlock } from './Skeletons';
 import {
   useAcceptFriendRequest,
@@ -38,17 +39,8 @@ function FriendRows({ online }: { online: boolean }) {
       .catch(() => undefined);
   };
 
-  const remove = (friend: FriendDto): void => {
-    if (window.confirm(t('friends.removeConfirm', { name: friend.displayName }))) {
-      removeFriend.mutate(friend.id);
-    }
-  };
-
-  const block = (friend: FriendDto): void => {
-    if (window.confirm(t('friends.blockConfirm', { name: friend.displayName }))) {
-      blockUser.mutate(friend.id);
-    }
-  };
+  // Что подтверждаем: убрать из друзей или заблокировать — и кого
+  const [ask, setAsk] = useState<{ action: 'remove' | 'block'; friend: FriendDto } | null>(null);
 
   return (
     <>
@@ -80,19 +72,36 @@ function FriendRows({ online }: { online: boolean }) {
           <button
             className="icon-button"
             title={t('friends.remove')}
-            onClick={() => remove(friend)}
+            onClick={() => setAsk({ action: 'remove', friend })}
           >
             <UserMinus size={18} />
           </button>
           <button
             className="icon-button danger"
             title={t('friends.block')}
-            onClick={() => block(friend)}
+            onClick={() => setAsk({ action: 'block', friend })}
           >
             <Ban size={18} />
           </button>
         </div>
       ))}
+
+      {ask && (
+        <ConfirmModal
+          title={ask.action === 'remove' ? t('friends.removeTitle') : t('friends.blockTitle')}
+          message={t(ask.action === 'remove' ? 'friends.removeConfirm' : 'friends.blockConfirm', {
+            name: ask.friend.displayName,
+          })}
+          confirmLabel={ask.action === 'remove' ? t('friends.remove') : t('friends.block')}
+          danger
+          onConfirm={() =>
+            ask.action === 'remove'
+              ? removeFriend.mutate(ask.friend.id)
+              : blockUser.mutate(ask.friend.id)
+          }
+          onClose={() => setAsk(null)}
+        />
+      )}
     </>
   );
 }

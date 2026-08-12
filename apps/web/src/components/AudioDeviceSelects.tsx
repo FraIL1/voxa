@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useVoiceStore } from '../stores/voice';
+import Select from './Select';
 
 interface DeviceOption {
   deviceId: string;
@@ -26,33 +27,28 @@ export default function AudioDeviceSelects() {
     );
   }, []);
 
+  const toOptions = (devices: DeviceOption[]): { value: string; label: string }[] =>
+    devices.map((d) => ({ value: d.deviceId, label: d.label || t('voice.defaultDevice') }));
+
   return (
     <>
       <label>
         {t('voice.mic')}
-        <select
+        <Select
           value={voice.micDeviceId ?? 'default'}
-          onChange={(e) => void voice.setAudioDevice('audioinput', e.target.value)}
-        >
-          {mics.map((d) => (
-            <option key={d.deviceId} value={d.deviceId}>
-              {d.label || t('voice.defaultDevice')}
-            </option>
-          ))}
-        </select>
+          options={toOptions(mics)}
+          placeholder={t('voice.defaultDevice')}
+          onChange={(value) => void voice.setAudioDevice('audioinput', value)}
+        />
       </label>
       <label>
         {t('voice.output')}
-        <select
+        <Select
           value={voice.outputDeviceId ?? 'default'}
-          onChange={(e) => void voice.setAudioDevice('audiooutput', e.target.value)}
-        >
-          {outputs.map((d) => (
-            <option key={d.deviceId} value={d.deviceId}>
-              {d.label || t('voice.defaultDevice')}
-            </option>
-          ))}
-        </select>
+          options={toOptions(outputs)}
+          placeholder={t('voice.defaultDevice')}
+          onChange={(value) => void voice.setAudioDevice('audiooutput', value)}
+        />
       </label>
     </>
   );

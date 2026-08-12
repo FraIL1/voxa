@@ -8,6 +8,8 @@ import { useDeleteGuild, useGuild, useLeaveGuild, useTransferGuild } from '../ho
 import { useUpdateGuild } from '../hooks/useGuildAdmin';
 import { useMembers } from '../hooks/useMembers';
 import { useAuthStore } from '../stores/auth';
+import ConfirmModal from './ConfirmModal';
+import Select from './Select';
 
 const MAX_ICON_BYTES = 256 * 1024;
 
@@ -32,6 +34,7 @@ export default function ServerProfileTab({
   const [description, setDescription] = useState(guild?.description ?? '');
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
+  const [asking, setAsking] = useState<'transfer' | 'delete' | null>(null);
 
   const myId = useAuthStore((s) => s.user?.id);
   const canManage = guild ? hasPermission(guild.myPermissions, Permissions.MANAGE_CHANNELS) : false;
@@ -158,45 +161,62 @@ export default function ServerProfileTab({
           <h2>{t('serverSettings.ownerZone')}</h2>
           <p className="settings-hint">{t('serverSettings.transferHint')}</p>
           <div className="invite-form">
-            <select value={heir} onChange={(e) => setHeir(e.target.value)}>
-              <option value="">{t('serverSettings.pickHeir')}</option>
-              {(members ?? [])
-                .filter((m) => m.id !== guild?.ownerId)
-                .map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.nickname ?? m.displayName}
-                  </option>
-                ))}
-            </select>
+            <Select
+              className="invite-expires"
+              value={heir}
+              placeholder={t('serverSettings.pickHeir')}
+              options={[
+                { value: '', label: t('serverSettings.pickHeir') },
+                ...(members ?? [])
+                  .filter((m) => m.id !== guild?.ownerId)
+                  .map((m) => ({ value: m.id, label: m.nickname ?? m.displayName })),
+              ]}
+              onChange={setHeir}
+            />
             <button
               className="btn-secondary"
               disabled={!heir || transferGuild.isPending}
-              onClick={() => {
-                const name = members?.find((m) => m.id === heir)?.displayName ?? '';
-                if (!window.confirm(t('serverSettings.transferConfirm', { name }))) return;
-                transferGuild.mutate(heir, { onSuccess: () => setHeir('') });
-              }}
+              onClick={() => setAsking('transfer')}
             >
               {t('serverSettings.transfer')}
             </button>
           </div>
 
-          <button
-            className="btn-secondary danger-text"
-            onClick={() => {
-              if (!window.confirm(t('serverSettings.deleteConfirm', { name: guild?.name ?? '' })))
-                return;
-              deleteGuild.mutate(guildId, {
-                onSuccess: () => {
-                  onClose();
-                  navigate('/home', { replace: true });
-                },
-              });
-            }}
-          >
+          <button className="btn-secondary danger-text" onClick={() => setAsking('delete')}>
             {t('serverSettings.delete')}
           </button>
         </>
+      )}
+
+      {asking === 'transfer' && (
+        <ConfirmModal
+          title={t('serverSettings.transferTitle')}
+          message={t('serverSettings.transferConfirm', {
+            name: members?.find((m) => m.id === heir)?.displayName ?? '',
+          })}
+          confirmLabel={t('serverSettings.transfer')}
+          danger
+          onConfirm={() => transferGuild.mutate(heir, { onSuccess: () => setHeir('') })}
+          onClose={() => setAsking(null)}
+        />
+      )}
+
+      {asking === 'delete' && (
+        <ConfirmModal
+          title={t('serverSettings.deleteTitle')}
+          message={t('serverSettings.deleteConfirm', { name: guild?.name ?? '' })}
+          confirmLabel={t('serverSettings.delete')}
+          danger
+          onConfirm={() =>
+            deleteGuild.mutate(guildId, {
+              onSuccess: () => {
+                onClose();
+                navigate('/home', { replace: true });
+              },
+            })
+          }
+          onClose={() => setAsking(null)}
+        />
       )}
     </>
   );

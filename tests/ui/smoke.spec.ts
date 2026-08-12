@@ -144,6 +144,50 @@ test.describe('Смена аккаунта', () => {
   });
 });
 
+test.describe('Свои окна вместо системных', () => {
+  test('удаление сообщения спрашивает в окне приложения', async ({ owner }) => {
+    await owner.locator('.rail-icon.server').first().click();
+    await owner.waitForURL(/\/guilds\//);
+
+    const text = `удалим это ${Date.now()}`;
+    await owner.getByRole('textbox').last().fill(text);
+    await owner.keyboard.press('Enter');
+    const message = owner.locator('.message', { hasText: text });
+    await expect(message).toBeVisible();
+
+    await message.hover();
+    await message.getByTitle('Удалить').click();
+
+    // Окно наше: у него есть разметка и кнопки приложения
+    const confirm = owner.locator('.confirm-modal');
+    await expect(confirm).toBeVisible();
+    await expect(confirm.getByRole('heading', { name: 'Удалить сообщение' })).toBeVisible();
+    await expect(confirm.getByRole('button', { name: 'Отмена' })).toBeVisible();
+
+    await confirm.getByRole('button', { name: 'Удалить', exact: true }).click();
+    await expect(confirm).toBeHidden();
+    await expect(owner.locator('.message', { hasText: text })).toHaveCount(0);
+  });
+
+  test('выбор устройства — свой список, а не системный', async ({ owner }) => {
+    await owner.locator('.user-card').getByTitle('Настройки').first().click();
+    await owner.getByRole('button', { name: 'Голос и звук' }).click();
+
+    // Системных select в приложении не осталось
+    await expect(owner.locator('select')).toHaveCount(0);
+
+    const trigger = owner.locator('.select-trigger').first();
+    await trigger.click();
+    await expect(owner.locator('.select-list')).toBeVisible();
+    await expect(owner.locator('.select-option').first()).toBeVisible();
+
+    // Escape закрывает список, но не окно настроек вокруг него
+    await owner.keyboard.press('Escape');
+    await expect(owner.locator('.select-list')).toBeHidden();
+    await expect(owner.locator('.settings-panel')).toBeVisible();
+  });
+});
+
 test.describe('Панель владельца', () => {
   test('разделы переключаются, сводка и списки видны', async ({ owner }) => {
     await owner.locator('.rail-icon.owner').click();

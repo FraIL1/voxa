@@ -10,6 +10,7 @@ import { useAuthStore } from '../stores/auth';
 import { openProfile } from '../stores/profileView';
 import Avatar from './Avatar';
 import Attachments from './Attachments';
+import ConfirmModal from './ConfirmModal';
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '🎉', '🔥', '👀', '😢', '🤔'];
 
@@ -63,6 +64,7 @@ export default function DmMessageItem({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const reactions = aggregateReactions(message, user?.id);
   const isPinned = message.pinnedAt !== null;
@@ -212,9 +214,7 @@ export default function DmMessageItem({
             <button
               className="icon-button danger"
               title={t('chat.delete')}
-              onClick={() => {
-                if (window.confirm(t('chat.deleteConfirm'))) deleteDm.mutate(message.id);
-              }}
+              onClick={() => setConfirmDelete(true)}
             >
               <Trash2 size={16} />
             </button>
@@ -236,6 +236,17 @@ export default function DmMessageItem({
             })}
           </div>
         </>
+      )}
+
+      {confirmDelete && (
+        <ConfirmModal
+          title={t('chat.deleteTitle')}
+          message={t('chat.deleteConfirm')}
+          confirmLabel={t('chat.delete')}
+          danger
+          onConfirm={() => deleteDm.mutate(message.id)}
+          onClose={() => setConfirmDelete(false)}
+        />
       )}
     </div>
   );

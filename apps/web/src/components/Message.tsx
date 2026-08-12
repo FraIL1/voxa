@@ -15,6 +15,7 @@ import { useChatStore } from '../stores/chat';
 import { openProfile } from '../stores/profileView';
 import Attachments from './Attachments';
 import Avatar from './Avatar';
+import ConfirmModal from './ConfirmModal';
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥', '🎉', '👀', '💯', '🤔', '👎', '🫡'];
 
@@ -91,11 +92,7 @@ export default function Message({ message }: { message: ChatMessage }) {
     if (e.key === 'Escape') setEditing(false);
   };
 
-  const onDelete = (): void => {
-    if (window.confirm(t('chat.deleteConfirm'))) {
-      deleteMessage.mutate(message.id);
-    }
-  };
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const react = (emoji: string, mine: boolean): void => {
     setPickerOpen(false);
@@ -228,7 +225,11 @@ export default function Message({ message }: { message: ChatMessage }) {
             </button>
           )}
           {canDelete && (
-            <button className="icon-button danger" title={t('chat.delete')} onClick={onDelete}>
+            <button
+              className="icon-button danger"
+              title={t('chat.delete')}
+              onClick={() => setConfirmDelete(true)}
+            >
               <Trash2 size={16} />
             </button>
           )}
@@ -249,6 +250,17 @@ export default function Message({ message }: { message: ChatMessage }) {
             })}
           </div>
         </>
+      )}
+
+      {confirmDelete && (
+        <ConfirmModal
+          title={t('chat.deleteTitle')}
+          message={t('chat.deleteConfirm')}
+          confirmLabel={t('chat.delete')}
+          danger
+          onConfirm={() => deleteMessage.mutate(message.id)}
+          onClose={() => setConfirmDelete(false)}
+        />
       )}
     </div>
   );

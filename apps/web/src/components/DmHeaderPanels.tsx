@@ -15,7 +15,9 @@ import {
 } from '../hooks/useDm';
 import { useAuthStore } from '../stores/auth';
 import Avatar from './Avatar';
+import ConfirmModal from './ConfirmModal';
 import { ProfileBody } from './ProfileCard';
+import PromptModal from './PromptModal';
 
 const dateFormat = new Intl.DateTimeFormat('ru', {
   day: 'numeric',
@@ -145,21 +147,12 @@ export function GroupPanel({
   const renameGroup = useRenameGroup(conversation.id);
   const leaveGroup = useLeaveGroup();
   const [adding, setAdding] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [leaving, setLeaving] = useState(false);
 
   const isOwner = conversation.ownerId === myId;
   const memberIds = new Set(conversation.members.map((m) => m.id));
   const candidates = (friends ?? []).filter((f) => !memberIds.has(f.id));
-
-  const rename = (): void => {
-    const next = window.prompt(t('dm.groupNameLabel'), conversation.name ?? '');
-    if (next && next.trim()) renameGroup.mutate(next.trim());
-  };
-
-  const leave = (): void => {
-    if (window.confirm(t('dm.groupLeaveConfirm'))) {
-      leaveGroup.mutate(conversation.id, { onSuccess: () => navigate('/home') });
-    }
-  };
 
   return (
     <div className="dm-panel">
@@ -170,7 +163,7 @@ export function GroupPanel({
         </button>
       </div>
 
-      <button className="btn-secondary" onClick={rename}>
+      <button className="btn-secondary" onClick={() => setRenaming(true)}>
         {t('dm.groupRename')}
       </button>
 
@@ -215,9 +208,34 @@ export function GroupPanel({
         </div>
       )}
 
-      <button className="btn-secondary danger-text" onClick={leave}>
+      <button className="btn-secondary danger-text" onClick={() => setLeaving(true)}>
         <LogOut size={15} /> {t('dm.groupLeave')}
       </button>
+
+      {renaming && (
+        <PromptModal
+          title={t('dm.groupRename')}
+          label={t('dm.groupNameLabel')}
+          placeholder={t('dm.groupNamePlaceholder')}
+          initialValue={conversation.name ?? ''}
+          maxLength={64}
+          onClose={() => setRenaming(false)}
+          onSubmit={(value) => renameGroup.mutate(value)}
+        />
+      )}
+
+      {leaving && (
+        <ConfirmModal
+          title={t('dm.groupLeaveTitle')}
+          message={t('dm.groupLeaveConfirm')}
+          confirmLabel={t('dm.groupLeave')}
+          danger
+          onConfirm={() =>
+            leaveGroup.mutate(conversation.id, { onSuccess: () => navigate('/home') })
+          }
+          onClose={() => setLeaving(false)}
+        />
+      )}
     </div>
   );
 }
