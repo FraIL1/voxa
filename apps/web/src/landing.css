@@ -349,6 +349,11 @@
   transition: background 200ms ease-out;
 }
 
+/* Текст первого экрана — над подсветкой, иначе она ложится поверх букв */
+.lp-hero-text {
+  position: relative;
+}
+
 .lp-eyebrow {
   display: inline-flex;
   align-items: center;
@@ -661,6 +666,13 @@
   position: relative;
   padding: 96px 0;
   border-top: 1px solid var(--border);
+}
+
+/* Через одну секции идут на чуть другом фоне: длинная страница перестаёт
+   выглядеть одним бесконечным полотном */
+.lp-voice,
+.lp-steps {
+  background: linear-gradient(180deg, transparent, var(--panel) 18%, var(--panel) 82%, transparent);
 }
 
 .lp-kicker {

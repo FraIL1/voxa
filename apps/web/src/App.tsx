@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router';
 
@@ -15,14 +15,9 @@ import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ServerInvitePage from './pages/ServerInvitePage';
+import { queryClient } from './lib/queryClient';
 import { isTauri, notifyAppReady } from './lib/tauri';
 import { useAuthStore } from './stores/auth';
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: { retry: 1, refetchOnWindowFocus: false },
-  },
-});
 
 const router = createBrowserRouter([
   // Корень — витрина для гостя; вошедшего она сама уводит на домашний экран

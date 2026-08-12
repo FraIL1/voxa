@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures';
+import { FRIEND, OWNER } from './global-setup';
 
 test.describe('Базовый обход интерфейса', () => {
   test('вход открывает домашний экран с друзьями и списком серверов', async ({ owner }) => {
@@ -101,6 +102,45 @@ test.describe('Оформление', () => {
     await owner.getByRole('button', { name: 'Оформление' }).click();
     await owner.getByRole('button', { name: 'Тёмная' }).click();
     await expect(owner.locator('html')).toHaveAttribute('data-theme', 'dark');
+  });
+});
+
+test.describe('Смена аккаунта', () => {
+  /**
+   * Вкладку никто не перезагружает: выход и вход идут внутри приложения.
+   * Кэш ответов при этом обязан обнулиться, иначе новый пользователь видит
+   * списки прошлого — так у владельца оставались чужие диалоги и друзья.
+   */
+  test('в той же вкладке не остаётся данных прошлого пользователя', async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    const signIn = async (user: { username: string; password: string }): Promise<void> => {
+      await page.getByLabel('Имя пользователя').fill(user.username);
+      await page.getByLabel('Пароль').fill(user.password);
+      await page.getByRole('button', { name: 'Войти' }).click();
+      await page.waitForURL(/\/(home|guilds)/, { timeout: 20_000 });
+    };
+
+    await page.goto('/login');
+    await signIn(OWNER);
+    await page.locator('.user-card').waitFor({ state: 'visible', timeout: 20_000 });
+    await page.getByRole('button', { name: 'Все', exact: true }).click();
+    await expect(page.locator('.friend-row', { hasText: 'uitest_friend' })).toHaveCount(1);
+
+    // Выход и вход другим аккаунтом — без перезагрузки страницы
+    await page.locator('.user-card .avatar').first().click();
+    await page.getByRole('button', { name: 'Выйти из аккаунта' }).click();
+    await page.waitForURL(/\/login/, { timeout: 20_000 });
+    await signIn(FRIEND);
+    await page.locator('.user-card').waitFor({ state: 'visible', timeout: 20_000 });
+
+    // В списке друзей должен быть владелец, а не сам вошедший из старого кэша
+    await page.getByRole('button', { name: 'Все', exact: true }).click();
+    await expect(page.locator('.friend-row', { hasText: 'uitest_owner' })).toHaveCount(1);
+    await expect(page.locator('.friend-row', { hasText: 'uitest_friend' })).toHaveCount(0);
+
+    await context.close();
   });
 });
 
