@@ -15,7 +15,7 @@ import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ServerInvitePage from './pages/ServerInvitePage';
-import { isTauri, revealWindow } from './lib/tauri';
+import { isTauri, notifyAppReady } from './lib/tauri';
 import { useAuthStore } from './stores/auth';
 
 const queryClient = new QueryClient({
@@ -54,8 +54,8 @@ const router = createBrowserRouter([
   },
 ]);
 
-/** Сколько минимум держим заставку в приложении, чтобы её было видно */
-const SPLASH_MIN_MS = 1100;
+/** Сколько минимум держим окно запуска, чтобы его было видно */
+const SPLASH_MIN_MS = 1400;
 
 export default function App() {
   const bootstrap = useAuthStore((s) => s.bootstrap);
@@ -64,8 +64,7 @@ export default function App() {
   const [splashHold, setSplashHold] = useState(() => isTauri());
 
   useEffect(() => {
-    // Окно десктопа скрыто до этого момента — показываем, когда есть что рисовать
-    void bootstrap().finally(() => void revealWindow());
+    void bootstrap();
   }, [bootstrap]);
 
   useEffect(() => {
@@ -75,6 +74,11 @@ export default function App() {
   }, [splashHold]);
 
   const booting = status === 'loading' || splashHold;
+
+  // Главное окно показываем, когда интерфейс уже нарисован
+  useEffect(() => {
+    if (!booting) void notifyAppReady();
+  }, [booting]);
 
   return (
     <QueryClientProvider client={queryClient}>

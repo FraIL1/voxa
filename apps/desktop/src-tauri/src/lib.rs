@@ -4,6 +4,16 @@ use tauri::{
     Manager,
 };
 
+/// Интерфейс загрузился: гасим окно запуска и показываем главное.
+/// Вызывается фронтендом, когда рисовать уже есть что.
+#[tauri::command]
+fn app_ready(app: tauri::AppHandle) {
+    if let Some(splash) = app.get_webview_window("splash") {
+        let _ = splash.close();
+    }
+    show_main_window(&app);
+}
+
 fn show_main_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
@@ -21,7 +31,18 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
+        .invoke_handler(tauri::generate_handler![app_ready])
         .setup(|app| {
+            // Иконку окна ставим крупной: Windows сама уменьшит её под панель
+            // задач, а из мелкой она получалась рассыпанной на пиксели
+            if let Some(window) = app.get_webview_window("main") {
+                if let Ok(icon) =
+                    tauri::image::Image::from_bytes(include_bytes!("../icons/256x256.png"))
+                {
+                    let _ = window.set_icon(icon);
+                }
+            }
+
             // Трей: клик — показать окно; меню — открыть/выход
             let show = MenuItem::with_id(app, "show", "Открыть Voxa", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Выход", true, None::<&str>)?;
@@ -57,6 +78,10 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
+            // Окно запуска закрывается по-настоящему, в трей прячется только главное
+            if window.label() != "main" {
+                return;
+            }
             // Закрытие окна = сворачивание в трей; настоящий выход — из меню трея
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 let _ = window.hide();

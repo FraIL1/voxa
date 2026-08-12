@@ -27,12 +27,14 @@ export async function hideWindow(): Promise<void> {
   await (await mainWindow())?.hide();
 }
 
-/** Показ окна после загрузки интерфейса — чтобы не мигало пустым */
-export async function revealWindow(): Promise<void> {
-  const window = await mainWindow();
-  if (!window) return;
-  await window.show();
-  await window.setFocus();
+/**
+ * Интерфейс готов: приложение закрывает окно запуска и показывает главное.
+ * Пока это не вызвано, пользователь видит заставку, а не пустое окно.
+ */
+export async function notifyAppReady(): Promise<void> {
+  if (!isTauri()) return;
+  const { invoke } = await import('@tauri-apps/api/core');
+  await invoke('app_ready').catch(() => undefined);
 }
 
 /** Глобальные хоткеи (работают даже когда окно свёрнуто): mute / deafen */

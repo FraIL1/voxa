@@ -11,13 +11,27 @@
   "app": {
     "windows": [
       {
+        "label": "splash",
+        "url": "splash.html",
+        "title": "Voxa",
+        "width": 420,
+        "height": 280,
+        "resizable": false,
+        "decorations": false,
+        "center": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": true
+      },
+      {
         "title": "Voxa",
         "width": 1240,
         "height": 800,
         "minWidth": 940,
         "minHeight": 600,
         "decorations": false,
-        "visible": false
+        "visible": false,
+        "label": "main"
       }
     ],
     "security": {
