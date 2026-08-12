@@ -5,6 +5,7 @@ import { Link, Navigate } from 'react-router';
 
 import { login } from '../api/auth';
 import { ApiError } from '../api/client';
+import { isTauri } from '../lib/tauri';
 import { useAuthStore } from '../stores/auth';
 
 export default function LoginPage() {
@@ -38,10 +39,13 @@ export default function LoginPage() {
 
   return (
     <div className="auth-screen">
-      <Link className="auth-home" to="/">
-        <span className="auth-home-mark">V</span>
-        Voxa
-      </Link>
+      {/* Возврат на витрину — только в браузере: в приложении её нет */}
+      {!isTauri() && (
+        <Link className="auth-home" to="/">
+          <span className="auth-home-mark">V</span>
+          Voxa
+        </Link>
+      )}
       <form className="auth-card" onSubmit={(e) => void onSubmit(e)}>
         <h1>
           <span className="brand">{t('app.name')}</span> — {t('auth.loginTitle')}

@@ -6,6 +6,7 @@ import { Link, Navigate, useParams } from 'react-router';
 
 import { register } from '../api/auth';
 import { api, ApiError } from '../api/client';
+import { isTauri } from '../lib/tauri';
 import { useAuthStore } from '../stores/auth';
 
 /** Регистрация в приложении по коду, который выдал владелец приложения. */
@@ -49,10 +50,13 @@ export default function RegisterPage() {
 
   return (
     <div className="auth-screen">
-      <Link className="auth-home" to="/">
-        <span className="auth-home-mark">V</span>
-        Voxa
-      </Link>
+      {/* Возврат на витрину — только в браузере: в приложении её нет */}
+      {!isTauri() && (
+        <Link className="auth-home" to="/">
+          <span className="auth-home-mark">V</span>
+          Voxa
+        </Link>
+      )}
       <form className="auth-card" onSubmit={(e) => void onSubmit(e)}>
         <h1>
           <span className="brand">{t('app.name')}</span> — {t('auth.registerTitle')}

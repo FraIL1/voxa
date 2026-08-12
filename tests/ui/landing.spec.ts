@@ -60,3 +60,22 @@ test.describe('Приветственная страница', () => {
     await expect(faq).toHaveClass(/open/);
   });
 });
+
+test.describe('Экран запуска', () => {
+  test('заставка показывается, пока проверяется вход, и уходит после', async ({ page }) => {
+    // На живом сервере проверка занимает миллисекунды — притормаживаем её
+    await page.route('**/api/auth/refresh', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+      await route.continue();
+    });
+
+    await page.goto('/login');
+    const splash = page.locator('.splash');
+    await expect(splash).toBeVisible();
+    await expect(splash.locator('.splash-wave span')).toHaveCount(5);
+
+    // Как только вход проверен, заставка сменяется формой
+    await expect(page.getByRole('button', { name: 'Войти' })).toBeVisible({ timeout: 10_000 });
+    await expect(splash).toBeHidden();
+  });
+});

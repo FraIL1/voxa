@@ -22,6 +22,16 @@ async function signedInPage(
   return page;
 }
 
+/**
+ * Открывает домашний экран и ждёт, пока приложение действительно готово:
+ * пока идёт проверка входа, показывается заставка и горячие клавиши ещё
+ * не работают — сценарии не должны стартовать в этот момент.
+ */
+async function openHome(page: Page): Promise<void> {
+  await page.goto('/home');
+  await page.locator('.user-card').waitFor({ state: 'visible', timeout: 20_000 });
+}
+
 interface WorkerPages {
   ownerSession: Page;
   friendSession: Page;
@@ -51,12 +61,12 @@ export const test = base.extend<{ owner: Page; friend: Page }, WorkerPages>({
   ],
 
   owner: async ({ ownerSession }, use) => {
-    await ownerSession.goto('/home');
+    await openHome(ownerSession);
     await use(ownerSession);
   },
 
   friend: async ({ friendSession }, use) => {
-    await friendSession.goto('/home');
+    await openHome(friendSession);
     await use(friendSession);
   },
 });
