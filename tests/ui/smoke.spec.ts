@@ -169,6 +169,41 @@ test.describe('Свои окна вместо системных', () => {
     await expect(owner.locator('.message', { hasText: text })).toHaveCount(0);
   });
 
+  test('галочки и поля нарисованы приложением, а не системой', async ({ owner }) => {
+    await owner.locator('.rail-icon.server').first().click();
+    await owner.waitForURL(/\/guilds\//);
+    await owner.locator('.server-header').click();
+    await owner.getByRole('button', { name: 'Настройки сервера' }).click();
+    await owner.getByRole('button', { name: 'Роли' }).click();
+
+    // Галочка: системную отрисовку заменили своей — иначе снятая была белой
+    const box = owner.locator('.role-perm input[type=checkbox]').first();
+    await expect(box).toBeVisible();
+    const boxStyle = await box.evaluate((el) => {
+      const cs = getComputedStyle(el);
+      const r = el.getBoundingClientRect();
+      return {
+        appearance: cs.appearance,
+        background: cs.backgroundColor,
+        size: `${Math.round(r.width)}x${Math.round(r.height)}`,
+        minHeight: cs.minHeight,
+        padding: cs.padding,
+      };
+    });
+    expect(boxStyle.appearance).toBe('none');
+    expect(boxStyle.size).toBe('16x16');
+    expect(boxStyle.minHeight).toBe('0px');
+    expect(boxStyle.padding).toBe('0px');
+    // Снятая галочка — цвета панели, а не системного белого
+    expect(boxStyle.background).toBe('rgb(22, 30, 45)');
+
+    // Выбор цвета роли — без системной рамки вокруг образца
+    const color = owner.locator('.role-color-input').first();
+    await expect(color).toHaveCSS('appearance', 'none');
+
+    await owner.locator('.settings-panel').getByTitle('Закрыть').click();
+  });
+
   test('выбор устройства — свой список, а не системный', async ({ owner }) => {
     await owner.locator('.user-card').getByTitle('Настройки').first().click();
     await owner.getByRole('button', { name: 'Голос и звук' }).click();
