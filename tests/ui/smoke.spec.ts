@@ -166,6 +166,32 @@ test.describe('Присутствие', () => {
   });
 });
 
+test.describe('Синхрон присутствия', () => {
+  test('смена статуса сразу видна и в карточке, и в списке участников', async ({ owner }) => {
+    await owner.locator('.rail-icon.server').first().click();
+    await owner.waitForURL(/\/guilds\//);
+
+    const meInList = owner.locator('.member', { hasText: 'uitest_owner' }).first();
+    await expect(meInList.locator('.status-dot')).toHaveClass(/online/);
+
+    // Ставим «не беспокоить» через меню профиля внизу слева
+    await owner.locator('.user-card-identity').click();
+    const menu = owner.locator('.profile-menu');
+    await menu.locator('.menu-sub .menu-item').first().click();
+    await menu.locator('.status-menu-item', { hasText: 'Не беспокоить' }).click();
+
+    // Обе части интерфейса должны показать новый статус без перезагрузки
+    await expect(owner.locator('.user-card-status')).toHaveText('Не беспокоить');
+    await expect(meInList.locator('.status-dot')).toHaveClass(/dnd/);
+
+    // Возвращаем обычный режим
+    await owner.locator('.user-card-identity').click();
+    await menu.locator('.menu-sub .menu-item').first().click();
+    await menu.locator('.status-menu-item', { hasText: 'В сети' }).click();
+    await expect(meInList.locator('.status-dot')).toHaveClass(/online/);
+  });
+});
+
 test.describe('Меню сервера', () => {
   test('выпадающее меню держится внутри боковой панели', async ({ owner }) => {
     await owner.locator('.rail-icon.server').first().click();

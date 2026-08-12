@@ -87,6 +87,8 @@ export interface WsReadyPayload {
   userId: string;
   /** Каналы, на события которых подписан сокет */
   channelIds: string[];
+  /** Как меня видят другие прямо сейчас — чтобы новый клиент не гадал */
+  status: PresenceStatus;
 }
 
 export interface DmReactionEventPayload {

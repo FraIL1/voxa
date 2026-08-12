@@ -14,6 +14,7 @@ import {
   type MemberDto,
   type MessageDto,
   type PresenceUpdatePayload,
+  type WsReadyPayload,
   type ReactionEventPayload,
   type ReadStateUpdatedPayload,
   type TypingPayload,
@@ -153,12 +154,20 @@ export function useRealtime(): void {
       void queryClient.invalidateQueries({ queryKey: MEMBERS_KEY });
     });
 
+    // При подключении сервер сразу говорит, как нас видят другие: иначе
+    // второе окно показывало бы «в сети», пока первое простаивает
+    socket.on(WsEvents.Ready, (p: WsReadyPayload) => {
+      usePresenceStore.getState().setMyStatus(p.status);
+    });
+
     socket.on(WsEvents.PresenceUpdate, (p: PresenceUpdatePayload) => {
       // Своё состояние показываем в карточке внизу — оно же уходит другим
       if (p.userId === useAuthStore.getState().user?.id) {
         usePresenceStore.getState().setMyStatus(p.status);
       }
-      queryClient.setQueryData<MemberDto[]>(MEMBERS_KEY, (members) =>
+      // Ключ участников — префикс ['members', guildId]: точечная запись по
+      // ['members'] уходила в пустоту, и список не менял статус до перезагрузки
+      queryClient.setQueriesData<MemberDto[]>({ queryKey: MEMBERS_KEY }, (members) =>
         members?.map((m) => (m.id === p.userId ? { ...m, status: p.status } : m)),
       );
       queryClient.setQueryData<FriendDto[]>(FRIENDS_KEY, (friends) =>

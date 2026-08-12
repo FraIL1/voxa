@@ -154,14 +154,17 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         ...channelIds.map(channelRoom),
       ]);
 
+      // Сокет регистрируем до Ready: тогда в нём уже верный статус, и новый
+      // клиент не показывает «в сети», пока другое окно простаивает
+      const becameOnline = await this.presence.connected(payload.sub, socket.id, user.presenceMode);
+
       const ready: WsServerEvents[typeof WsEvents.Ready] = {
         userId: payload.sub,
         channelIds,
+        status: this.presence.statusOf(payload.sub),
       };
       socket.emit(WsEvents.Ready, ready);
 
-      // Первый сокет пользователя — все видят его в сети (с учётом режима)
-      const becameOnline = await this.presence.connected(payload.sub, socket.id, user.presenceMode);
       if (becameOnline) {
         this.emitToAll(WsEvents.PresenceUpdate, {
           userId: payload.sub,
