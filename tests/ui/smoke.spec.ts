@@ -104,6 +104,37 @@ test.describe('Оформление', () => {
   });
 });
 
+test.describe('Панель владельца', () => {
+  test('разделы переключаются, сводка и списки видны', async ({ owner }) => {
+    await owner.locator('.rail-icon.owner').click();
+    const panel = owner.locator('.owner-panel');
+    await expect(panel).toBeVisible();
+
+    // Обзор: плитки со сводкой, «сейчас онлайн» выделена
+    await expect(panel.locator('.admin-tile')).toHaveCount(9);
+    await expect(panel.locator('.admin-tile.accent')).toHaveCount(1);
+    await expect(panel.locator('.admin-tile-icon').first()).toBeVisible();
+
+    // Кнопки разделов оформлены, а не серые системные
+    const tab = panel.getByRole('button', { name: 'Пользователи' });
+    const tabBg = await tab.evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(tabBg).toBe('rgba(0, 0, 0, 0)');
+
+    await tab.click();
+    await expect(panel.getByPlaceholder('Поиск по логину или имени')).toBeVisible();
+    await expect(panel.getByText('uitest_friend').first()).toBeVisible();
+
+    await panel.getByRole('button', { name: 'Серверы' }).click();
+    await expect(panel.getByRole('heading', { name: 'Серверы' })).toBeVisible();
+
+    await panel.getByRole('button', { name: 'Хранилище' }).click();
+    await expect(panel.locator('.admin-tile')).toHaveCount(3);
+
+    await panel.getByTitle('Закрыть').click();
+    await expect(panel).toBeHidden();
+  });
+});
+
 test.describe('Присутствие', () => {
   test('меню профиля меняет режим и подпись под ником', async ({ owner }) => {
     await owner.locator('.user-card-identity').click();

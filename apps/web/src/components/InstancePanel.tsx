@@ -1,7 +1,33 @@
 import type { InstanceUserDto } from '@voxa/shared';
-import { Ban, Check, Copy, LogOut, Search, Trash2, X } from 'lucide-react';
+import {
+  Activity,
+  Ban,
+  Check,
+  Clock,
+  Copy,
+  Crown,
+  FileQuestion,
+  Files,
+  HardDrive,
+  LayoutDashboard,
+  LogOut,
+  KeyRound,
+  MessageSquare,
+  Search,
+  Server,
+  ShieldBan,
+  SlidersHorizontal,
+  Tag,
+  Ticket,
+  Trash2,
+  Users as UsersIcon,
+  X,
+  type LucideIcon,
+} from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import Avatar from './Avatar';
 
 import {
   useCleanupStorage,
@@ -34,27 +60,35 @@ function Overview() {
   const { data } = useInstanceOverview(true);
   if (!data) return null;
 
-  const tiles: [string, string | number][] = [
-    [t('instance.users'), data.usersTotal],
-    [t('instance.online'), data.onlineNow],
-    [t('instance.guilds'), data.guildsTotal],
-    [t('instance.messages'), data.messagesTotal + data.dmMessagesTotal],
-    [t('instance.sessions'), data.activeSessions],
-    [t('instance.banned'), data.bannedTotal],
-    [t('instance.storage'), `${data.storageMb} МБ`],
-    [t('community.version'), data.serverVersion],
-    [t('community.uptime'), `${Math.floor(data.uptimeSeconds / 3600)} ч`],
+  const tiles: [string, string | number, LucideIcon, boolean?][] = [
+    [t('instance.users'), data.usersTotal, UsersIcon],
+    [t('instance.online'), data.onlineNow, Activity, true],
+    [t('instance.guilds'), data.guildsTotal, Server],
+    [t('instance.messages'), data.messagesTotal + data.dmMessagesTotal, MessageSquare],
+    [t('instance.sessions'), data.activeSessions, KeyRound],
+    [t('instance.banned'), data.bannedTotal, ShieldBan],
+    [t('instance.storage'), `${data.storageMb} МБ`, HardDrive],
+    [t('community.version'), data.serverVersion, Tag],
+    [t('community.uptime'), `${Math.floor(data.uptimeSeconds / 3600)} ч`, Clock],
   ];
 
   return (
-    <div className="admin-tiles">
-      {tiles.map(([label, value]) => (
-        <div key={label} className="admin-tile">
-          <div className="admin-tile-value">{value}</div>
-          <div className="admin-tile-label">{label}</div>
-        </div>
-      ))}
-    </div>
+    <>
+      <h2>{t('instance.tabOverview')}</h2>
+      <p className="settings-hint">{t('instance.overviewHint')}</p>
+
+      <div className="admin-tiles">
+        {tiles.map(([label, value, Icon, accent]) => (
+          <div key={label} className={`admin-tile${accent ? ' accent' : ''}`}>
+            <span className="admin-tile-icon">
+              <Icon size={15} />
+            </span>
+            <div className="admin-tile-value">{value}</div>
+            <div className="admin-tile-label">{label}</div>
+          </div>
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -74,6 +108,9 @@ function Users() {
 
   return (
     <>
+      <h2>{t('instance.tabUsers')}</h2>
+      <p className="settings-hint">{t('instance.usersHint')}</p>
+
       <div className="dm-panel-search">
         <Search size={15} />
         <input
@@ -84,21 +121,34 @@ function Users() {
         />
       </div>
 
+      {(users ?? []).length === 0 && <p className="empty-state">{t('instance.noUsers')}</p>}
       {(users ?? []).map((user) => (
         <div key={user.id} className="admin-row">
-          <span className="admin-row-name">
-            {user.displayName}
-            <span className="dm-profile-username"> @{user.username}</span>
+          <Avatar
+            name={user.displayName}
+            url={user.avatarUrl}
+            status={user.status}
+            className="friend-avatar"
+          />
+          <span className="owner-row-main">
+            <span className="admin-row-name">{user.displayName}</span>
+            <span className="admin-row-info">
+              @{user.username} ·{' '}
+              {t('instance.userStats', {
+                owned: user.guildsOwned,
+                joined: user.guildsJoined,
+                sessions: user.activeSessions,
+              })}
+            </span>
           </span>
-          <span className="admin-row-info">
-            {t('instance.userStats', {
-              owned: user.guildsOwned,
-              joined: user.guildsJoined,
-              sessions: user.activeSessions,
-            })}
-            {user.bannedReason !== null && ` · ${t('instance.isBanned')}`}
-            {user.isInstanceOwner && ` · ${t('instance.owner')}`}
-          </span>
+          {user.isInstanceOwner && (
+            <span className="owner-chip gold">
+              <Crown size={12} /> {t('instance.owner')}
+            </span>
+          )}
+          {user.bannedReason !== null && (
+            <span className="owner-chip danger">{t('instance.isBanned')}</span>
+          )}
           {!user.isInstanceOwner && (
             <>
               <button
@@ -134,19 +184,24 @@ function Bans() {
   const { data: bans } = useInstanceBans(true);
   const unban = useInstanceUnban();
 
-  if (!bans || bans.length === 0) return <p className="settings-hint">{t('instance.noBans')}</p>;
-
   return (
     <>
-      {bans.map((ban) => (
+      <h2>{t('instance.tabBans')}</h2>
+      <p className="settings-hint">{t('instance.bansHint')}</p>
+
+      {(bans ?? []).length === 0 && <p className="empty-state">{t('instance.noBans')}</p>}
+      {(bans ?? []).map((ban) => (
         <div key={ban.id} className="admin-row">
-          <span className="admin-row-name">
-            {ban.displayName}
-            <span className="dm-profile-username"> @{ban.username}</span>
-          </span>
-          <span className="admin-row-info">
-            {ban.reason || t('community.noReason')}
-            {ban.bannedByUsername && ` · ${ban.bannedByUsername}`}
+          <Avatar name={ban.displayName} url={ban.avatarUrl} className="friend-avatar" />
+          <span className="owner-row-main">
+            <span className="admin-row-name">
+              {ban.displayName}
+              <span className="dm-profile-username"> @{ban.username}</span>
+            </span>
+            <span className="admin-row-info">
+              {ban.reason || t('community.noReason')}
+              {ban.bannedByUsername && ` · ${ban.bannedByUsername}`}
+            </span>
           </span>
           <button className="btn-secondary" onClick={() => unban.mutate(ban.id)}>
             {t('instance.unban')}
@@ -164,16 +219,23 @@ function Guilds() {
 
   return (
     <>
+      <h2>{t('instance.tabGuilds')}</h2>
+      <p className="settings-hint">{t('instance.guildsHint')}</p>
+
+      {(guilds ?? []).length === 0 && <p className="empty-state">{t('instance.noGuilds')}</p>}
       {(guilds ?? []).map((guild) => (
         <div key={guild.id} className="admin-row">
-          <span className="admin-row-name">{guild.name}</span>
-          <span className="admin-row-info">
-            {t('instance.guildStats', {
-              owner: guild.ownerUsername ?? '—',
-              members: guild.members,
-              channels: guild.channels,
-            })}{' '}
-            · {dateFormat.format(new Date(guild.createdAt))}
+          <Avatar name={guild.name} url={guild.iconUrl} className="friend-avatar guild" />
+          <span className="owner-row-main">
+            <span className="admin-row-name">{guild.name}</span>
+            <span className="admin-row-info">
+              {t('instance.guildStats', {
+                owner: guild.ownerUsername ? `@${guild.ownerUsername}` : '—',
+                members: guild.members,
+                channels: guild.channels,
+              })}{' '}
+              · {dateFormat.format(new Date(guild.createdAt))}
+            </span>
           </span>
           <button
             className="icon-button danger"
@@ -200,19 +262,31 @@ function Settings() {
 
   return (
     <>
-      <label className="settings-toggle">
-        <input
-          type="checkbox"
-          checked={settings.registrationOpen}
-          onChange={(e) => update.mutate({ registrationOpen: e.target.checked })}
-        />
-        {t('instance.registrationOpen')}
-      </label>
-      <p className="settings-hint">{t('instance.registrationHint')}</p>
+      <h2>{t('instance.tabSettings')}</h2>
+      <p className="settings-hint">{t('instance.settingsHint')}</p>
 
-      <label>
-        {t('instance.maxGuilds')}
+      <label className="owner-setting">
+        <span className="owner-setting-text">
+          <span className="owner-setting-name">{t('instance.registrationOpen')}</span>
+          <span className="settings-hint">{t('instance.registrationHint')}</span>
+        </span>
+        <span className="owner-switch">
+          <input
+            type="checkbox"
+            checked={settings.registrationOpen}
+            onChange={(e) => update.mutate({ registrationOpen: e.target.checked })}
+          />
+          <span className="owner-switch-track" />
+        </span>
+      </label>
+
+      <label className="owner-setting">
+        <span className="owner-setting-text">
+          <span className="owner-setting-name">{t('instance.maxGuilds')}</span>
+          <span className="settings-hint">{t('instance.maxGuildsHint')}</span>
+        </span>
         <input
+          className="owner-setting-input"
           type="number"
           min={1}
           max={500}
@@ -256,7 +330,9 @@ function RegistrationInvites() {
 
   return (
     <>
+      <h2>{t('instance.tabReg')}</h2>
       <p className="settings-hint">{t('instance.regHint')}</p>
+
       <div className="invite-form">
         <input
           type="number"
@@ -276,12 +352,12 @@ function RegistrationInvites() {
         </button>
       </div>
 
-      {active.length === 0 && <p className="settings-hint">{t('instance.noRegInvites')}</p>}
+      {active.length === 0 && <p className="empty-state">{t('instance.noRegInvites')}</p>}
       {active.map((invite) => (
         <div key={invite.id} className="admin-row">
           <code className="invite-code">{invite.code}</code>
           <span className="admin-row-info">
-            {invite.uses}/{invite.maxUses ?? '∞'}
+            {t('instance.regUses', { uses: invite.uses, max: invite.maxUses ?? '∞' })}
           </span>
           <button
             className="icon-button"
@@ -311,16 +387,28 @@ function Storage() {
 
   return (
     <>
+      <h2>{t('instance.tabStorage')}</h2>
+      <p className="settings-hint">{t('instance.storageHint')}</p>
+
       <div className="admin-tiles">
         <div className="admin-tile">
+          <span className="admin-tile-icon">
+            <HardDrive size={15} />
+          </span>
           <div className="admin-tile-value">{storage.totalMb} МБ</div>
           <div className="admin-tile-label">{t('instance.storageTotal')}</div>
         </div>
         <div className="admin-tile">
+          <span className="admin-tile-icon">
+            <Files size={15} />
+          </span>
           <div className="admin-tile-value">{storage.filesTotal}</div>
           <div className="admin-tile-label">{t('instance.filesTotal')}</div>
         </div>
         <div className="admin-tile">
+          <span className="admin-tile-icon">
+            <FileQuestion size={15} />
+          </span>
           <div className="admin-tile-value">{storage.orphanFiles}</div>
           <div className="admin-tile-label">{t('instance.orphans')}</div>
         </div>
@@ -339,7 +427,7 @@ function Storage() {
         <div key={row.username} className="admin-row">
           <span className="admin-row-name">@{row.username}</span>
           <span className="admin-row-info">
-            {row.mb} МБ · {row.files}
+            {t('instance.storageRow', { mb: row.mb, files: row.files })}
           </span>
         </div>
       ))}
@@ -352,28 +440,32 @@ export default function InstancePanel({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<Tab>('overview');
 
-  const tabs: [Tab, string][] = [
-    ['overview', t('instance.tabOverview')],
-    ['users', t('instance.tabUsers')],
-    ['regInvites', t('instance.tabReg')],
-    ['bans', t('instance.tabBans')],
-    ['guilds', t('instance.tabGuilds')],
-    ['settings', t('instance.tabSettings')],
-    ['storage', t('instance.tabStorage')],
+  // Иконка у каждого раздела: список из семи одинаковых строк читается плохо
+  const tabs: [Tab, string, LucideIcon][] = [
+    ['overview', t('instance.tabOverview'), LayoutDashboard],
+    ['users', t('instance.tabUsers'), UsersIcon],
+    ['regInvites', t('instance.tabReg'), Ticket],
+    ['bans', t('instance.tabBans'), ShieldBan],
+    ['guilds', t('instance.tabGuilds'), Server],
+    ['settings', t('instance.tabSettings'), SlidersHorizontal],
+    ['storage', t('instance.tabStorage'), HardDrive],
   ];
 
   return (
     <div className="settings-overlay" onClick={onClose}>
-      <div className="settings-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="settings-panel owner-panel" onClick={(e) => e.stopPropagation()}>
         <nav className="settings-nav">
-          <div className="settings-nav-title">{t('instance.title')}</div>
-          {tabs.map(([key, label]) => (
+          <div className="owner-nav-head">
+            <Crown size={15} />
+            {t('instance.title')}
+          </div>
+          {tabs.map(([key, label, Icon]) => (
             <button
               key={key}
-              className={`settings-nav-item${tab === key ? ' active' : ''}`}
+              className={`settings-tab${tab === key ? ' active' : ''}`}
               onClick={() => setTab(key)}
             >
-              {label}
+              <Icon size={15} /> {label}
             </button>
           ))}
         </nav>

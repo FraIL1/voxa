@@ -1,5 +1,16 @@
 import { hasPermission, Permissions } from '@voxa/shared';
-import { Check, Copy, Trash2 } from 'lucide-react';
+import {
+  Activity,
+  Check,
+  Clock,
+  Copy,
+  HardDrive,
+  KeyRound,
+  Tag,
+  Trash2,
+  Users,
+  type LucideIcon,
+} from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router';
@@ -27,19 +38,22 @@ export function Overview() {
   const { data } = useAdminOverview(true);
   if (!data) return null;
 
-  const tiles: [string, string | number][] = [
-    [t('community.usersTotal'), data.usersTotal],
-    [t('community.onlineNow'), data.onlineNow],
-    [t('community.sessions'), data.activeSessions],
-    [t('community.filesMb'), `${data.filesTotalMb} МБ`],
-    [t('community.version'), data.serverVersion],
-    [t('community.uptime'), `${Math.floor(data.uptimeSeconds / 3600)} ч`],
+  const tiles: [string, string | number, LucideIcon, boolean?][] = [
+    [t('community.usersTotal'), data.usersTotal, Users],
+    [t('community.onlineNow'), data.onlineNow, Activity, true],
+    [t('community.sessions'), data.activeSessions, KeyRound],
+    [t('community.filesMb'), `${data.filesTotalMb} МБ`, HardDrive],
+    [t('community.version'), data.serverVersion, Tag],
+    [t('community.uptime'), `${Math.floor(data.uptimeSeconds / 3600)} ч`, Clock],
   ];
 
   return (
     <div className="admin-tiles">
-      {tiles.map(([label, value]) => (
-        <div key={label} className="admin-tile">
+      {tiles.map(([label, value, Icon, accent]) => (
+        <div key={label} className={`admin-tile${accent ? ' accent' : ''}`}>
+          <span className="admin-tile-icon">
+            <Icon size={15} />
+          </span>
           <div className="admin-tile-value">{value}</div>
           <div className="admin-tile-label">{label}</div>
         </div>
