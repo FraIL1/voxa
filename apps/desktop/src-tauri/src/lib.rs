@@ -27,8 +27,14 @@ pub fn run() {
             let quit = MenuItem::with_id(app, "quit", "Выход", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show, &quit])?;
 
+            // Иконку трея берём крупную: на экранах с высокой плотностью
+            // мелкая растягивалась и рассыпалась на пиксели
+            let tray_icon = tauri::image::Image::from_bytes(include_bytes!(
+                "../icons/128x128.png"
+            ))?;
+
             TrayIconBuilder::with_id("main")
-                .icon(app.default_window_icon().expect("нет иконки окна").clone())
+                .icon(tray_icon)
                 .tooltip("Voxa")
                 .menu(&menu)
                 .show_menu_on_left_click(false)

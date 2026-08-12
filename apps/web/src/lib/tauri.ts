@@ -7,6 +7,34 @@ export function isTauri(): boolean {
   return '__TAURI_INTERNALS__' in window;
 }
 
+/** Окно приложения; в браузере методов окна нет */
+async function mainWindow() {
+  if (!isTauri()) return null;
+  const { getCurrentWindow } = await import('@tauri-apps/api/window');
+  return getCurrentWindow();
+}
+
+export async function minimizeWindow(): Promise<void> {
+  await (await mainWindow())?.minimize();
+}
+
+export async function toggleMaximizeWindow(): Promise<void> {
+  await (await mainWindow())?.toggleMaximize();
+}
+
+/** Закрытие окна прячет приложение в трей, а не завершает его */
+export async function hideWindow(): Promise<void> {
+  await (await mainWindow())?.hide();
+}
+
+/** Показ окна после загрузки интерфейса — чтобы не мигало пустым */
+export async function revealWindow(): Promise<void> {
+  const window = await mainWindow();
+  if (!window) return;
+  await window.show();
+  await window.setFocus();
+}
+
 /** Глобальные хоткеи (работают даже когда окно свёрнуто): mute / deafen */
 export async function registerGlobalShortcuts(actions: {
   toggleMute: () => void;

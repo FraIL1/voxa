@@ -23,6 +23,7 @@ import {
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, Navigate } from 'react-router';
 
+import { isTauri } from '../lib/tauri';
 import { useAuthStore } from '../stores/auth';
 import '../landing.css';
 
@@ -247,6 +248,8 @@ export default function LandingPage() {
 
   // Вошедшего сразу пускаем внутрь: витрина ему уже не нужна
   if (status === 'authed') return <Navigate to="/home" replace />;
+  // В десктопном приложении витрины быть не должно — это сайт, а не окно
+  if (isTauri()) return <Navigate to="/login" replace />;
 
   const downloadButton = (extra = ''): ReactNode =>
     DOWNLOAD_URL ? (

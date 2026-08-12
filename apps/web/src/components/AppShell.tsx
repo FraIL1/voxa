@@ -13,6 +13,7 @@ import IncomingCallModal from './IncomingCallModal';
 import ProfileModal from './ProfileCard';
 import QuickSwitcher from './QuickSwitcher';
 import ServerRail from './ServerRail';
+import Splash from './Splash';
 import TimeoutNotice from './TimeoutNotice';
 
 export default function AppShell() {
@@ -61,7 +62,7 @@ export default function AppShell() {
     };
   }, []);
 
-  if (status === 'loading') return <div className="splash">{t('app.loading')}</div>;
+  if (status === 'loading') return <Splash hint={t('app.loading')} />;
   if (status === 'guest') return <Navigate to="/login" replace />;
 
   return (

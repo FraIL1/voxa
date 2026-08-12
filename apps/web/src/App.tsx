@@ -9,10 +9,12 @@ import DmView from './components/DmView';
 import FriendsView from './components/FriendsView';
 import HomeLayout from './components/HomeLayout';
 import ServerLayout from './components/ServerLayout';
+import TitleBar from './components/TitleBar';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ServerInvitePage from './pages/ServerInvitePage';
+import { isTauri, revealWindow } from './lib/tauri';
 import { useAuthStore } from './stores/auth';
 
 const queryClient = new QueryClient({
@@ -55,12 +57,19 @@ export default function App() {
   const bootstrap = useAuthStore((s) => s.bootstrap);
 
   useEffect(() => {
-    void bootstrap();
+    // Окно десктопа скрыто до этого момента — показываем, когда есть что рисовать
+    void bootstrap().finally(() => void revealWindow());
   }, [bootstrap]);
 
   return (
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
+      {/* В приложении сверху своя полоса заголовка, в браузере её нет */}
+      <div className={isTauri() ? 'app-window framed' : 'app-window'}>
+        <TitleBar />
+        <div className="app-window-body">
+          <RouterProvider router={router} />
+        </div>
+      </div>
     </QueryClientProvider>
   );
 }
