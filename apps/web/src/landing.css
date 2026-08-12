@@ -188,14 +188,6 @@
 .lp-logo-mark {
   width: 30px;
   height: 30px;
-  border-radius: 9px;
-  display: grid;
-  place-items: center;
-  background: var(--gradient-accent);
-  color: var(--accent-text);
-  font-size: 16px;
-  font-weight: 800;
-  box-shadow: 0 6px 18px rgba(34, 211, 238, 0.28);
 }
 
 .lp-logo.small {

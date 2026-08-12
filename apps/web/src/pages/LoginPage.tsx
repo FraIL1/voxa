@@ -7,6 +7,7 @@ import { login } from '../api/auth';
 import { ApiError } from '../api/client';
 import { isTauri } from '../lib/tauri';
 import { useAuthStore } from '../stores/auth';
+import Logo from '../components/Logo';
 
 export default function LoginPage() {
   const { t } = useTranslation();
@@ -42,7 +43,7 @@ export default function LoginPage() {
       {/* Возврат на витрину — только в браузере: в приложении её нет */}
       {!isTauri() && (
         <Link className="auth-home" to="/">
-          <span className="auth-home-mark">V</span>
+          <Logo className="auth-home-mark" />
           Voxa
         </Link>
       )}

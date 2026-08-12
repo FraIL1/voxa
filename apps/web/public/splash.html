@@ -44,17 +44,12 @@
       .logo {
         position: relative;
         z-index: 1;
+        display: block;
         width: 74px;
         height: 74px;
-        border-radius: 22px;
-        display: grid;
-        place-items: center;
-        background: linear-gradient(135deg, #22d3ee 0%, #2dd4bf 100%);
-        color: #04121a;
-        font-size: 36px;
-        font-weight: 800;
-        letter-spacing: -0.02em;
-        box-shadow: 0 14px 40px rgba(34, 211, 238, 0.32);
+        object-fit: contain;
+        /* Тень по форме знака, а не по его прямоугольнику */
+        filter: drop-shadow(0 14px 34px rgba(34, 211, 238, 0.35));
         animation: breath 2.4s ease-in-out infinite;
       }
 
@@ -151,7 +146,7 @@
     <div class="mark">
       <span class="ring"></span>
       <span class="ring delayed"></span>
-      <span class="logo">V</span>
+      <img class="logo" src="icon-512.png" alt="" />
     </div>
 
     <div class="bars">

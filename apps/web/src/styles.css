@@ -4491,6 +4491,15 @@ h3 {
   color: var(--text-faint);
 }
 
+/* Знак Voxa — та же картинка, что и иконка приложения */
+.logo-mark {
+  display: block;
+  flex-shrink: 0;
+  object-fit: contain;
+  /* Тень повторяет форму знака, а не его прямоугольник */
+  filter: drop-shadow(0 5px 14px rgba(34, 211, 238, 0.3));
+}
+
 /* Возврат на главную с экранов входа и регистрации */
 .auth-home {
   position: absolute;
@@ -4514,14 +4523,6 @@ h3 {
 .auth-home-mark {
   width: 30px;
   height: 30px;
-  border-radius: 9px;
-  display: grid;
-  place-items: center;
-  background: var(--gradient-accent);
-  color: var(--accent-text);
-  font-size: 16px;
-  font-weight: 800;
-  box-shadow: 0 6px 18px rgba(34, 211, 238, 0.28);
 }
 
 /* ---------- Оболочка окна и своя полоса заголовка ---------- */
@@ -4565,13 +4566,8 @@ h3 {
 .titlebar-mark {
   width: 18px;
   height: 18px;
-  border-radius: 6px;
-  display: grid;
-  place-items: center;
-  background: var(--gradient-accent);
-  color: var(--accent-text);
-  font-size: 11px;
-  font-weight: 800;
+  /* В полосе заголовка знак мелкий — свечение только мешает */
+  filter: none;
 }
 
 .titlebar-controls {
@@ -4629,14 +4625,7 @@ h3 {
   z-index: 1;
   width: 76px;
   height: 76px;
-  border-radius: 24px;
-  display: grid;
-  place-items: center;
-  background: var(--gradient-accent);
-  color: var(--accent-text);
-  font-size: 38px;
-  font-weight: 800;
-  box-shadow: 0 14px 40px rgba(34, 211, 238, 0.3);
+  filter: drop-shadow(0 14px 34px rgba(34, 211, 238, 0.35));
   animation: splash-breath 2.4s ease-in-out infinite;
 }
 

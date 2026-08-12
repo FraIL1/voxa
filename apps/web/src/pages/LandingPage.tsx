@@ -25,6 +25,7 @@ import { Link, Navigate } from 'react-router';
 
 import { isTauri } from '../lib/tauri';
 import { useAuthStore } from '../stores/auth';
+import Logo from '../components/Logo';
 import '../landing.css';
 
 /** Где лежит установщик; задаётся при сборке (VITE_DOWNLOAD_URL) */
@@ -274,7 +275,7 @@ export default function LandingPage() {
       <header className="lp-header">
         <div className="lp-wrap lp-header-inner">
           <a className="lp-logo" href="#top">
-            <span className="lp-logo-mark">V</span>
+            <Logo className="lp-logo-mark" />
             Voxa
           </a>
           <nav className="lp-nav">
@@ -595,7 +596,7 @@ export default function LandingPage() {
       <footer className="lp-footer">
         <div className="lp-wrap lp-footer-inner">
           <a className="lp-logo small" href="#top">
-            <span className="lp-logo-mark">V</span>
+            <Logo className="lp-logo-mark" />
             Voxa
           </a>
           <span className="lp-footer-note">© {YEAR} Voxa. Все права защищены.</span>

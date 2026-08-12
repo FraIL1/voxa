@@ -8,6 +8,7 @@ import { register } from '../api/auth';
 import { api, ApiError } from '../api/client';
 import { isTauri } from '../lib/tauri';
 import { useAuthStore } from '../stores/auth';
+import Logo from '../components/Logo';
 
 /** Регистрация в приложении по коду, который выдал владелец приложения. */
 export default function RegisterPage() {
@@ -53,7 +54,7 @@ export default function RegisterPage() {
       {/* Возврат на витрину — только в браузере: в приложении её нет */}
       {!isTauri() && (
         <Link className="auth-home" to="/">
-          <span className="auth-home-mark">V</span>
+          <Logo className="auth-home-mark" />
           Voxa
         </Link>
       )}

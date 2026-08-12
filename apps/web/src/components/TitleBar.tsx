@@ -1,6 +1,7 @@
 import { Minus, Square, X } from 'lucide-react';
 
 import { isTauri, minimizeWindow, toggleMaximizeWindow, hideWindow } from '../lib/tauri';
+import Logo from './Logo';
 
 /**
  * Своя полоса заголовка десктопного окна. Системная рамка отключена, поэтому
@@ -13,7 +14,7 @@ export default function TitleBar() {
   return (
     <div className="titlebar" data-tauri-drag-region>
       <span className="titlebar-brand" data-tauri-drag-region>
-        <span className="titlebar-mark">V</span>
+        <Logo className="titlebar-mark" />
         Voxa
       </span>
 
