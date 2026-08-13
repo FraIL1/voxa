@@ -2325,4 +2325,64 @@ describe('Voxa: критический поток (e2e)', () => {
       .send({ muted: false })
       .expect(200);
   });
+
+  it('порядок серверов свой у каждого и не задевает чужой', async () => {
+    // Второй сервер владельца — переставлять имеет смысл минимум два
+    const second = await request(httpServer)
+      .post('/api/guilds')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ name: 'Сервер для порядка' })
+      .expect(201);
+    const secondId = second.body.id as string;
+
+    const idsOf = async (token: string): Promise<string[]> => {
+      const res = await request(httpServer)
+        .get('/api/guilds')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      return (res.body as { id: string }[]).map((g) => g.id);
+    };
+
+    const ownerBefore = await idsOf(ownerAccess);
+    const memberBefore = await idsOf(memberAccess);
+    expect(ownerBefore.length).toBeGreaterThan(1);
+
+    // Переворачиваем порядок у владельца
+    const reversed = [...ownerBefore].reverse();
+    await request(httpServer)
+      .patch('/api/guilds/order')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ guildIds: reversed })
+      .expect(204);
+    expect(await idsOf(ownerAccess)).toEqual(reversed);
+
+    // У другого участника порядок прежний: настройка личная
+    expect(await idsOf(memberAccess)).toEqual(memberBefore);
+
+    // Чужие и выдуманные серверы в списке молча пропускаются
+    await request(httpServer)
+      .patch('/api/guilds/order')
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ guildIds: [secondId, ...memberBefore] })
+      .expect(204);
+    expect(await idsOf(memberAccess)).toEqual(memberBefore);
+
+    // Мусор вместо списка не принимается
+    await request(httpServer)
+      .patch('/api/guilds/order')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ guildIds: ['не-uuid'] })
+      .expect(400);
+
+    // Возвращаем как было и убираем лишний сервер
+    await request(httpServer)
+      .patch('/api/guilds/order')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ guildIds: ownerBefore })
+      .expect(204);
+    await request(httpServer)
+      .delete(`/api/guilds/${secondId}`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(204);
+  });
 });
