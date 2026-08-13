@@ -5536,32 +5536,31 @@ h3 {
   filter: blur(12px);
 }
 
-/* Призма: графит, координатная сетка и волосяные линии */
-.skin-preview.prism {
+/* Поток: графит, рассеянное сияние по углам, волосяные линии */
+.skin-preview.flow {
   background: #0b0e14;
 }
 
-.skin-preview.prism .glow {
-  inset: -20%;
+.skin-preview.flow .glow {
+  inset: -30%;
   background:
-    linear-gradient(to right, #1e2531 1px, transparent 1px),
-    linear-gradient(to bottom, #1e2531 1px, transparent 1px);
-  background-size: 8px 8px;
-  filter: none;
-  opacity: 0.9;
+    radial-gradient(50% 50% at 15% 10%, var(--accent), transparent 60%),
+    radial-gradient(45% 45% at 95% 95%, #2dd4bf, transparent 60%);
+  filter: blur(6px);
+  opacity: 0.7;
 }
 
-.skin-preview.prism .rail {
+.skin-preview.flow .rail {
   background: #0d1118;
   border-right: 1px solid #1e2531;
 }
 
-.skin-preview.prism .side {
+.skin-preview.flow .side {
   background: #10141c;
   border-right: 1px solid #1e2531;
 }
 
-.skin-preview.prism .main {
+.skin-preview.flow .main {
   background: transparent;
 }
 
@@ -5805,6 +5804,79 @@ h3 {
   }
 
   .rail-icon:active {
+    transform: none;
+  }
+}
+
+/* ---------- Отклик на действия ---------- */
+
+/* Блик пробегает по главной кнопке при наведении. Живёт поверх заливки и
+   не задевает текст: у надписи свой слой выше. */
+.btn-primary {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.28) 50%,
+    transparent 70%
+  );
+  transform: translateX(-120%);
+  pointer-events: none;
+}
+
+.btn-primary:hover:not(:disabled)::after {
+  animation: sheen 620ms ease-out;
+}
+
+@keyframes sheen {
+  to {
+    transform: translateX(120%);
+  }
+}
+
+/* Строки списков подаются вперёд под курсором — интерфейс отвечает на мышь */
+.friend-row.clickable:hover,
+.member:hover,
+.dm-link:hover {
+  transform: translateX(2px);
+}
+
+.friend-row.clickable,
+.member,
+.dm-link {
+  transition:
+    background var(--transition),
+    transform var(--transition);
+}
+
+/* Иконки действий слегка приподнимаются */
+.icon-button {
+  transition:
+    background var(--transition),
+    color var(--transition),
+    transform var(--transition);
+}
+
+.icon-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-primary:hover:not(:disabled)::after {
+    animation: none;
+  }
+
+  .friend-row.clickable:hover,
+  .member:hover,
+  .dm-link:hover,
+  .icon-button:hover:not(:disabled) {
     transform: none;
   }
 }

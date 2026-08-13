@@ -7,7 +7,7 @@ import { create } from 'zustand';
  * «Классический» сохранён намеренно — это тот вид, с которым проект жил до
  * переделки, и вернуться к нему можно одним переключателем, без отката кода.
  */
-export type Skin = 'prism' | 'classic';
+export type Skin = 'flow' | 'classic';
 
 const KEY = 'voxa-skin';
 
@@ -15,9 +15,9 @@ function readStored(): Skin {
   try {
     // Всё, кроме явного «классического», считаем новым обликом: так старое
     // сохранённое значение не оставляет человека с несуществующим видом
-    return localStorage.getItem(KEY) === 'classic' ? 'classic' : 'prism';
+    return localStorage.getItem(KEY) === 'classic' ? 'classic' : 'flow';
   } catch {
-    return 'prism';
+    return 'flow';
   }
 }
 

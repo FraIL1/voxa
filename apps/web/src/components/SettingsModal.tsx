@@ -27,7 +27,7 @@ const ACCENTS = [
   '#38bdf8',
 ] as const;
 
-const SKINS: Skin[] = ['prism', 'classic'];
+const SKINS: Skin[] = ['flow', 'classic'];
 
 const DENSITIES: Density[] = ['cozy', 'compact'];
 

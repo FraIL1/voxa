@@ -1,0 +1,242 @@
+/* ============================================================
+   Облик «Поток»
+
+   Всё здесь живёт под [data-skin='flow'] и ничего не трогает в
+   классическом виде: переключатель в настройках возвращает прежний
+   интерфейс без отката кода.
+
+   Главное правило — ничего не должно мешать читать. Поэтому в фоне нет ни
+   одной линии: только медленное рассеянное сияние по углам, которое не
+   пересекает текст в принципе. Характер задают не обои, а поведение:
+     • графит вместо чёрного — на чёрном любая линия выглядит грязной;
+     • волосяные границы вместо теней;
+     • цвет только там, где что-то происходит;
+     • движение и отклик на действия, а не украшения под текстом.
+   ============================================================ */
+
+:root[data-skin='flow'] {
+  /* Графит с холодным отливом */
+  --bg: #0b0e14;
+  --panel: #10141c;
+  --panel-raised: #151a24;
+  --panel-hover: #1c222e;
+  --nav-bg: #0d1118;
+  --border: #1e2531;
+  --border-strong: #2b3441;
+
+  --text: #e8edf5;
+  --text-muted: #97a2b4;
+  --text-faint: #647085;
+
+  --radius-sm: 6px;
+  --radius: 9px;
+  --radius-lg: 14px;
+
+  --shadow-sm: 0 1px 0 rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+
+:root[data-skin='flow'][data-theme='light'] {
+  --bg: #e7eaf1;
+  --panel: #eff2f7;
+  --panel-raised: #f5f7fa;
+  --panel-hover: #e2e7f0;
+  --nav-bg: #e3e7ef;
+  --border: #d5dbe6;
+  --border-strong: #b8c1d0;
+
+  --text: #202736;
+  --text-muted: #5a6577;
+  --text-faint: #8b95a6;
+}
+
+/* ---------- Шрифт ---------- */
+
+/* Inter стоит в каждом втором интерфейсе — от него и ощущение «как у всех».
+   Manrope геометричнее, с характерными окончаниями, и знает кириллицу. */
+:root[data-skin='flow'] body {
+  font-family: 'Manrope Variable', 'Inter Variable', system-ui, sans-serif;
+}
+
+:root[data-skin='flow'] h1,
+:root[data-skin='flow'] h2,
+:root[data-skin='flow'] h3 {
+  letter-spacing: -0.025em;
+  font-weight: 800;
+}
+
+/* Время, счётчики и размеры — моноширинные: цифры не прыгают при обновлении */
+:root[data-skin='flow'] .message-time,
+:root[data-skin='flow'] .mention-badge,
+:root[data-skin='flow'] .rail-badge,
+:root[data-skin='flow'] .friends-count,
+:root[data-skin='flow'] .admin-tile-value,
+:root[data-skin='flow'] .level-value,
+:root[data-skin='flow'] .call-duration,
+:root[data-skin='flow'] .dm-header-count {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  letter-spacing: 0.01em;
+}
+
+/* ---------- Сияние ---------- */
+
+/* Два рассеянных пятна света по углам, медленно дышат. Никаких линий и
+   узоров: под текстом должен быть ровный фон, иначе буквы «режет». */
+.app-backdrop {
+  display: none;
+}
+
+:root[data-skin='flow'] .app-backdrop {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      58% 46% at 6% -6%,
+      color-mix(in srgb, var(--accent) 26%, transparent),
+      transparent 62%
+    ),
+    radial-gradient(46% 40% at 104% 104%, rgba(45, 212, 191, 0.22), transparent 62%);
+  animation: flow-breathe 26s ease-in-out infinite alternate;
+}
+
+@keyframes flow-breathe {
+  to {
+    opacity: 0.62;
+    transform: scale(1.08);
+  }
+}
+
+:root[data-skin='flow'][data-theme='light'] .app-backdrop {
+  opacity: 0.55;
+}
+
+/* Интерфейс лежит над сиянием */
+:root[data-skin='flow'] .app-root {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------- Поверхности ---------- */
+
+/* Панели плотные и непрозрачные: сквозь прибор ничего не просвечивает.
+   Разделяют их волосяные линии, а не тени. */
+:root[data-skin='flow'] .server-rail,
+:root[data-skin='flow'] .sidebar,
+:root[data-skin='flow'] .members {
+  background: var(--nav-bg);
+  border-color: var(--border);
+}
+
+:root[data-skin='flow'] .channel-header,
+:root[data-skin='flow'] .titlebar,
+:root[data-skin='flow'] .user-card {
+  background: var(--panel);
+  border-color: var(--border);
+}
+
+/* Окна: та же плотность, чёткая рамка, минимум размытия под ними */
+:root[data-skin='flow'] .settings-overlay {
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+:root[data-skin='flow'] .settings-panel,
+:root[data-skin='flow'] .add-server-modal,
+:root[data-skin='flow'] .confirm-modal,
+:root[data-skin='flow'] .share-modal,
+:root[data-skin='flow'] .profile-modal,
+:root[data-skin='flow'] .context-menu,
+:root[data-skin='flow'] .profile-menu,
+:root[data-skin='flow'] .server-dropdown,
+:root[data-skin='flow'] .select-list,
+:root[data-skin='flow'] .call-dock {
+  background: var(--panel);
+  border-color: var(--border-strong);
+}
+
+/* ---------- Цвет как сигнал ---------- */
+
+/* Активное отмечено чертой акцента, а не заливкой во всю ширину:
+   взгляд цепляется за край, а текст остаётся спокойным */
+:root[data-skin='flow'] .channel-link.active,
+:root[data-skin='flow'] .settings-tab.active,
+:root[data-skin='flow'] .select-option.active {
+  background: var(--panel-hover);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+:root[data-skin='flow'] .rail-icon.active {
+  box-shadow:
+    inset 0 0 0 1px var(--accent),
+    0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+/* Иконки серверов — скруглённый квадрат, при выборе становится точнее */
+:root[data-skin='flow'] .rail-icon {
+  border-radius: 12px;
+  transition:
+    border-radius var(--transition),
+    background var(--transition),
+    box-shadow var(--transition);
+}
+
+:root[data-skin='flow'] .rail-icon.active {
+  border-radius: 9px;
+}
+
+/* Кнопка действия ровная, без ореола: свет тут не украшение */
+:root[data-skin='flow'] .btn-primary {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+/* Говорящий: тонкое кольцо и ровное дыхание, без разлива света */
+:root[data-skin='flow'] .voice-tile.speaking .voice-avatar,
+:root[data-skin='flow'] .call-tile.speaking .call-tile-avatar {
+  box-shadow:
+    0 0 0 2px var(--accent),
+    0 0 0 5px color-mix(in srgb, var(--accent) 18%, transparent);
+  animation: flow-speak 1.6s ease-in-out infinite;
+}
+
+@keyframes flow-speak {
+  50% {
+    box-shadow:
+      0 0 0 2px var(--accent),
+      0 0 0 8px color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-skin='flow'] .voice-tile.speaking .voice-avatar,
+  :root[data-skin='flow'] .call-tile.speaking .call-tile-avatar {
+    animation: none;
+  }
+}
+
+/* ---------- Мелкая геометрия ---------- */
+
+/* Сообщение под курсором подсвечивается полосой слева, как строка в таблице */
+:root[data-skin='flow'] .message:hover {
+  background: var(--panel);
+  box-shadow: inset 2px 0 0 var(--border-strong);
+}
+
+/* Поле ввода — именно поле, а не пилюля: ровные края.
+   Фон вешаем на .composer-inner: .composer это внешняя обёртка с отступами,
+   и подложка на ней вылезала широким прямоугольником за края поля. */
+:root[data-skin='flow'] .composer-inner {
+  border-radius: var(--radius);
+  background: var(--panel-raised);
+  border-color: var(--border-strong);
+  box-shadow: none;
+}
+
+:root[data-skin='flow'] .composer-inner:focus-within {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+}

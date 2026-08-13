@@ -409,7 +409,7 @@ test.describe('Облик', () => {
     await owner.getByRole('button', { name: 'Оформление' }).click();
 
     // По умолчанию новый облик: живой фон нарисован
-    await expect(owner.locator('html')).toHaveAttribute('data-skin', 'prism');
+    await expect(owner.locator('html')).toHaveAttribute('data-skin', 'flow');
     await expect(owner.locator('.app-backdrop')).toHaveCSS('display', 'block');
 
     await owner.getByRole('button', { name: 'Классический' }).click();
@@ -424,8 +424,8 @@ test.describe('Облик', () => {
 
     await owner.locator('.user-card').getByTitle('Настройки').first().click();
     await owner.getByRole('button', { name: 'Оформление' }).click();
-    await owner.getByRole('button', { name: 'Призма' }).click();
-    await expect(owner.locator('html')).toHaveAttribute('data-skin', 'prism');
+    await owner.getByRole('button', { name: 'Поток' }).click();
+    await expect(owner.locator('html')).toHaveAttribute('data-skin', 'flow');
     await owner.locator('.settings-panel').getByTitle('Закрыть').click();
   });
 
