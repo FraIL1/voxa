@@ -409,13 +409,13 @@ test.describe('Облик', () => {
     await owner.getByRole('button', { name: 'Оформление' }).click();
 
     // По умолчанию новый облик: живой фон нарисован
-    await expect(owner.locator('html')).toHaveAttribute('data-skin', 'aurora');
-    await expect(owner.locator('.app-aurora')).toHaveCSS('display', 'block');
+    await expect(owner.locator('html')).toHaveAttribute('data-skin', 'prism');
+    await expect(owner.locator('.app-backdrop')).toHaveCSS('display', 'block');
 
     await owner.getByRole('button', { name: 'Классический' }).click();
     await expect(owner.locator('html')).toHaveAttribute('data-skin', 'classic');
     // Классический — это прежний плотный вид: фона нет, панель непрозрачна
-    await expect(owner.locator('.app-aurora')).toHaveCSS('display', 'none');
+    await expect(owner.locator('.app-backdrop')).toHaveCSS('display', 'none');
     await expect(owner.locator('.sidebar')).toHaveCSS('background-color', 'rgb(15, 21, 33)');
 
     await owner.reload();
@@ -424,8 +424,8 @@ test.describe('Облик', () => {
 
     await owner.locator('.user-card').getByTitle('Настройки').first().click();
     await owner.getByRole('button', { name: 'Оформление' }).click();
-    await owner.getByRole('button', { name: 'Аврора' }).click();
-    await expect(owner.locator('html')).toHaveAttribute('data-skin', 'aurora');
+    await owner.getByRole('button', { name: 'Призма' }).click();
+    await expect(owner.locator('html')).toHaveAttribute('data-skin', 'prism');
     await owner.locator('.settings-panel').getByTitle('Закрыть').click();
   });
 

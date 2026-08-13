@@ -13,7 +13,7 @@ try {
 // остаётся выбираемым в настройках.
 try {
   var skin = localStorage.getItem('voxa-skin');
-  document.documentElement.dataset.skin = skin === 'classic' ? 'classic' : 'aurora';
+  document.documentElement.dataset.skin = skin === 'classic' ? 'classic' : 'prism';
 } catch (e) {
-  document.documentElement.dataset.skin = 'aurora';
+  document.documentElement.dataset.skin = 'prism';
 }

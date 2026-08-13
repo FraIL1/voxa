@@ -1,7 +1,7 @@
 import '@fontsource-variable/inter';
 import '@fontsource-variable/manrope';
 import './styles.css';
-import './skin-aurora.css';
+import './skin-prism.css';
 import './i18n';
 
 import { StrictMode } from 'react';

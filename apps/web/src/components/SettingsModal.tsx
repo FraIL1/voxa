@@ -26,7 +26,7 @@ const ACCENTS = [
   '#38bdf8',
 ] as const;
 
-const SKINS: Skin[] = ['aurora', 'classic'];
+const SKINS: Skin[] = ['prism', 'classic'];
 
 const THEMES: ThemeMode[] = ['dark', 'light', 'auto'];
 

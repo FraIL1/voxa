@@ -1,0 +1,255 @@
+/* ============================================================
+   Облик «Призма»
+
+   Всё здесь живёт под [data-skin='prism'] и ничего не трогает в
+   классическом виде: переключатель в настройках возвращает прежний
+   интерфейс без отката кода.
+
+   Замысел — не «красиво и мягко», а «точно». Приложение должно выглядеть
+   как прибор, а не как обои:
+     • сетка — под интерфейсом тонкая координатная сетка, она задаёт
+       ощущение чертежа и точности;
+     • волосяные линии — границы в один пиксель, чёткие, без размытых теней;
+     • цвет как сигнал — акцент только там, где что-то происходит;
+       всё остальное графит, и поэтому активное видно мгновенно;
+     • цифры моноширинные — время и счётчики не пляшут при обновлении.
+   ============================================================ */
+
+:root[data-skin='prism'] {
+  /* Графит с холодным отливом. Не чёрный: на чёрном любая линия выглядит
+     грязной, а на графите — чистой */
+  --bg: #0b0e14;
+  --panel: #10141c;
+  --panel-raised: #151a24;
+  --panel-hover: #1c222e;
+  --nav-bg: #0d1118;
+  --border: #1e2531;
+  --border-strong: #2b3441;
+
+  --text: #e8edf5;
+  --text-muted: #97a2b4;
+  --text-faint: #647085;
+
+  /* Скругления сдержаннее: прибор, а не подушка */
+  --radius-sm: 6px;
+  --radius: 9px;
+  --radius-lg: 14px;
+
+  /* Тени почти нет — глубину задают линии и плотность, а не размытие */
+  --shadow-sm: 0 1px 0 rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.6);
+
+  /* Шаг координатной сетки */
+  --grid: 28px;
+}
+
+:root[data-skin='prism'][data-theme='light'] {
+  --bg: #e7eaf1;
+  --panel: #eff2f7;
+  --panel-raised: #f5f7fa;
+  --panel-hover: #e2e7f0;
+  --nav-bg: #e3e7ef;
+  --border: #d5dbe6;
+  --border-strong: #b8c1d0;
+
+  --text: #202736;
+  --text-muted: #5a6577;
+  --text-faint: #8b95a6;
+}
+
+/* ---------- Шрифт ---------- */
+
+/* Inter стоит в каждом втором интерфейсе — от него и ощущение «как у всех».
+   Manrope геометричнее, с характерными окончаниями, и знает кириллицу. */
+:root[data-skin='prism'] body {
+  font-family: 'Manrope Variable', 'Inter Variable', system-ui, sans-serif;
+}
+
+:root[data-skin='prism'] h1,
+:root[data-skin='prism'] h2,
+:root[data-skin='prism'] h3 {
+  letter-spacing: -0.025em;
+  font-weight: 800;
+}
+
+/* Время, счётчики и размеры — моноширинные: цифры не прыгают при обновлении */
+:root[data-skin='prism'] .message-time,
+:root[data-skin='prism'] .mention-badge,
+:root[data-skin='prism'] .rail-badge,
+:root[data-skin='prism'] .friends-count,
+:root[data-skin='prism'] .admin-tile-value,
+:root[data-skin='prism'] .level-value,
+:root[data-skin='prism'] .call-duration,
+:root[data-skin='prism'] .dm-header-count {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  letter-spacing: 0.01em;
+}
+
+/* ---------- Координатная сетка ---------- */
+
+/* Под всем интерфейсом — чертёжная сетка. Едва различима, но именно она
+   отличает «прибор» от «тёмной темы»: у поверхности появляется масштаб. */
+.app-backdrop {
+  display: none;
+}
+
+:root[data-skin='prism'] .app-backdrop {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, var(--border) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--border) 1px, transparent 1px);
+  background-size: var(--grid) var(--grid);
+  /* Сетка гуще к верхнему левому углу и растворяется к низу */
+  mask-image: radial-gradient(120% 90% at 12% 0%, #000 0%, transparent 72%);
+  -webkit-mask-image: radial-gradient(120% 90% at 12% 0%, #000 0%, transparent 72%);
+  opacity: 0.5;
+}
+
+/* Один холодный отсвет сверху — как блик на стекле прибора, без движения */
+:root[data-skin='prism'] .app-backdrop::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    90% 60% at 18% -10%,
+    color-mix(in srgb, var(--accent) 22%, transparent),
+    transparent 60%
+  );
+  opacity: 0.5;
+}
+
+:root[data-skin='prism'][data-theme='light'] .app-backdrop::after {
+  opacity: 0.25;
+}
+
+/* Интерфейс лежит над сеткой */
+:root[data-skin='prism'] .app-root {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------- Поверхности ---------- */
+
+/* Панели плотные и непрозрачные: сквозь прибор ничего не просвечивает.
+   Разделяют их волосяные линии, а не тени. */
+:root[data-skin='prism'] .server-rail,
+:root[data-skin='prism'] .sidebar,
+:root[data-skin='prism'] .members {
+  background: var(--nav-bg);
+  border-color: var(--border);
+}
+
+:root[data-skin='prism'] .channel-header,
+:root[data-skin='prism'] .titlebar,
+:root[data-skin='prism'] .user-card {
+  background: var(--panel);
+  border-color: var(--border);
+}
+
+/* Окна: та же плотность, чёткая рамка, минимум размытия под ними */
+:root[data-skin='prism'] .settings-overlay {
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+:root[data-skin='prism'] .settings-panel,
+:root[data-skin='prism'] .add-server-modal,
+:root[data-skin='prism'] .confirm-modal,
+:root[data-skin='prism'] .share-modal,
+:root[data-skin='prism'] .profile-modal,
+:root[data-skin='prism'] .context-menu,
+:root[data-skin='prism'] .profile-menu,
+:root[data-skin='prism'] .server-dropdown,
+:root[data-skin='prism'] .select-list,
+:root[data-skin='prism'] .call-dock {
+  background: var(--panel);
+  border-color: var(--border-strong);
+}
+
+/* ---------- Цвет как сигнал ---------- */
+
+/* Активное отмечено чертой акцента, а не заливкой во всю ширину:
+   взгляд цепляется за край, а текст остаётся спокойным */
+:root[data-skin='prism'] .channel-link.active,
+:root[data-skin='prism'] .settings-tab.active,
+:root[data-skin='prism'] .select-option.active {
+  background: var(--panel-hover);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+:root[data-skin='prism'] .rail-icon.active {
+  box-shadow:
+    inset 0 0 0 1px var(--accent),
+    0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+/* Иконки серверов — скруглённый квадрат, при выборе становится точнее */
+:root[data-skin='prism'] .rail-icon {
+  border-radius: 12px;
+  transition:
+    border-radius var(--transition),
+    background var(--transition),
+    box-shadow var(--transition);
+}
+
+:root[data-skin='prism'] .rail-icon.active {
+  border-radius: 9px;
+}
+
+/* Кнопка действия ровная, без ореола: свет тут не украшение */
+:root[data-skin='prism'] .btn-primary {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+/* Говорящий: тонкое кольцо и ровное дыхание, без разлива света */
+:root[data-skin='prism'] .voice-tile.speaking .voice-avatar,
+:root[data-skin='prism'] .call-tile.speaking .call-tile-avatar {
+  box-shadow:
+    0 0 0 2px var(--accent),
+    0 0 0 5px color-mix(in srgb, var(--accent) 18%, transparent);
+  animation: prism-speak 1.6s ease-in-out infinite;
+}
+
+@keyframes prism-speak {
+  50% {
+    box-shadow:
+      0 0 0 2px var(--accent),
+      0 0 0 8px color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-skin='prism'] .voice-tile.speaking .voice-avatar,
+  :root[data-skin='prism'] .call-tile.speaking .call-tile-avatar {
+    animation: none;
+  }
+}
+
+/* ---------- Мелкая геометрия ---------- */
+
+/* Сообщение под курсором подсвечивается полосой слева, как строка в таблице */
+:root[data-skin='prism'] .message:hover {
+  background: var(--panel);
+  box-shadow: inset 2px 0 0 var(--border-strong);
+}
+
+/* Поле ввода — именно поле, а не пилюля: ровные края под стать сетке.
+   Фон вешаем на .composer-inner: .composer это внешняя обёртка с отступами,
+   и подложка на ней вылезала широким прямоугольником за края поля. */
+:root[data-skin='prism'] .composer-inner {
+  border-radius: var(--radius);
+  background: var(--panel-raised);
+  border-color: var(--border-strong);
+  box-shadow: none;
+}
+
+:root[data-skin='prism'] .composer-inner:focus-within {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+}

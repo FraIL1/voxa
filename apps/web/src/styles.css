@@ -60,18 +60,23 @@
 }
 
 /* Светлая тема: та же геометрия и тот же циан, но на дневных поверхностях.
-   Акцент затемнён — на белом ярко-циановый текст нечитаем. */
-:root[data-theme='light'] {
-  --bg: #eef1f7;
-  --panel: #ffffff;
-  --panel-raised: #f7f9fc;
-  --panel-hover: #e9eef6;
-  --border: #dfe5ee;
-  --border-strong: #c3ccdb;
+   Акцент затемнён — на белом ярко-циановый текст нечитаем.
 
-  --text: #101826;
-  --text-muted: #56657d;
-  --text-faint: #8593a8;
+   Чистого белого и почти чёрного текста здесь намеренно нет: от них светлая
+   тема и «резала глаза». Самая светлая поверхность приглушена, текст мягче
+   чёрного, а разница между соседними слоями меньше — глазу не нужно каждый
+   раз перестраиваться. */
+:root[data-theme='light'] {
+  --bg: #e7eaf1;
+  --panel: #f1f3f8;
+  --panel-raised: #f6f8fb;
+  --panel-hover: #e2e7f0;
+  --border: #d9dfe9;
+  --border-strong: #bcc5d4;
+
+  --text: #232b3a;
+  --text-muted: #5a6577;
+  --text-faint: #8b95a6;
 
   --accent: #0891b2;
   --accent-hover: #0e7490;
@@ -87,16 +92,16 @@
   --success: #059669;
   --warning: #d97706;
 
-  --shadow-sm: 0 1px 2px rgba(16, 24, 38, 0.08);
-  --shadow-md: 0 8px 24px rgba(16, 24, 38, 0.1);
-  --shadow-lg: 0 24px 64px rgba(16, 24, 38, 0.16);
+  --shadow-sm: 0 1px 2px rgba(16, 24, 38, 0.05);
+  --shadow-md: 0 8px 24px rgba(16, 24, 38, 0.07);
+  --shadow-lg: 0 24px 64px rgba(16, 24, 38, 0.12);
   --ring: 0 0 0 3px rgba(8, 145, 178, 0.22);
 
-  --tint: rgba(16, 24, 38, 0.025);
-  --overlay: rgba(24, 33, 48, 0.42);
-  --rail-bg: linear-gradient(180deg, #e3e8f1, var(--bg));
-  --code-bg: #f1f4f9;
-  --nav-bg: linear-gradient(180deg, var(--panel), #eaeff7);
+  --tint: rgba(16, 24, 38, 0.02);
+  --overlay: rgba(24, 33, 48, 0.38);
+  --rail-bg: linear-gradient(180deg, #dde3ed, var(--bg));
+  --code-bg: #eceff6;
+  --nav-bg: linear-gradient(180deg, var(--panel), #e6ebf3);
 
   color-scheme: light;
 }
@@ -5531,21 +5536,33 @@ h3 {
   filter: blur(12px);
 }
 
-/* Аврора: цветной подсвет за полупрозрачными панелями */
-.skin-preview.aurora {
-  background: #05070d;
+/* Призма: графит, координатная сетка и волосяные линии */
+.skin-preview.prism {
+  background: #0b0e14;
 }
 
-.skin-preview.aurora .rail {
-  background: rgba(255, 255, 255, 0.05);
+.skin-preview.prism .glow {
+  inset: -20%;
+  background:
+    linear-gradient(to right, #1e2531 1px, transparent 1px),
+    linear-gradient(to bottom, #1e2531 1px, transparent 1px);
+  background-size: 8px 8px;
+  filter: none;
+  opacity: 0.9;
 }
 
-.skin-preview.aurora .side {
-  background: rgba(255, 255, 255, 0.035);
+.skin-preview.prism .rail {
+  background: #0d1118;
+  border-right: 1px solid #1e2531;
 }
 
-.skin-preview.aurora .main {
-  background: rgba(255, 255, 255, 0.015);
+.skin-preview.prism .side {
+  background: #10141c;
+  border-right: 1px solid #1e2531;
+}
+
+.skin-preview.prism .main {
+  background: transparent;
 }
 
 /* Классический: плотные непрозрачные панели, без подсвета */

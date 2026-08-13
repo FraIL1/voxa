@@ -67,12 +67,8 @@ export default function AppShell() {
 
   return (
     <div className="app-root">
-      {/* Живой фон облика «Аврора»; в классическом виде скрыт стилями */}
-      <div className="app-aurora" aria-hidden>
-        <span />
-        <span />
-        <span />
-      </div>
+      {/* Подложка облика «Призма»: сетка и отсвет. В классическом виде скрыта */}
+      <div className="app-backdrop" aria-hidden />
       <ServerRail />
       <Outlet />
       <TimeoutNotice />
