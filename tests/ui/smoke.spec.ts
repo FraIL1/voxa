@@ -637,6 +637,48 @@ test.describe('Синхрон присутствия', () => {
     await menu.locator('.status-menu-item', { hasText: 'В сети' }).click();
     await expect(meInList.locator('.status-dot')).toHaveClass(/online/);
   });
+
+  /**
+   * «Не беспокоить» и «отошёл» — это присутствие, человек на месте. В списке
+   * друзей он должен быть среди тех, кто в сети, и подписан своим статусом.
+   * Не в сети — только когда включена невидимка или человек действительно ушёл.
+   */
+  test('«не беспокоить» виден другу как статус, а не как офлайн', async ({ owner, friend }) => {
+    /* Своя карточка показывает не выбранный режим, а то, как тебя видят
+       другие: с невидимкой это «Не в сети». Поэтому ожидаемую подпись
+       передаём отдельно от названия режима. */
+    const setMode = async (label: string, ownLabel = label): Promise<void> => {
+      await owner.locator('.user-card-identity').click();
+      const menu = owner.locator('.profile-menu');
+      await menu.locator('.menu-sub .menu-item').first().click();
+      await menu.locator('.status-menu-item', { hasText: label }).click();
+      await expect(owner.locator('.user-card-status')).toHaveText(ownLabel);
+    };
+
+    const rowInOnlineTab = async (): Promise<string | null> => {
+      await friend.getByRole('button', { name: 'В сети', exact: true }).click();
+      const row = friend.locator('.friend-row', { hasText: 'uitest_owner' });
+      if ((await row.count()) === 0) return null;
+      return row.locator('.friend-status').innerText();
+    };
+
+    await setMode('Не беспокоить');
+    await expect.poll(rowInOnlineTab).toBe('Не беспокоить');
+
+    await setMode('Отошёл');
+    await expect.poll(rowInOnlineTab).toBe('Отошёл');
+
+    // Невидимка — единственный режим, когда для других я не в сети
+    await setMode('Невидимка', 'Не в сети');
+    await expect.poll(rowInOnlineTab).toBeNull();
+    await friend.getByRole('button', { name: 'Все', exact: true }).click();
+    await expect(
+      friend.locator('.friend-row', { hasText: 'uitest_owner' }).locator('.friend-status'),
+    ).toHaveText('Не в сети');
+
+    await setMode('В сети');
+    await expect.poll(rowInOnlineTab).toBe('В сети');
+  });
 });
 
 test.describe('Меню сервера', () => {
