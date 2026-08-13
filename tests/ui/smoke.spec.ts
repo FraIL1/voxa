@@ -206,7 +206,7 @@ test.describe('Свои окна вместо системных', () => {
 
   test('выбор устройства — свой список, а не системный', async ({ owner }) => {
     await owner.locator('.user-card').getByTitle('Настройки').first().click();
-    await owner.getByRole('button', { name: 'Голос и звук' }).click();
+    await owner.getByRole('button', { name: 'Голос и видео' }).click();
 
     // Системных select в приложении не осталось
     await expect(owner.locator('select')).toHaveCount(0);
@@ -220,6 +220,67 @@ test.describe('Свои окна вместо системных', () => {
     await owner.keyboard.press('Escape');
     await expect(owner.locator('.select-list')).toBeHidden();
     await expect(owner.locator('.settings-panel')).toBeVisible();
+  });
+});
+
+test.describe('Кликабельность', () => {
+  test('строка друга открывает профиль, а кнопки внутри — свои действия', async ({ owner }) => {
+    await owner.getByRole('button', { name: 'Все', exact: true }).click();
+    const row = owner.locator('.friend-row', { hasText: 'uitest_friend' }).first();
+    await expect(row).toBeVisible();
+
+    await row.click();
+    const card = owner.locator('.profile-modal');
+    await expect(card).toBeVisible();
+    await expect(card.getByText('@uitest_friend')).toBeVisible();
+    await owner.keyboard.press('Escape');
+    await expect(card).toBeHidden();
+
+    // Кнопка внутри строки профиль не открывает: у неё своё дело
+    await row.getByTitle('Написать').click();
+    await owner.waitForURL(/\/dm\//);
+    await expect(owner.locator('.profile-modal')).toHaveCount(0);
+  });
+
+  test('имя собеседника в шапке диалога открывает профиль', async ({ owner }) => {
+    await owner.getByRole('button', { name: 'Все', exact: true }).click();
+    await owner.getByTitle('Написать').first().click();
+    await owner.waitForURL(/\/dm\//);
+
+    await owner.locator('.dm-header-title').click();
+    await expect(owner.locator('.profile-modal').getByText('@uitest_friend')).toBeVisible();
+  });
+
+  test('серверы в левом столбце можно перетаскивать', async ({ owner }) => {
+    // Ждём список серверов: считать их сразу нельзя — он ещё грузится,
+    // и сценарий молча пропускался вместо проверки
+    const rail = owner.locator('.rail-icon.server');
+    await expect(rail).toHaveCount(2);
+
+    const before = await rail.evaluateAll((els) => els.map((el) => el.getAttribute('title')));
+    await rail.first().dragTo(rail.nth(1));
+
+    await expect
+      .poll(() => rail.evaluateAll((els) => els.map((el) => el.getAttribute('title'))))
+      .not.toEqual(before);
+
+    // Порядок пережил перезагрузку — значит сохранился на сервере
+    const after = await rail.evaluateAll((els) => els.map((el) => el.getAttribute('title')));
+    await owner.reload();
+    await owner.locator('.user-card').waitFor({ state: 'visible', timeout: 20_000 });
+    await expect
+      .poll(() =>
+        owner
+          .locator('.rail-icon.server')
+          .evaluateAll((e) => e.map((el) => el.getAttribute('title'))),
+      )
+      .toEqual(after);
+
+    // Возвращаем прежний порядок: он общий для всего прогона
+    await rail.first().dragTo(rail.nth(1));
+    await expect
+      .poll(() => rail.evaluateAll((els) => els.map((el) => el.getAttribute('title'))))
+      .toEqual(before);
   });
 });
 

@@ -5,7 +5,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router';
 
 import { useDmConversations } from '../hooks/useDm';
 import { useFriendRequests } from '../hooks/useFriends';
-import { useGuilds } from '../hooks/useGuilds';
+import { useGuilds, useReorderGuilds } from '../hooks/useGuilds';
 import { useAuthStore } from '../stores/auth';
 import AddServerModal from './AddServerModal';
 import InstancePanel from './InstancePanel';
@@ -18,9 +18,25 @@ export default function ServerRail() {
   const { data: conversations } = useDmConversations();
   const { data: requests } = useFriendRequests();
   const { data: guilds } = useGuilds();
+  const reorder = useReorderGuilds();
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [instanceOpen, setInstanceOpen] = useState(false);
   const isInstanceOwner = useAuthStore((s) => s.user?.isInstanceOwner ?? false);
+
+  /** Перетащили один сервер на место другого — сохраняем новый порядок */
+  const drop = (targetId: string): void => {
+    const ids = (guilds ?? []).map((g) => g.id);
+    const from = ids.indexOf(dragId ?? '');
+    const to = ids.indexOf(targetId);
+    setDragId(null);
+    setOverId(null);
+    if (from < 0 || to < 0 || from === to) return;
+    const next = [...ids];
+    next.splice(to, 0, ...next.splice(from, 1));
+    reorder.mutate(next);
+  };
 
   const homeActive = location.pathname.startsWith('/home') || location.pathname.startsWith('/dm');
   const dmUnread = (conversations ?? []).reduce((sum, c) => sum + c.unreadCount, 0);
@@ -44,8 +60,34 @@ export default function ServerRail() {
         <NavLink
           key={guild.id}
           to={`/guilds/${guild.id}`}
-          className={({ isActive }) => `rail-icon server${isActive ? ' active' : ''}`}
+          className={({ isActive }) =>
+            `rail-icon server${isActive ? ' active' : ''}${dragId === guild.id ? ' dragging' : ''}${
+              overId === guild.id && dragId !== guild.id ? ' drop-target' : ''
+            }`
+          }
           title={guild.name}
+          draggable
+          onDragStart={(e) => {
+            setDragId(guild.id);
+            e.dataTransfer.effectAllowed = 'move';
+            // Без этого Firefox не начинает перетаскивание
+            e.dataTransfer.setData('text/plain', guild.id);
+          }}
+          onDragEnd={() => {
+            setDragId(null);
+            setOverId(null);
+          }}
+          onDragOver={(e) => {
+            if (!dragId) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            setOverId(guild.id);
+          }}
+          onDragLeave={() => setOverId((id) => (id === guild.id ? null : id))}
+          onDrop={(e) => {
+            e.preventDefault();
+            drop(guild.id);
+          }}
         >
           {guild.iconUrl ? (
             <img className="rail-icon-img" src={guild.iconUrl} alt="" />

@@ -16,6 +16,7 @@ import {
   auditQuerySchema,
   createGuildSchema,
   joinGuildRequestSchema,
+  reorderGuildsSchema,
   updateNotifyModeSchema,
   transferGuildSchema,
   createRoleSchema,
@@ -33,6 +34,7 @@ import {
   type GuildJoinRequestDto,
   type JoinAttemptResultDto,
   type JoinGuildRequestInput,
+  type ReorderGuildsInput,
   type UpdateNotifyModeInput,
   type TransferGuildInput,
   type MemberDto,
@@ -75,6 +77,16 @@ export class GuildsController {
     @Body(new ZodValidationPipe(createGuildSchema)) body: CreateGuildInput,
   ): Promise<GuildDto> {
     return this.guilds.create(user.id, body);
+  }
+
+  /** Свой порядок серверов в левом столбце */
+  @Patch('order')
+  @HttpCode(204)
+  reorder(
+    @CurrentUser() user: RequestUser,
+    @Body(new ZodValidationPipe(reorderGuildsSchema)) body: ReorderGuildsInput,
+  ): Promise<void> {
+    return this.guilds.reorder(user.id, body.guildIds);
   }
 
   /** Витрина: публичные серверы и серверы по заявке */

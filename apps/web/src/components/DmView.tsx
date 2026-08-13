@@ -31,6 +31,7 @@ import type { DmChatMessage } from '../api/dm-cache';
 import { uploadFile } from '../api/uploads';
 import { useDmAck, useDmConversations, useDmMessages, useSendDm } from '../hooks/useDm';
 import { useCallStore } from '../stores/call';
+import { openProfile } from '../stores/profileView';
 import CallPanel from './CallPanel';
 import OngoingCallBanner from './OngoingCallBanner';
 import { dmTitle } from '../api/dm-cache';
@@ -290,11 +291,17 @@ export default function DmView() {
   return (
     <div className="channel-view">
       <header className="channel-header">
-        {isGroup ? <UsersRound size={18} /> : <AtSign size={18} />}
-        {title}
-        {isGroup && conversation && (
-          <span className="dm-header-count">{conversation.members.length}</span>
-        )}
+        <button
+          className="dm-header-title"
+          title={isGroup ? t('dm.groupSettings') : t('dm.profileTitle')}
+          onClick={() => (isGroup ? setPanel('group') : peer && openProfile(peer.id))}
+        >
+          {isGroup ? <UsersRound size={18} /> : <AtSign size={18} />}
+          {title}
+          {isGroup && conversation && (
+            <span className="dm-header-count">{conversation.members.length}</span>
+          )}
+        </button>
 
         <div className="dm-header-actions">
           <button

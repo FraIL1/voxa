@@ -91,6 +91,15 @@ export default async function globalSetup(_config: FullConfig): Promise<void> {
       token: friend.accessToken,
     });
 
+    // Второй сервер владельца — на нём проверяется перетаскивание в столбце
+    if (guilds.length < 2) {
+      await api('/guilds', {
+        method: 'POST',
+        token: owner.accessToken,
+        body: JSON.stringify({ name: 'Второй сервер' }),
+      });
+    }
+
     // Дружба: заявка и встречная заявка сразу дают принятую дружбу
     await api('/friends/requests', {
       method: 'POST',

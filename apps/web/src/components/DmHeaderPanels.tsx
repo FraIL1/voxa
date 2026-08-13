@@ -14,6 +14,7 @@ import {
   useRenameGroup,
 } from '../hooks/useDm';
 import { useAuthStore } from '../stores/auth';
+import { openProfile } from '../stores/profileView';
 import Avatar from './Avatar';
 import ConfirmModal from './ConfirmModal';
 import { ProfileBody } from './ProfileCard';
@@ -171,7 +172,21 @@ export function GroupPanel({
         {t('dm.groupMembers').toUpperCase()} — {conversation.members.length}
       </div>
       {conversation.members.map((m) => (
-        <div key={m.id} className="friend-row">
+        <div
+          key={m.id}
+          className="friend-row clickable"
+          role="button"
+          tabIndex={0}
+          onClick={(e) => {
+            if (!(e.target as HTMLElement).closest('button')) openProfile(m.id);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              openProfile(m.id);
+            }
+          }}
+        >
           <Avatar name={m.displayName} url={m.avatarUrl} className="friend-avatar" />
           <span className="friend-name">{m.displayName}</span>
           {conversation.ownerId === m.id && (

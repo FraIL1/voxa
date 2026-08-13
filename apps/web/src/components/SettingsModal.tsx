@@ -394,7 +394,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
             <>
               <h2>{t('settings.voiceTab')}</h2>
               <div className="settings-form">
-                <AudioDeviceSelects />
+                <AudioDeviceSelects withCamera />
               </div>
             </>
           )}

@@ -31,6 +31,26 @@ export function useMyGuildPermissions(guildId: string | undefined): number {
   return useGuild(guildId)?.myPermissions ?? 0;
 }
 
+/**
+ * Свой порядок серверов. Список меняем в кэше сразу — перетаскивание должно
+ * ощущаться мгновенно, а не ждать ответа сервера.
+ */
+export function useReorderGuilds() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (guildIds: string[]) =>
+      api<void>('/guilds/order', { method: 'PATCH', body: { guildIds } }),
+    onMutate: (guildIds) => {
+      queryClient.setQueryData<GuildDto[]>(GUILDS_KEY, (guilds) =>
+        guilds
+          ? [...guilds].sort((a, b) => guildIds.indexOf(a.id) - guildIds.indexOf(b.id))
+          : guilds,
+      );
+    },
+    onError: () => void queryClient.invalidateQueries({ queryKey: GUILDS_KEY }),
+  });
+}
+
 export function useCreateGuild() {
   const queryClient = useQueryClient();
   return useMutation({

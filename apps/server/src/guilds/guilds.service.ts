@@ -62,9 +62,32 @@ export class GuildsService {
     const memberships = await this.prisma.guildMember.findMany({
       where: { userId },
       include: { guild: true },
-      orderBy: { joinedAt: 'asc' },
+      // Порядок задаёт сам человек перетаскиванием; у всех нулей — по дате входа
+      orderBy: [{ position: 'asc' }, { joinedAt: 'asc' }],
     });
     return Promise.all(memberships.map((m) => this.toDto(m.guild, userId)));
+  }
+
+  /**
+   * Новый порядок серверов лично для этого человека. Чужие id молча
+   * пропускаем: список приходит с клиента, доверять ему нельзя.
+   */
+  async reorder(userId: string, guildIds: string[]): Promise<void> {
+    const mine = await this.prisma.guildMember.findMany({
+      where: { userId },
+      select: { guildId: true },
+    });
+    const allowed = new Set(mine.map((m) => m.guildId));
+    const ordered = guildIds.filter((id) => allowed.has(id));
+
+    await this.prisma.$transaction(
+      ordered.map((guildId, index) =>
+        this.prisma.guildMember.update({
+          where: { guildId_userId: { guildId, userId } },
+          data: { position: index },
+        }),
+      ),
+    );
   }
 
   async guildDto(userId: string, guildId: string): Promise<GuildDto> {

@@ -137,6 +137,8 @@ model GuildMember {
   timedOutUntil DateTime?  @map("timed_out_until")
   /// Уведомления с этого сервера
   notifyMode    NotifyMode @default(ALL) @map("notify_mode")
+  /// Место сервера в левом столбце лично у этого участника
+  position      Int        @default(0)
   joinedAt      DateTime   @default(now()) @map("joined_at")
 
   @@id([guildId, userId])

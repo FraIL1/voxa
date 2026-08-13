@@ -1,17 +1,19 @@
 import type { ChannelDto } from '@voxa/shared';
 import { Headphones, HeadphoneOff, Mic, MicOff, MonitorUp, PhoneOff, Volume2 } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { participantsOf, useVoiceStates } from '../hooks/useVoiceStates';
 import { useAuthStore } from '../stores/auth';
 import { screenVideoTrackOf, SELF_SCREEN, useVoiceStore } from '../stores/voice';
 import Avatar from './Avatar';
+import ShareOptionsModal from './ShareOptionsModal';
 
 export default function VoiceView({ channel }: { channel: ChannelDto }) {
   const { t } = useTranslation();
   const { data: voiceStates } = useVoiceStates();
   const voice = useVoiceStore();
+  const [shareOpen, setShareOpen] = useState(false);
   const myId = useAuthStore((s) => s.user?.id);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -126,7 +128,7 @@ export default function VoiceView({ channel }: { channel: ChannelDto }) {
             <button
               className={`icon-button voice-control${voice.sharing ? ' sharing' : ''}`}
               title={voice.sharing ? t('voice.stopShare') : t('voice.shareScreen')}
-              onClick={() => void voice.toggleScreenShare()}
+              onClick={() => (voice.sharing ? void voice.toggleScreenShare() : setShareOpen(true))}
             >
               <MonitorUp size={20} />
             </button>
@@ -148,6 +150,14 @@ export default function VoiceView({ channel }: { channel: ChannelDto }) {
           </button>
         )}
       </div>
+
+      {shareOpen && (
+        <ShareOptionsModal
+          initial={voice.shareOptions}
+          onStart={(options) => void voice.toggleScreenShare(options)}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
     </div>
   );
 }

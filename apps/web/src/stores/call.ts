@@ -17,8 +17,15 @@ import { create } from 'zustand';
 
 import { api } from '../api/client';
 import { playJoinSound, playLeaveSound } from '../lib/sounds';
+import { useVoiceStore } from './voice';
 
 /** Комната звонка живёт вне стора: LiveKit-объекты не для рендера */
+/** Камеру выбирают в настройках; здесь только читаем выбранное */
+function cameraOptions(): { deviceId: string } | undefined {
+  const deviceId = useVoiceStore.getState().cameraDeviceId;
+  return deviceId ? { deviceId } : undefined;
+}
+
 let room: Room | null = null;
 let localVideo: LocalVideoTrack | null = null;
 /** Видео участников по их id — в беседе их может быть несколько */
@@ -265,7 +272,7 @@ export const useCallStore = create<CallState>()((set, get) => ({
   toggleCamera: async () => {
     const next = !get().cameraOn;
     try {
-      await room?.localParticipant.setCameraEnabled(next);
+      await room?.localParticipant.setCameraEnabled(next, cameraOptions());
       localVideo =
         (room?.localParticipant.getTrackPublication(Track.Source.Camera)?.track as
           LocalVideoTrack | undefined) ?? null;
@@ -374,7 +381,7 @@ async function connect(
   await next.localParticipant.setMicrophoneEnabled(!muted);
   applyDeafen(deafened);
   if (video) {
-    await next.localParticipant.setCameraEnabled(true).catch(() => undefined);
+    await next.localParticipant.setCameraEnabled(true, cameraOptions()).catch(() => undefined);
     localVideo =
       (next.localParticipant.getTrackPublication(Track.Source.Camera)?.track as
         LocalVideoTrack | undefined) ?? null;

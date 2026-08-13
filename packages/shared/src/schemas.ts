@@ -46,6 +46,13 @@ export const createInviteSchema = z.object({
 });
 export type CreateInviteInput = z.infer<typeof createInviteSchema>;
 
+/** Новый порядок серверов: полный список id в нужной последовательности */
+export const reorderGuildsSchema = z.object({
+  guildIds: z.array(z.string().uuid()).min(1).max(200),
+});
+
+export type ReorderGuildsInput = z.infer<typeof reorderGuildsSchema>;
+
 export const createCategorySchema = z.object({
   name: z.string().trim().min(1).max(32),
 });

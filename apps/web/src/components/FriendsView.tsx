@@ -1,10 +1,11 @@
 import type { FriendDto } from '@voxa/shared';
 import { Ban, Check, MessageSquare, UserMinus, UserPlus, Users, X } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 
 import { useOpenDm } from '../hooks/useDm';
+import { openProfile } from '../stores/profileView';
 import Avatar from './Avatar';
 import ConfirmModal from './ConfirmModal';
 import { EmptyBlock } from './Skeletons';
@@ -21,6 +22,32 @@ import {
 } from '../hooks/useFriends';
 
 type Tab = 'online' | 'all' | 'requests' | 'blocked' | 'add';
+
+/**
+ * Строка человека. Клик по ней открывает профиль — кроме клика по кнопкам
+ * действий внутри: у них своё дело.
+ */
+function PersonRow({ userId, children }: { userId: string; children: ReactNode }) {
+  const open = (): void => openProfile(userId);
+  return (
+    <div
+      className="friend-row clickable"
+      role="button"
+      tabIndex={0}
+      onClick={(e) => {
+        if (!(e.target as HTMLElement).closest('button')) open();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          open();
+        }
+      }}
+    >
+      {children}
+    </div>
+  );
+}
 
 function FriendRows({ online }: { online: boolean }) {
   const { t } = useTranslation();
@@ -55,7 +82,7 @@ function FriendRows({ online }: { online: boolean }) {
         />
       )}
       {shown.map((friend) => (
-        <div key={friend.id} className="friend-row">
+        <PersonRow key={friend.id} userId={friend.id}>
           <Avatar
             name={friend.displayName}
             url={friend.avatarUrl}
@@ -83,7 +110,7 @@ function FriendRows({ online }: { online: boolean }) {
           >
             <Ban size={18} />
           </button>
-        </div>
+        </PersonRow>
       ))}
 
       {ask && (
@@ -133,7 +160,7 @@ function RequestRows() {
         </div>
       )}
       {incoming.map((request) => (
-        <div key={request.id} className="friend-row">
+        <PersonRow key={request.id} userId={request.user.id}>
           <Avatar
             name={request.user.displayName}
             url={request.user.avatarUrl}
@@ -155,7 +182,7 @@ function RequestRows() {
           >
             <X size={18} />
           </button>
-        </div>
+        </PersonRow>
       ))}
       {outgoing.length > 0 && (
         <div className="friends-count">
@@ -163,7 +190,7 @@ function RequestRows() {
         </div>
       )}
       {outgoing.map((request) => (
-        <div key={request.id} className="friend-row">
+        <PersonRow key={request.id} userId={request.user.id}>
           <Avatar
             name={request.user.displayName}
             url={request.user.avatarUrl}
@@ -178,7 +205,7 @@ function RequestRows() {
           >
             <X size={18} />
           </button>
-        </div>
+        </PersonRow>
       ))}
     </>
   );
@@ -198,14 +225,14 @@ function BlockedRows() {
         {t('friends.blocked').toUpperCase()} — {blocked.length}
       </div>
       {blocked.map((user) => (
-        <div key={user.id} className="friend-row">
+        <PersonRow key={user.id} userId={user.id}>
           <Avatar name={user.displayName} url={user.avatarUrl} className="friend-avatar" />
           <span className="friend-name">{user.displayName}</span>
           <span className="friend-status" />
           <button className="btn-secondary" onClick={() => unblock.mutate(user.id)}>
             {t('friends.unblock')}
           </button>
-        </div>
+        </PersonRow>
       ))}
     </>
   );

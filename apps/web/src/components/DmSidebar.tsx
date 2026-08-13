@@ -1,20 +1,25 @@
-import type { DmConversationDto } from '@voxa/shared';
+import type { DmConversationDto, PresenceStatus } from '@voxa/shared';
 import { BellOff, Pin, PinOff, Users, UsersRound } from 'lucide-react';
 import { useState, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink } from 'react-router';
 
-import { dmAvatarLetter, dmTitle } from '../api/dm-cache';
+import { dmTitle } from '../api/dm-cache';
 import { useDmConversations, useToggleConversationPin } from '../hooks/useDm';
+import { useFriends } from '../hooks/useFriends';
+import Avatar from './Avatar';
 import CreateGroupModal from './CreateGroupModal';
 import DmContextMenu, { type DmMenuState } from './DmContextMenu';
 import UserCard from './UserCard';
 
 function DmLink({
   conversation,
+  status,
   onContextMenu,
 }: {
   conversation: DmConversationDto;
+  /** Присутствие собеседника; для группы не показываем */
+  status?: PresenceStatus;
   onContextMenu: (e: MouseEvent<HTMLElement>, conversation: DmConversationDto) => void;
 }) {
   const { t } = useTranslation();
@@ -31,9 +36,18 @@ function DmLink({
         }${muted ? ' muted' : ''}`
       }
     >
-      <div className="dm-avatar" aria-hidden>
-        {conversation.isGroup ? <UsersRound size={14} /> : dmAvatarLetter(conversation)}
-      </div>
+      {conversation.isGroup ? (
+        <div className="avatar dm-avatar group" aria-hidden>
+          <UsersRound size={16} />
+        </div>
+      ) : (
+        <Avatar
+          name={dmTitle(conversation)}
+          url={conversation.peer?.avatarUrl}
+          status={status}
+          className="dm-avatar"
+        />
+      )}
       <span className="channel-name">{dmTitle(conversation)}</span>
       {muted && <BellOff size={13} className="dm-muted-mark" />}
       {conversation.unreadCount > 0 && (
@@ -59,6 +73,7 @@ function DmLink({
 export default function DmSidebar() {
   const { t } = useTranslation();
   const { data: conversations } = useDmConversations();
+  const { data: friends } = useFriends();
   const [groupOpen, setGroupOpen] = useState(false);
   const [menu, setMenu] = useState<DmMenuState | null>(null);
   const list = conversations ?? [];
@@ -67,6 +82,10 @@ export default function DmSidebar() {
     e.preventDefault();
     setMenu({ x: e.clientX, y: e.clientY, conversation });
   };
+  // Присутствие берём из списка друзей: с кем не дружим — точки нет
+  const statusOf = (conversation: DmConversationDto): PresenceStatus | undefined =>
+    friends?.find((f) => f.id === conversation.peer?.id)?.status;
+
   const pinned = list.filter((c) => c.pinned);
   const rest = list.filter((c) => !c.pinned);
 
@@ -97,7 +116,7 @@ export default function DmSidebar() {
           <>
             <div className="category-name">{t('dm.pinnedChats')}</div>
             {pinned.map((c) => (
-              <DmLink key={c.id} conversation={c} onContextMenu={openMenu} />
+              <DmLink key={c.id} conversation={c} status={statusOf(c)} onContextMenu={openMenu} />
             ))}
           </>
         )}
@@ -105,7 +124,7 @@ export default function DmSidebar() {
         <div className="category-name">{t('dm.section')}</div>
         {list.length === 0 && <p className="sidebar-empty">{t('dm.noConversations')}</p>}
         {rest.map((c) => (
-          <DmLink key={c.id} conversation={c} onContextMenu={openMenu} />
+          <DmLink key={c.id} conversation={c} status={statusOf(c)} onContextMenu={openMenu} />
         ))}
       </div>
 

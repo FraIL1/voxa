@@ -9,6 +9,7 @@ import {
   UserPlus,
   X,
 } from 'lucide-react';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 
@@ -246,6 +247,15 @@ export function ProfileBody({ userId, onNavigate }: { userId: string; onNavigate
 
 /** Профиль поверх интерфейса: открывается кликом по участнику или автору */
 export default function ProfileModal({ userId, onClose }: { userId: string; onClose: () => void }) {
+  // Escape закрывает карточку — так закрываются все остальные окна
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   const { t } = useTranslation();
   return (
     <div

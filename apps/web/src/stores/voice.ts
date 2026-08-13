@@ -16,11 +16,14 @@ import { emitVoiceState } from '../api/socket';
 import { playJoinSound, playLeaveSound } from '../lib/sounds';
 
 const DEVICES_KEY = 'voxa-audio-devices';
+const SHARE_KEY = 'voxa-share-options';
 const VOLUMES_KEY = 'voxa-participant-volumes';
 
 interface SavedDevices {
   micId: string | null;
   outputId: string | null;
+  /** Камера общая для голосовых каналов и звонков в личке */
+  cameraId: string | null;
 }
 
 function loadJson<T>(key: string, fallback: T): T {
@@ -40,6 +43,16 @@ function saveJson(key: string, value: unknown): void {
   }
 }
 
+/** Качество, частота кадров и звук демонстрации экрана */
+export interface ShareOptions {
+  width: number;
+  height: number;
+  frameRate: number;
+  audio: boolean;
+}
+
+const DEFAULT_SHARE: ShareOptions = { width: 1280, height: 720, frameRate: 30, audio: true };
+
 interface VoiceState {
   channelId: string | null;
   /** Имя канала на момент входа (для панели вне контекста сервера) */
@@ -54,6 +67,7 @@ interface VoiceState {
   /** Выбранные аудиоустройства (persisted) */
   micDeviceId: string | null;
   outputDeviceId: string | null;
+  cameraDeviceId: string | null;
   /** Локальная громкость участников, userId → 0..1 (persisted) */
   participantVolumes: Record<string, number>;
   /** Я демонстрирую экран */
@@ -70,8 +84,11 @@ interface VoiceState {
   toggleMute: () => Promise<void>;
   toggleDeafen: () => Promise<void>;
   setAudioDevice: (kind: 'audioinput' | 'audiooutput', deviceId: string) => Promise<void>;
+  setCameraDevice: (deviceId: string) => Promise<void>;
   setParticipantVolume: (userId: string, volume: number) => void;
-  toggleScreenShare: () => Promise<void>;
+  /** Что показывать и как — спрашиваем перед запуском, выбор запоминается */
+  shareOptions: ShareOptions;
+  toggleScreenShare: (options?: ShareOptions) => Promise<void>;
   watch: (userId: string | null) => void;
 }
 
@@ -111,7 +128,11 @@ function cleanupRoom(): void {
   room = null;
 }
 
-const savedDevices = loadJson<SavedDevices>(DEVICES_KEY, { micId: null, outputId: null });
+const savedDevices = loadJson<SavedDevices>(DEVICES_KEY, {
+  micId: null,
+  outputId: null,
+  cameraId: null,
+});
 
 export const useVoiceStore = create<VoiceState>()((set, get) => ({
   channelId: null,
@@ -123,10 +144,12 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
   speaking: {},
   micDeviceId: savedDevices.micId,
   outputDeviceId: savedDevices.outputId,
+  cameraDeviceId: savedDevices.cameraId,
   participantVolumes: loadJson<Record<string, number>>(VOLUMES_KEY, {}),
   sharing: false,
   screenSharers: [],
   watching: null,
+  shareOptions: loadJson<ShareOptions>(SHARE_KEY, DEFAULT_SHARE),
 
   join: async (channelId, channelName) => {
     const state = get();
@@ -296,12 +319,22 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
   },
 
   setAudioDevice: async (kind, deviceId) => {
-    const saved = loadJson<SavedDevices>(DEVICES_KEY, { micId: null, outputId: null });
+    const saved = loadJson<SavedDevices>(DEVICES_KEY, savedDevices);
     const nextSaved =
       kind === 'audioinput' ? { ...saved, micId: deviceId } : { ...saved, outputId: deviceId };
     saveJson(DEVICES_KEY, nextSaved);
     set(kind === 'audioinput' ? { micDeviceId: deviceId } : { outputDeviceId: deviceId });
     if (room) await room.switchActiveDevice(kind, deviceId);
+  },
+
+  /** Выбор камеры общий на всё приложение: звонки в личке берут его же */
+  setCameraDevice: async (deviceId) => {
+    saveJson(DEVICES_KEY, {
+      ...loadJson<SavedDevices>(DEVICES_KEY, savedDevices),
+      cameraId: deviceId,
+    });
+    set({ cameraDeviceId: deviceId });
+    if (room) await room.switchActiveDevice('videoinput', deviceId).catch(() => undefined);
   },
 
   setParticipantVolume: (userId, volume) => {
@@ -311,14 +344,18 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
     room?.remoteParticipants.get(userId)?.setVolume(volume);
   },
 
-  toggleScreenShare: async () => {
+  toggleScreenShare: async (options) => {
     const { channelId, sharing } = get();
     if (!room || !channelId) return;
+    const next = options ?? get().shareOptions;
+    if (options) {
+      saveJson(SHARE_KEY, options);
+      set({ shareOptions: options });
+    }
     try {
-      // 720p/30fps по умолчанию (раздел 5.5 PRD), со звуком вкладки/окна
       const publication = await room.localParticipant.setScreenShareEnabled(!sharing, {
-        audio: true,
-        resolution: { width: 1280, height: 720, frameRate: 30 },
+        audio: next.audio,
+        resolution: { width: next.width, height: next.height, frameRate: next.frameRate },
       });
       if (sharing) {
         localScreenTrack = null;
