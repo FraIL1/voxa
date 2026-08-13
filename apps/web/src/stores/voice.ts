@@ -13,6 +13,7 @@ import { create } from 'zustand';
 
 import { api } from '../api/client';
 import { emitVoiceState } from '../api/socket';
+import { applyMicGain, registerOutput, unregisterOutput } from '../lib/audio-io';
 import {
   playDeafen,
   playMicOff,
@@ -121,16 +122,24 @@ function attachAudioTrack(track: RemoteTrack, deafened: boolean): void {
   element.muted = deafened;
   element.style.display = 'none';
   document.body.appendChild(element);
+  registerOutput(element);
   audioElements.set(track.sid ?? String(audioElements.size), element);
 }
 
 function detachTrack(track: RemoteTrack): void {
   for (const element of track.detach()) element.remove();
-  if (track.sid) audioElements.delete(track.sid);
+  if (track.sid) {
+    const element = audioElements.get(track.sid);
+    if (element) unregisterOutput(element);
+    audioElements.delete(track.sid);
+  }
 }
 
 function cleanupRoom(): void {
-  for (const element of audioElements.values()) element.remove();
+  for (const element of audioElements.values()) {
+    unregisterOutput(element);
+    element.remove();
+  }
   audioElements.clear();
   screenVideoTracks.clear();
   localScreenTrack = null;
@@ -252,6 +261,9 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
 
       await next.connect(grant.url, grant.token);
       await next.localParticipant.setMicrophoneEnabled(true);
+      await applyMicGain(
+        next.localParticipant.getTrackPublication(Track.Source.Microphone)?.audioTrack,
+      );
 
       set({ connecting: false, muted: false, deafened: false });
       emitVoiceState({ channelId, muted: false, deafened: false });
@@ -271,7 +283,10 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
     const current = room;
     room = null; // до disconnect: обработчик Disconnected не должен дублировать
     if (current) await current.disconnect();
-    for (const element of audioElements.values()) element.remove();
+    for (const element of audioElements.values()) {
+      unregisterOutput(element);
+      element.remove();
+    }
     audioElements.clear();
     screenVideoTracks.clear();
     localScreenTrack = null;

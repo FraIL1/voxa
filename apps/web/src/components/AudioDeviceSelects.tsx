@@ -1,8 +1,15 @@
 import { createLocalVideoTrack, Room, type LocalVideoTrack } from 'livekit-client';
-import { Bell, BellOff, Play, Video, VideoOff } from 'lucide-react';
+import { Bell, BellOff, Mic, Play, Video, VideoOff, Volume2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import {
+  measureMicLevel,
+  micGain,
+  outputVolume,
+  setMicGain,
+  setOutputVolume,
+} from '../lib/audio-io';
 import { playPreview, setSoundsEnabled, soundsEnabled } from '../lib/sounds';
 import { useVoiceStore } from '../stores/voice';
 import Select from './Select';
@@ -21,6 +28,10 @@ export default function AudioDeviceSelects({ withCamera = false }: { withCamera?
   const [cameras, setCameras] = useState<DeviceOption[]>([]);
   const [preview, setPreview] = useState(false);
   const [sounds, setSounds] = useState(soundsEnabled);
+  const [gain, setGain] = useState(micGain);
+  const [output, setOutput] = useState(outputVolume);
+  const [testing, setTesting] = useState(false);
+  const [level, setLevel] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -66,6 +77,14 @@ export default function AudioDeviceSelects({ withCamera = false }: { withCamera?
     };
   }, [preview, voice.cameraDeviceId]);
 
+  useEffect(() => {
+    if (!testing) {
+      setLevel(0);
+      return;
+    }
+    return measureMicLevel(voice.micDeviceId, setLevel);
+  }, [testing, voice.micDeviceId]);
+
   const toOptions = (devices: DeviceOption[]): { value: string; label: string }[] =>
     devices.map((d) => ({ value: d.deviceId, label: d.label || t('voice.defaultDevice') }));
 
@@ -80,6 +99,39 @@ export default function AudioDeviceSelects({ withCamera = false }: { withCamera?
           onChange={(value) => void voice.setAudioDevice('audioinput', value)}
         />
       </label>
+
+      <div className="level-row">
+        <Mic size={15} />
+        <input
+          className="volume-slider level-slider"
+          type="range"
+          min={0}
+          max={200}
+          step={5}
+          value={Math.round(gain * 100)}
+          aria-label={t('voice.micVolume')}
+          onChange={(e) => {
+            const next = Number(e.target.value) / 100;
+            setGain(next);
+            setMicGain(next);
+          }}
+        />
+        <span className="level-value">{Math.round(gain * 100)}%</span>
+      </div>
+
+      <button
+        className="btn-secondary"
+        onClick={() => setTesting((on) => !on)}
+        title={t('voice.micTestHint')}
+      >
+        <Mic size={15} /> {testing ? t('voice.micTestStop') : t('voice.micTest')}
+      </button>
+
+      {testing && (
+        <div className="mic-meter" role="progressbar" aria-valuenow={Math.round(level * 100)}>
+          <span className="mic-meter-fill" style={{ transform: `scaleX(${level})` }} />
+        </div>
+      )}
       <label>
         {t('voice.output')}
         <Select
@@ -89,6 +141,25 @@ export default function AudioDeviceSelects({ withCamera = false }: { withCamera?
           onChange={(value) => void voice.setAudioDevice('audiooutput', value)}
         />
       </label>
+
+      <div className="level-row">
+        <Volume2 size={15} />
+        <input
+          className="volume-slider level-slider"
+          type="range"
+          min={0}
+          max={100}
+          step={5}
+          value={Math.round(output * 100)}
+          aria-label={t('voice.outputVolume')}
+          onChange={(e) => {
+            const next = Number(e.target.value) / 100;
+            setOutput(next);
+            setOutputVolume(next);
+          }}
+        />
+        <span className="level-value">{Math.round(output * 100)}%</span>
+      </div>
 
       {withCamera && (
         <>

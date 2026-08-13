@@ -393,7 +393,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           {tab === 'voice' && (
             <>
               <h2>{t('settings.voiceTab')}</h2>
-              <div className="settings-form">
+              <div className="settings-form voice-form">
                 <AudioDeviceSelects withCamera />
               </div>
             </>

@@ -16,6 +16,7 @@ import {
 import { create } from 'zustand';
 
 import { api } from '../api/client';
+import { applyMicGain, registerOutput, unregisterOutput } from '../lib/audio-io';
 import {
   playCallConnected,
   playCallEnded,
@@ -64,12 +65,16 @@ function applyDeafen(deafened: boolean): void {
 function attachAudio(track: RemoteTrack, identity: string): void {
   const element = track.attach();
   element.autoplay = true;
+  registerOutput(element);
   audioElements.set(identity, element as HTMLAudioElement);
   document.body.appendChild(element);
 }
 
 function cleanup(): void {
-  for (const element of audioElements.values()) element.remove();
+  for (const element of audioElements.values()) {
+    unregisterOutput(element);
+    element.remove();
+  }
   audioElements.clear();
   remoteVideos.clear();
   localVideo = null;
@@ -375,6 +380,8 @@ async function connect(
   next.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack, _pub, participant) => {
     if (track.kind === Track.Kind.Audio) {
       track.detach().forEach((el) => el.remove());
+      const gone = audioElements.get(participant.identity);
+      if (gone) unregisterOutput(gone);
       audioElements.delete(participant.identity);
       return;
     }
@@ -407,6 +414,9 @@ async function connect(
   // которое человек выбрал, а не с микрофоном наотмашь
   const { muted, deafened } = get();
   await next.localParticipant.setMicrophoneEnabled(!muted);
+  await applyMicGain(
+    next.localParticipant.getTrackPublication(Track.Source.Microphone)?.audioTrack,
+  );
   applyDeafen(deafened);
   if (video) {
     await next.localParticipant.setCameraEnabled(true, cameraOptions()).catch(() => undefined);

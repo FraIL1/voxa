@@ -5381,9 +5381,13 @@ h3 {
   background: var(--accent);
 }
 
-/* Выключатель звуков приложения */
+/* Выключатель звуков приложения. Селектор с родителем не случаен: правило
+   .settings-form label ставит всем подписям колонку и весит больше одного
+   класса — без этого карточка складывалась вертикально. */
+.settings-form .sound-toggle,
 .sound-toggle {
   display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 12px;
   padding: 12px 14px;
@@ -5406,4 +5410,56 @@ h3 {
 .sound-toggle .btn-secondary {
   flex: none;
   padding: 0 12px;
+}
+
+/* Громкость входа и выхода: ползунок в строке с иконкой и числом */
+.level-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-faint);
+}
+
+/* Ползунок громкости участника скрыт до наведения — здесь он всегда виден */
+.level-slider {
+  flex: 1;
+  width: auto;
+  opacity: 1;
+}
+
+.level-value {
+  flex: none;
+  width: 44px;
+  text-align: right;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+/* Полоска проверки микрофона */
+.mic-meter {
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.mic-meter-fill {
+  display: block;
+  height: 100%;
+  width: 100%;
+  transform-origin: left;
+  transform: scaleX(0);
+  border-radius: inherit;
+  background: var(--gradient-accent);
+  /* Полоска догоняет голос быстро, но не дёргается на каждый кадр */
+  transition: transform 60ms linear;
+}
+
+/* В голосе и видео строк больше и они шире: ползунки, полоска, предпросмотр */
+.voice-form {
+  max-width: 460px;
+  gap: 14px;
 }

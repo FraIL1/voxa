@@ -336,6 +336,60 @@ test.describe('Звуки', () => {
   });
 });
 
+test.describe('Громкость и проверка микрофона', () => {
+  test('ползунки применяются, запоминаются и полоска уровня работает', async ({ owner }) => {
+    await owner.locator('.user-card').getByTitle('Настройки').first().click();
+    await owner.getByRole('button', { name: 'Голос и видео' }).click();
+
+    const mic = owner.getByLabel('Громкость микрофона');
+    const output = owner.getByLabel('Громкость собеседников');
+    await expect(mic).toBeVisible();
+    await expect(output).toBeVisible();
+
+    // Карточка звуков лежит строкой, а не столбиком
+    await expect(owner.locator('.sound-toggle')).toHaveCSS('flex-direction', 'row');
+
+    await mic.fill('160');
+    await output.fill('40');
+    await expect(owner.locator('.level-value').first()).toHaveText('160%');
+    await expect(owner.locator('.level-value').nth(1)).toHaveText('40%');
+
+    // Значения сохранены на клиенте, а не только в поле
+    const saved = await owner.evaluate(() =>
+      JSON.parse(localStorage.getItem('voxa-audio-levels') ?? '{}'),
+    );
+    expect(saved).toMatchObject({ micGain: 1.6, output: 0.4 });
+
+    // Проверка микрофона показывает живой уровень
+    await owner.getByRole('button', { name: 'Проверить микрофон' }).click();
+    const meter = owner.locator('.mic-meter');
+    await expect(meter).toBeVisible();
+    await expect
+      .poll(() =>
+        meter.locator('.mic-meter-fill').evaluate((el) => {
+          const m = new DOMMatrix(getComputedStyle(el).transform);
+          return m.a;
+        }),
+      )
+      .toBeGreaterThan(0);
+    await owner.getByRole('button', { name: 'Остановить проверку' }).click();
+    await expect(meter).toBeHidden();
+
+    // Выбор переживает перезагрузку
+    await owner.reload();
+    await owner.locator('.user-card').waitFor({ state: 'visible', timeout: 20_000 });
+    await owner.locator('.user-card').getByTitle('Настройки').first().click();
+    await owner.getByRole('button', { name: 'Голос и видео' }).click();
+    await expect(owner.getByLabel('Громкость микрофона')).toHaveValue('160');
+    await expect(owner.getByLabel('Громкость собеседников')).toHaveValue('40');
+
+    // Возвращаем как было: следующий сценарий начинает с обычной громкости
+    await owner.getByLabel('Громкость микрофона').fill('100');
+    await owner.getByLabel('Громкость собеседников').fill('100');
+    await owner.locator('.settings-panel').getByTitle('Закрыть').click();
+  });
+});
+
 test.describe('Панель владельца', () => {
   test('разделы переключаются, сводка и списки видны', async ({ owner }) => {
     await owner.locator('.rail-icon.owner').click();
