@@ -7,6 +7,7 @@ import { logout } from '../api/auth';
 import { api, ApiError } from '../api/client';
 import { getAutostart, isTauri, setAutostart } from '../lib/tauri';
 import { useAuthStore } from '../stores/auth';
+import { useSkinStore, type Skin } from '../stores/skin';
 import { useThemeStore, type ThemeMode } from '../stores/theme';
 import AudioDeviceSelects from './AudioDeviceSelects';
 import Avatar from './Avatar';
@@ -24,6 +25,8 @@ const ACCENTS = [
   '#fbbf24',
   '#38bdf8',
 ] as const;
+
+const SKINS: Skin[] = ['aurora', 'classic'];
 
 const THEMES: ThemeMode[] = ['dark', 'light', 'auto'];
 
@@ -59,6 +62,8 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
+  const skin = useSkinStore((s) => s.skin);
+  const setSkin = useSkinStore((s) => s.setSkin);
   const themeMode = useThemeStore((s) => s.mode);
   const setThemeMode = useThemeStore((s) => s.setMode);
   const [tab, setTab] = useState<Tab>('profile');
@@ -342,6 +347,27 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
             <>
               <h2>{t('settings.appearanceTab')}</h2>
               <div className="settings-form">
+                <label>{t('settings.skin')}</label>
+                <div className="skin-choices">
+                  {SKINS.map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={`skin-choice${skin === value ? ' active' : ''}`}
+                      onClick={() => setSkin(value)}
+                    >
+                      <span className={`skin-preview ${value}`} aria-hidden>
+                        <i className="glow" />
+                        <i className="rail" />
+                        <i className="side" />
+                        <i className="main" />
+                      </span>
+                      <span className="theme-choice-label">{t(`settings.skin_${value}`)}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="settings-hint">{t('settings.skinHint')}</p>
+
                 <label>{t('settings.theme')}</label>
                 <div className="theme-choices">
                   {THEMES.map((mode) => (

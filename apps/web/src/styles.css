@@ -5463,3 +5463,108 @@ h3 {
   max-width: 460px;
   gap: 14px;
 }
+
+/* ---------- Выбор облика ---------- */
+
+.skin-choices {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.skin-choice {
+  padding: 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--panel-raised);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition:
+    border-color var(--transition),
+    transform var(--transition);
+}
+
+.skin-choice:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+
+.skin-choice.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+/* Крошечный макет окна: видно разницу до переключения */
+.skin-preview {
+  position: relative;
+  display: flex;
+  height: 62px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.skin-preview i {
+  display: block;
+  position: relative;
+  z-index: 1;
+}
+
+.skin-preview .rail {
+  width: 14%;
+}
+
+.skin-preview .side {
+  width: 26%;
+}
+
+.skin-preview .main {
+  flex: 1;
+}
+
+.skin-preview .glow {
+  position: absolute;
+  inset: -40%;
+  z-index: 0;
+  background: radial-gradient(circle at 25% 25%, var(--accent), transparent 55%);
+  filter: blur(12px);
+}
+
+/* Аврора: цветной подсвет за полупрозрачными панелями */
+.skin-preview.aurora {
+  background: #05070d;
+}
+
+.skin-preview.aurora .rail {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.skin-preview.aurora .side {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.skin-preview.aurora .main {
+  background: rgba(255, 255, 255, 0.015);
+}
+
+/* Классический: плотные непрозрачные панели, без подсвета */
+.skin-preview.classic .glow {
+  display: none;
+}
+
+.skin-preview.classic {
+  background: #0f1521;
+}
+
+.skin-preview.classic .rail {
+  background: #080b12;
+}
+
+.skin-preview.classic .side {
+  background: #0f1521;
+}
+
+.skin-preview.classic .main {
+  background: #131c2b;
+}

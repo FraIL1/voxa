@@ -89,9 +89,14 @@ test.describe('Оформление', () => {
     await owner.getByRole('button', { name: 'Светлая' }).click();
 
     await expect(owner.locator('html')).toHaveAttribute('data-theme', 'light');
-    // Фон страницы действительно светлый, а не только атрибут
-    const bg = await owner.evaluate(() => getComputedStyle(document.body).backgroundColor);
-    expect(bg).toBe('rgb(238, 241, 247)');
+    // Фон действительно светлый, а не только атрибут. Точный цвет не
+    // проверяем: он свой у каждого облика, а светлота общая
+    const bright = await owner.evaluate(() => {
+      const parts = getComputedStyle(document.body).backgroundColor.match(/\d+/g)!.map(Number);
+      const [r, g, b] = parts as [number, number, number];
+      return r * 0.299 + g * 0.587 + b * 0.114;
+    });
+    expect(bright).toBeGreaterThan(140);
 
     // Перезагрузка сохраняет выбор
     await owner.reload();
@@ -182,9 +187,16 @@ test.describe('Свои окна вместо системных', () => {
     const boxStyle = await box.evaluate((el) => {
       const cs = getComputedStyle(el);
       const r = el.getBoundingClientRect();
+      // Эталон берём из того же токена: цвет панели свой у каждого облика
+      const probe = document.createElement('div');
+      probe.style.background = 'var(--panel-raised)';
+      document.body.appendChild(probe);
+      const panel = getComputedStyle(probe).backgroundColor;
+      probe.remove();
       return {
         appearance: cs.appearance,
         background: cs.backgroundColor,
+        panel,
         size: `${Math.round(r.width)}x${Math.round(r.height)}`,
         minHeight: cs.minHeight,
         padding: cs.padding,
@@ -195,7 +207,8 @@ test.describe('Свои окна вместо системных', () => {
     expect(boxStyle.minHeight).toBe('0px');
     expect(boxStyle.padding).toBe('0px');
     // Снятая галочка — цвета панели, а не системного белого
-    expect(boxStyle.background).toBe('rgb(22, 30, 45)');
+    expect(boxStyle.background).toBe(boxStyle.panel);
+    expect(boxStyle.background).not.toBe('rgb(255, 255, 255)');
 
     // Выбор цвета роли — без системной рамки вокруг образца
     const color = owner.locator('.role-color-input').first();
@@ -387,6 +400,56 @@ test.describe('Громкость и проверка микрофона', () =>
     await owner.getByLabel('Громкость микрофона').fill('100');
     await owner.getByLabel('Громкость собеседников').fill('100');
     await owner.locator('.settings-panel').getByTitle('Закрыть').click();
+  });
+});
+
+test.describe('Облик', () => {
+  test('переключается, запоминается и возвращает прежний вид', async ({ owner }) => {
+    await owner.locator('.user-card').getByTitle('Настройки').first().click();
+    await owner.getByRole('button', { name: 'Оформление' }).click();
+
+    // По умолчанию новый облик: живой фон нарисован
+    await expect(owner.locator('html')).toHaveAttribute('data-skin', 'aurora');
+    await expect(owner.locator('.app-aurora')).toHaveCSS('display', 'block');
+
+    await owner.getByRole('button', { name: 'Классический' }).click();
+    await expect(owner.locator('html')).toHaveAttribute('data-skin', 'classic');
+    // Классический — это прежний плотный вид: фона нет, панель непрозрачна
+    await expect(owner.locator('.app-aurora')).toHaveCSS('display', 'none');
+    await expect(owner.locator('.sidebar')).toHaveCSS('background-color', 'rgb(15, 21, 33)');
+
+    await owner.reload();
+    await owner.locator('.user-card').waitFor({ state: 'visible', timeout: 20_000 });
+    await expect(owner.locator('html')).toHaveAttribute('data-skin', 'classic');
+
+    await owner.locator('.user-card').getByTitle('Настройки').first().click();
+    await owner.getByRole('button', { name: 'Оформление' }).click();
+    await owner.getByRole('button', { name: 'Аврора' }).click();
+    await expect(owner.locator('html')).toHaveAttribute('data-skin', 'aurora');
+    await owner.locator('.settings-panel').getByTitle('Закрыть').click();
+  });
+
+  /**
+   * Окна живут внутри боковой панели. Размытие на самой панели делало её
+   * точкой отсчёта для position: fixed — окно съезжало влево и теряло
+   * затемнение. Проверяем именно это, а не «окно открылось».
+   */
+  test('окно настроек по центру экрана, а не внутри панели', async ({ owner }) => {
+    await owner.locator('.user-card').getByTitle('Настройки').first().click();
+    const panel = owner.locator('.settings-panel');
+    await expect(panel).toBeVisible();
+
+    const box = await panel.boundingBox();
+    const view = owner.viewportSize();
+    expect(box && view).toBeTruthy();
+    const panelCenter = box!.x + box!.width / 2;
+    expect(Math.abs(panelCenter - view!.width / 2)).toBeLessThan(4);
+
+    // Затемнение накрывает весь экран, а не кусок панели
+    const overlay = await owner.locator('.settings-overlay').boundingBox();
+    expect(overlay!.width).toBeGreaterThanOrEqual(view!.width - 1);
+
+    await panel.getByTitle('Закрыть').click();
   });
 });
 

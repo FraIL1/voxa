@@ -1,0 +1,302 @@
+/* ============================================================
+   Облик «Аврора»
+
+   Всё здесь живёт под [data-skin='aurora'] и ничего не трогает в
+   классическом виде: переключатель в настройках возвращает прежний
+   интерфейс без отката кода.
+
+   Три идеи вместо плоского серого пластика:
+     • материал — панели это полупрозрачное стекло над живым фоном,
+       глубина задаётся слоями и размытием, а не рамками;
+     • свет — активное и говорящее светится, а не просто красится;
+     • форма — крупнее скругления и мягче края.
+   ============================================================ */
+
+:root[data-skin='aurora'] {
+  /* Фон уходит в синеву: цвет даёт живой слой, а не сама подложка */
+  --bg: #05070d;
+  --panel: rgba(255, 255, 255, 0.028);
+  --panel-raised: rgba(255, 255, 255, 0.05);
+  --panel-hover: rgba(255, 255, 255, 0.08);
+  --nav-bg: rgba(255, 255, 255, 0.018);
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.13);
+
+  --text: #eef3fb;
+  --text-muted: #a3b1c6;
+  --text-faint: #6d7c93;
+
+  /* Скругления крупнее: это первое, что отличает силуэт от плоских панелей */
+  --radius-sm: 10px;
+  --radius: 14px;
+  --radius-lg: 22px;
+
+  --shadow-md: 0 10px 30px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 24px 70px rgba(0, 0, 0, 0.55);
+
+  /* Стекло: одна переменная на всё размытие — легко ослабить целиком */
+  --glass: saturate(150%) blur(22px);
+}
+
+:root[data-skin='aurora'][data-theme='light'] {
+  --bg: #eaeef7;
+  --panel: rgba(255, 255, 255, 0.6);
+  --panel-raised: rgba(255, 255, 255, 0.75);
+  --panel-hover: rgba(255, 255, 255, 0.92);
+  --nav-bg: rgba(255, 255, 255, 0.5);
+  --border: rgba(15, 30, 55, 0.09);
+  --border-strong: rgba(15, 30, 55, 0.16);
+
+  --text: #0d1626;
+  --text-muted: #43536b;
+  --text-faint: #6b7b93;
+
+  --shadow-md: 0 10px 30px rgba(20, 40, 80, 0.1);
+  --shadow-lg: 0 24px 70px rgba(20, 40, 80, 0.16);
+}
+
+/* ---------- Шрифт ---------- */
+
+/* Inter стоит в каждом втором интерфейсе — от него и ощущение «как у всех».
+   Manrope геометричнее, с характерными окончаниями, и знает кириллицу. */
+:root[data-skin='aurora'] body {
+  font-family: 'Manrope Variable', 'Inter Variable', system-ui, sans-serif;
+  letter-spacing: -0.005em;
+}
+
+:root[data-skin='aurora'] h1,
+:root[data-skin='aurora'] h2,
+:root[data-skin='aurora'] h3 {
+  letter-spacing: -0.03em;
+  font-weight: 800;
+}
+
+/* ---------- Живой фон ---------- */
+
+/* Медленно плывущие пятна света под всем приложением. Это единственный
+   источник цвета в фоне: сами панели прозрачны и берут цвет отсюда. */
+.app-aurora {
+  display: none;
+}
+
+:root[data-skin='aurora'] .app-aurora {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+:root[data-skin='aurora'] .app-aurora span {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0.28;
+  will-change: transform;
+}
+
+:root[data-skin='aurora'] .app-aurora span:nth-child(1) {
+  width: 46vw;
+  height: 46vw;
+  top: -14vw;
+  left: -8vw;
+  background: var(--accent);
+  animation: aurora-a 34s ease-in-out infinite alternate;
+}
+
+:root[data-skin='aurora'] .app-aurora span:nth-child(2) {
+  width: 38vw;
+  height: 38vw;
+  bottom: -16vw;
+  right: -6vw;
+  background: #2dd4bf;
+  animation: aurora-b 44s ease-in-out infinite alternate;
+}
+
+:root[data-skin='aurora'] .app-aurora span:nth-child(3) {
+  width: 30vw;
+  height: 30vw;
+  top: 40%;
+  left: 45%;
+  background: #6366f1;
+  opacity: 0.16;
+  animation: aurora-c 52s ease-in-out infinite alternate;
+}
+
+@keyframes aurora-a {
+  to {
+    transform: translate3d(14vw, 10vh, 0) scale(1.2);
+  }
+}
+
+@keyframes aurora-b {
+  to {
+    transform: translate3d(-12vw, -8vh, 0) scale(1.15);
+  }
+}
+
+@keyframes aurora-c {
+  to {
+    transform: translate3d(-18vw, 12vh, 0) scale(0.85);
+  }
+}
+
+/* Кому мешает движение — фон замирает */
+@media (prefers-reduced-motion: reduce) {
+  :root[data-skin='aurora'] .app-aurora span {
+    animation: none;
+  }
+}
+
+/* Интерфейс лежит над фоном */
+:root[data-skin='aurora'] .app-root,
+:root[data-skin='aurora'] .app-window-body > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------- Стекло ---------- */
+
+/* Размытия на самих панелях нет намеренно. backdrop-filter делает элемент
+   точкой отсчёта для потомков с position: fixed — окно настроек, живущее
+   внутри боковой панели, переставало центрироваться по экрану и теряло
+   затемнение. Плюс на прокручиваемых списках такой слой уезжает вместе с
+   содержимым. Поэтому глубину даёт прозрачность поверх и без того размытого
+   фона, а размытие остаётся только на подложке модальных окон, где оно
+   ничего не ломает. */
+
+:root[data-skin='aurora'] .sidebar,
+:root[data-skin='aurora'] .members,
+:root[data-skin='aurora'] .server-rail {
+  border-color: var(--border);
+  background: var(--nav-bg);
+}
+
+:root[data-skin='aurora'] .channel-header,
+:root[data-skin='aurora'] .titlebar,
+:root[data-skin='aurora'] .user-card {
+  background: var(--panel);
+}
+
+/* Подложка окон гуще: под ней не должно читаться содержимое */
+:root[data-skin='aurora'] .settings-overlay {
+  backdrop-filter: saturate(140%) blur(14px);
+  -webkit-backdrop-filter: saturate(140%) blur(14px);
+}
+
+:root[data-skin='aurora'] .settings-panel,
+:root[data-skin='aurora'] .add-server-modal,
+:root[data-skin='aurora'] .confirm-modal,
+:root[data-skin='aurora'] .share-modal,
+:root[data-skin='aurora'] .profile-modal,
+:root[data-skin='aurora'] .context-menu,
+:root[data-skin='aurora'] .profile-menu,
+:root[data-skin='aurora'] .server-dropdown,
+:root[data-skin='aurora'] .select-list,
+:root[data-skin='aurora'] .call-dock {
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  border-color: var(--border-strong);
+}
+
+:root[data-skin='aurora'][data-theme='light'] .settings-panel,
+:root[data-skin='aurora'][data-theme='light'] .add-server-modal,
+:root[data-skin='aurora'][data-theme='light'] .confirm-modal,
+:root[data-skin='aurora'][data-theme='light'] .share-modal,
+:root[data-skin='aurora'][data-theme='light'] .profile-modal,
+:root[data-skin='aurora'][data-theme='light'] .context-menu,
+:root[data-skin='aurora'][data-theme='light'] .profile-menu,
+:root[data-skin='aurora'][data-theme='light'] .server-dropdown,
+:root[data-skin='aurora'][data-theme='light'] .select-list,
+:root[data-skin='aurora'][data-theme='light'] .call-dock {
+  background: color-mix(in srgb, #ffffff 92%, transparent);
+}
+
+/* ---------- Свет как состояние ---------- */
+
+/* Выбранный сервер и активный канал не просто красятся — они светятся */
+:root[data-skin='aurora'] .rail-icon.active {
+  box-shadow:
+    0 0 0 1px var(--accent-line),
+    0 0 24px -4px var(--accent);
+}
+
+:root[data-skin='aurora'] .channel-link.active,
+:root[data-skin='aurora'] .settings-tab.active,
+:root[data-skin='aurora'] .select-option.active {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent) 20%, transparent),
+    transparent 85%
+  );
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+/* Кнопка действия светится тем же цветом, что и акцент */
+:root[data-skin='aurora'] .btn-primary {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.28) inset,
+    0 8px 28px -6px var(--accent);
+}
+
+/* Говорящий участник: кольцо света, а не плоская обводка */
+:root[data-skin='aurora'] .voice-tile.speaking .voice-avatar,
+:root[data-skin='aurora'] .call-tile.speaking .call-tile-avatar {
+  box-shadow:
+    0 0 0 2px var(--accent),
+    0 0 26px -2px var(--accent);
+  animation: speak-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes speak-pulse {
+  50% {
+    box-shadow:
+      0 0 0 3px var(--accent),
+      0 0 38px 0 var(--accent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-skin='aurora'] .voice-tile.speaking .voice-avatar,
+  :root[data-skin='aurora'] .call-tile.speaking .call-tile-avatar {
+    animation: none;
+  }
+}
+
+/* ---------- Форма ---------- */
+
+/* Иконки серверов — скруглённый квадрат, ближе к «капсуле» при выборе */
+:root[data-skin='aurora'] .rail-icon {
+  border-radius: 18px;
+  transition:
+    border-radius var(--transition),
+    background var(--transition),
+    box-shadow var(--transition),
+    transform var(--transition);
+}
+
+:root[data-skin='aurora'] .rail-icon:hover {
+  transform: translateY(-1px);
+}
+
+:root[data-skin='aurora'] .rail-icon.active {
+  border-radius: 15px;
+}
+
+/* Сообщение под курсором приподнимается подложкой (тот же класс и в личке) */
+:root[data-skin='aurora'] .message:hover {
+  background: var(--panel);
+  border-radius: var(--radius);
+}
+
+/* Поле ввода — заметная пилюля, а не еле видная рамка */
+:root[data-skin='aurora'] .composer {
+  border-radius: var(--radius-lg);
+  background: var(--panel-raised);
+  border-color: var(--border);
+}
+
+:root[data-skin='aurora'] .composer:focus-within {
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent);
+}
