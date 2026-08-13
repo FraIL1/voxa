@@ -112,6 +112,8 @@ interface CallState {
   error: string | null;
   /** Чем закончился прошлый звонок (для короткого уведомления) */
   endedReason: DmCallEndReason | null;
+  /** Кто говорит прямо сейчас: в групповом звонке иначе не разобрать */
+  speaking: Record<string, boolean>;
 
   startCall: (
     conversationId: string,
@@ -146,6 +148,7 @@ const IDLE_STATE = {
   muted: false,
   deafened: false,
   startedAt: null,
+  speaking: {} as Record<string, boolean>,
 };
 
 export const useCallStore = create<CallState>()((set, get) => ({
@@ -160,6 +163,7 @@ export const useCallStore = create<CallState>()((set, get) => ({
   muted: false,
   deafened: false,
   cameraOn: false,
+  speaking: {},
   videoUserIds: [],
   startedAt: null,
   videoVersion: 0,
@@ -392,6 +396,10 @@ async function connect(
         videoVersion: s.videoVersion + 1,
       }));
     }
+  });
+
+  next.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
+    set({ speaking: Object.fromEntries(speakers.map((p) => [p.identity, true])) });
   });
 
   // Кто-то вошёл в комнату — разговор реально начался

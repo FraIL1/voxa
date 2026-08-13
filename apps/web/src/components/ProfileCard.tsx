@@ -9,7 +9,7 @@ import {
   UserPlus,
   X,
 } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 
@@ -22,6 +22,7 @@ import {
 } from '../hooks/useFriends';
 import { useProfile, useRefreshProfile } from '../hooks/useProfile';
 import { useCallStore } from '../stores/call';
+import { useProfileViewStore } from '../stores/profileView';
 import Avatar from './Avatar';
 
 const joinedFormat = new Intl.DateTimeFormat('ru', {
@@ -257,6 +258,34 @@ export default function ProfileModal({ userId, onClose }: { userId: string; onCl
   }, [onClose]);
 
   const { t } = useTranslation();
+  const origin = useProfileViewStore((s) => s.origin);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Карточка вылетает из того места, по которому кликнули. Считаем смещение
+   * от её центра до этой точки и стартуем оттуда.
+   *
+   * transform-origin тут не годится: он отсчитывается от угла самого окна, а
+   * точка клика — в координатах экрана. Из-за этого прошлая версия сжималась
+   * из случайного места, и движения было не видно.
+   *
+   * Класс вешаем здесь же, до первого кадра: иначе анимация успевает начаться
+   * со значениями по умолчанию.
+   */
+  useLayoutEffect(() => {
+    const card = cardRef.current;
+    if (!card || !origin) return;
+    /* Мерим offset-геометрию, а не getBoundingClientRect: последняя учитывает
+       уже наложенное преобразование. В разработке React прогоняет эффект
+       дважды, второй проход мерил уже сдвинутую анимацией карточку — смещение
+       обнулялось, и движения было не видно. */
+    const centerX = card.offsetLeft + card.offsetWidth / 2;
+    const centerY = card.offsetTop + card.offsetHeight / 2;
+    card.style.setProperty('--dx', `${origin.x - centerX}px`);
+    card.style.setProperty('--dy', `${origin.y - centerY}px`);
+    card.classList.add('grows');
+  }, [origin]);
+
   return (
     <div
       className="settings-overlay"
@@ -264,7 +293,7 @@ export default function ProfileModal({ userId, onClose }: { userId: string; onCl
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="profile-modal">
+      <div className="profile-modal" ref={cardRef}>
         <button className="icon-button profile-close" title={t('settings.close')} onClick={onClose}>
           <X size={16} />
         </button>

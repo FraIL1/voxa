@@ -1,5 +1,5 @@
 import type { PresenceStatus } from '@voxa/shared';
-import { useState } from 'react';
+import { useState, type MouseEvent } from 'react';
 
 interface AvatarProps {
   /** Имя нужно для запасного варианта — первой буквы */
@@ -9,7 +9,8 @@ interface AvatarProps {
   status?: PresenceStatus;
   /** Дополнительные классы размера/формы из общих стилей */
   className?: string;
-  onClick?: () => void;
+  /** Событие передаём наружу: по нему открывающееся окно понимает, откуда расти */
+  onClick?: (event: MouseEvent<HTMLDivElement>) => void;
   title?: string;
 }
 

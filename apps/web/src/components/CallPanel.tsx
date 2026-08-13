@@ -20,12 +20,15 @@ import Avatar from './Avatar';
 /** Плитка участника: видео, если камера включена, иначе аватар */
 function CallTile({
   userId,
+  speaking = false,
   name,
   avatarUrl,
   self,
   withVideo,
 }: {
   userId: string;
+  /** Говорит прямо сейчас — плитка подсвечивается */
+  speaking?: boolean;
   name: string;
   avatarUrl?: string | null;
   self?: boolean;
@@ -44,7 +47,11 @@ function CallTile({
   }, [userId, self, withVideo]);
 
   return (
-    <div className={`call-tile${self ? ' self' : ''}${withVideo ? ' video' : ''}`}>
+    <div
+      className={`call-tile${self ? ' self' : ''}${withVideo ? ' video' : ''}${
+        speaking ? ' speaking' : ''
+      }`}
+    >
       {withVideo ? (
         <video ref={ref} className="call-video" autoPlay playsInline muted={self} />
       ) : (
@@ -82,6 +89,7 @@ export default function CallPanel({ conversationId }: { conversationId: string }
   const peerName = useCallStore((s) => s.peerName);
   const peerAvatar = useCallStore((s) => s.peerAvatar);
   const isGroup = useCallStore((s) => s.isGroup);
+  const speaking = useCallStore((s) => s.speaking);
   const participants = useCallStore((s) => s.participants);
   const muted = useCallStore((s) => s.muted);
   const deafened = useCallStore((s) => s.deafened);
@@ -136,6 +144,7 @@ export default function CallPanel({ conversationId }: { conversationId: string }
               name={p.displayName}
               avatarUrl={p.avatarUrl}
               withVideo={videoUserIds.includes(p.id)}
+              speaking={speaking[p.id] ?? false}
             />
           ))}
           <CallTile
@@ -143,6 +152,7 @@ export default function CallPanel({ conversationId }: { conversationId: string }
             name={t('call.you')}
             avatarUrl={me?.avatarUrl}
             withVideo={cameraOn}
+            speaking={speaking[me?.id ?? ''] ?? false}
             self
           />
         </div>

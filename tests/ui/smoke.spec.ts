@@ -89,9 +89,14 @@ test.describe('Оформление', () => {
     await owner.getByRole('button', { name: 'Светлая' }).click();
 
     await expect(owner.locator('html')).toHaveAttribute('data-theme', 'light');
-    // Фон страницы действительно светлый, а не только атрибут
-    const bg = await owner.evaluate(() => getComputedStyle(document.body).backgroundColor);
-    expect(bg).toBe('rgb(238, 241, 247)');
+    // Фон действительно светлый, а не только атрибут. Точный цвет не
+    // проверяем: он свой у каждого облика, а светлота общая
+    const bright = await owner.evaluate(() => {
+      const parts = getComputedStyle(document.body).backgroundColor.match(/\d+/g)!.map(Number);
+      const [r, g, b] = parts as [number, number, number];
+      return r * 0.299 + g * 0.587 + b * 0.114;
+    });
+    expect(bright).toBeGreaterThan(140);
 
     // Перезагрузка сохраняет выбор
     await owner.reload();
@@ -182,9 +187,16 @@ test.describe('Свои окна вместо системных', () => {
     const boxStyle = await box.evaluate((el) => {
       const cs = getComputedStyle(el);
       const r = el.getBoundingClientRect();
+      // Эталон берём из того же токена: цвет панели свой у каждого облика
+      const probe = document.createElement('div');
+      probe.style.background = 'var(--panel-raised)';
+      document.body.appendChild(probe);
+      const panel = getComputedStyle(probe).backgroundColor;
+      probe.remove();
       return {
         appearance: cs.appearance,
         background: cs.backgroundColor,
+        panel,
         size: `${Math.round(r.width)}x${Math.round(r.height)}`,
         minHeight: cs.minHeight,
         padding: cs.padding,
@@ -195,7 +207,8 @@ test.describe('Свои окна вместо системных', () => {
     expect(boxStyle.minHeight).toBe('0px');
     expect(boxStyle.padding).toBe('0px');
     // Снятая галочка — цвета панели, а не системного белого
-    expect(boxStyle.background).toBe('rgb(22, 30, 45)');
+    expect(boxStyle.background).toBe(boxStyle.panel);
+    expect(boxStyle.background).not.toBe('rgb(255, 255, 255)');
 
     // Выбор цвета роли — без системной рамки вокруг образца
     const color = owner.locator('.role-color-input').first();
@@ -390,6 +403,123 @@ test.describe('Громкость и проверка микрофона', () =>
   });
 });
 
+test.describe('Облик', () => {
+  test('переключается, запоминается и возвращает прежний вид', async ({ owner }) => {
+    await owner.locator('.user-card').getByTitle('Настройки').first().click();
+    await owner.getByRole('button', { name: 'Оформление' }).click();
+
+    // По умолчанию новый облик: живой фон нарисован
+    await expect(owner.locator('html')).toHaveAttribute('data-skin', 'flow');
+    await expect(owner.locator('.app-backdrop')).toHaveCSS('display', 'block');
+
+    await owner.getByRole('button', { name: 'Классический' }).click();
+    await expect(owner.locator('html')).toHaveAttribute('data-skin', 'classic');
+    // Классический — это прежний плотный вид: фона нет, панель непрозрачна
+    await expect(owner.locator('.app-backdrop')).toHaveCSS('display', 'none');
+    await expect(owner.locator('.sidebar')).toHaveCSS('background-color', 'rgb(15, 21, 33)');
+
+    await owner.reload();
+    await owner.locator('.user-card').waitFor({ state: 'visible', timeout: 20_000 });
+    await expect(owner.locator('html')).toHaveAttribute('data-skin', 'classic');
+
+    await owner.locator('.user-card').getByTitle('Настройки').first().click();
+    await owner.getByRole('button', { name: 'Оформление' }).click();
+    await owner.getByRole('button', { name: 'Поток' }).click();
+    await expect(owner.locator('html')).toHaveAttribute('data-skin', 'flow');
+    await owner.locator('.settings-panel').getByTitle('Закрыть').click();
+  });
+
+  /**
+   * Окна живут внутри боковой панели. Размытие на самой панели делало её
+   * точкой отсчёта для position: fixed — окно съезжало влево и теряло
+   * затемнение. Проверяем именно это, а не «окно открылось».
+   */
+  test('окно настроек по центру экрана, а не внутри панели', async ({ owner }) => {
+    await owner.locator('.user-card').getByTitle('Настройки').first().click();
+    const panel = owner.locator('.settings-panel');
+    await expect(panel).toBeVisible();
+
+    const box = await panel.boundingBox();
+    const view = owner.viewportSize();
+    expect(box && view).toBeTruthy();
+    const panelCenter = box!.x + box!.width / 2;
+    expect(Math.abs(panelCenter - view!.width / 2)).toBeLessThan(4);
+
+    // Затемнение накрывает весь экран, а не кусок панели
+    const overlay = await owner.locator('.settings-overlay').boundingBox();
+    expect(overlay!.width).toBeGreaterThanOrEqual(view!.width - 1);
+
+    await panel.getByTitle('Закрыть').click();
+  });
+});
+
+test.describe('Плотность и движение', () => {
+  test('компактный режим сжимает строки и запоминается', async ({ owner }) => {
+    await owner.locator('.rail-icon.server').first().click();
+    await owner.waitForURL(/\/guilds\//);
+
+    // Сразу после перехода строка ещё нулевой высоты — ждём отрисовки,
+    // иначе сравниваем с нулём и тест врёт
+    const row = owner.locator('.channel-link').first();
+    await row.waitFor({ state: 'visible', timeout: 20_000 });
+    const rowHeight = async (): Promise<number> => {
+      await expect
+        .poll(() => row.evaluate((el) => el.getBoundingClientRect().height))
+        .toBeGreaterThan(0);
+      return row.evaluate((el) => el.getBoundingClientRect().height);
+    };
+    const cozy = await rowHeight();
+
+    await owner.locator('.user-card').getByTitle('Настройки').first().click();
+    await owner.getByRole('button', { name: 'Оформление' }).click();
+    await owner.getByRole('button', { name: 'Компактно' }).click();
+    await expect(owner.locator('html')).toHaveAttribute('data-density', 'compact');
+    await owner.locator('.settings-panel').getByTitle('Закрыть').click();
+
+    const compact = await rowHeight();
+    expect(compact).toBeLessThan(cozy);
+
+    await owner.reload();
+    await owner.locator('.user-card').waitFor({ state: 'visible', timeout: 20_000 });
+    await expect(owner.locator('html')).toHaveAttribute('data-density', 'compact');
+
+    // Возвращаем просторный режим следующим сценариям
+    await owner.locator('.user-card').getByTitle('Настройки').first().click();
+    await owner.getByRole('button', { name: 'Оформление' }).click();
+    await owner.getByRole('button', { name: 'Просторно' }).click();
+    await owner.locator('.settings-panel').getByTitle('Закрыть').click();
+  });
+
+  test('карточка профиля вылетает из того, по чему кликнули', async ({ owner }) => {
+    await owner.locator('.rail-icon.server').first().click();
+    await owner.waitForURL(/\/guilds\//);
+
+    const member = owner.locator('.member', { hasText: 'uitest_friend' }).first();
+    const box = await member.boundingBox();
+    const view = owner.viewportSize()!;
+    await member.click();
+
+    const card = owner.locator('.profile-modal');
+    await expect(card).toBeVisible();
+    await expect(card).toHaveClass(/grows/);
+
+    /* Проверяем смещение, а не положение в кадре: положение зависит от того,
+       в какой момент замерили, а смещение задано один раз и не меняется.
+       Карточка стоит по центру, значит смещение — расстояние от центра
+       экрана до места клика. */
+    const shift = await card.evaluate((el) => ({
+      dx: Number.parseFloat(getComputedStyle(el).getPropertyValue('--dx')),
+      dy: Number.parseFloat(getComputedStyle(el).getPropertyValue('--dy')),
+    }));
+    expect(Math.abs(shift.dx - (box!.x + box!.width / 2 - view.width / 2))).toBeLessThan(4);
+    expect(Math.abs(shift.dy - (box!.y + box!.height / 2 - view.height / 2))).toBeLessThan(4);
+    // Смещение не нулевое, иначе движения не видно — ради этого всё и затевалось
+    expect(Math.abs(shift.dx)).toBeGreaterThan(100);
+
+    await owner.keyboard.press('Escape');
+  });
+});
+
 test.describe('Панель владельца', () => {
   test('разделы переключаются, сводка и списки видны', async ({ owner }) => {
     await owner.locator('.rail-icon.owner').click();
@@ -506,6 +636,48 @@ test.describe('Синхрон присутствия', () => {
     await menu.locator('.menu-sub .menu-item').first().click();
     await menu.locator('.status-menu-item', { hasText: 'В сети' }).click();
     await expect(meInList.locator('.status-dot')).toHaveClass(/online/);
+  });
+
+  /**
+   * «Не беспокоить» и «отошёл» — это присутствие, человек на месте. В списке
+   * друзей он должен быть среди тех, кто в сети, и подписан своим статусом.
+   * Не в сети — только когда включена невидимка или человек действительно ушёл.
+   */
+  test('«не беспокоить» виден другу как статус, а не как офлайн', async ({ owner, friend }) => {
+    /* Своя карточка показывает не выбранный режим, а то, как тебя видят
+       другие: с невидимкой это «Не в сети». Поэтому ожидаемую подпись
+       передаём отдельно от названия режима. */
+    const setMode = async (label: string, ownLabel = label): Promise<void> => {
+      await owner.locator('.user-card-identity').click();
+      const menu = owner.locator('.profile-menu');
+      await menu.locator('.menu-sub .menu-item').first().click();
+      await menu.locator('.status-menu-item', { hasText: label }).click();
+      await expect(owner.locator('.user-card-status')).toHaveText(ownLabel);
+    };
+
+    const rowInOnlineTab = async (): Promise<string | null> => {
+      await friend.getByRole('button', { name: 'В сети', exact: true }).click();
+      const row = friend.locator('.friend-row', { hasText: 'uitest_owner' });
+      if ((await row.count()) === 0) return null;
+      return row.locator('.friend-status').innerText();
+    };
+
+    await setMode('Не беспокоить');
+    await expect.poll(rowInOnlineTab).toBe('Не беспокоить');
+
+    await setMode('Отошёл');
+    await expect.poll(rowInOnlineTab).toBe('Отошёл');
+
+    // Невидимка — единственный режим, когда для других я не в сети
+    await setMode('Невидимка', 'Не в сети');
+    await expect.poll(rowInOnlineTab).toBeNull();
+    await friend.getByRole('button', { name: 'Все', exact: true }).click();
+    await expect(
+      friend.locator('.friend-row', { hasText: 'uitest_owner' }).locator('.friend-status'),
+    ).toHaveText('Не в сети');
+
+    await setMode('В сети');
+    await expect.poll(rowInOnlineTab).toBe('В сети');
   });
 });
 

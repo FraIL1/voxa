@@ -28,14 +28,14 @@ type Tab = 'online' | 'all' | 'requests' | 'blocked' | 'add';
  * действий внутри: у них своё дело.
  */
 function PersonRow({ userId, children }: { userId: string; children: ReactNode }) {
-  const open = (): void => openProfile(userId);
+  const open = (event?: { currentTarget: Element }): void => openProfile(userId, event);
   return (
     <div
       className="friend-row clickable"
       role="button"
       tabIndex={0}
       onClick={(e) => {
-        if (!(e.target as HTMLElement).closest('button')) open();
+        if (!(e.target as HTMLElement).closest('button')) open(e);
       }}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -57,7 +57,10 @@ function FriendRows({ online }: { online: boolean }) {
   const removeFriend = useRemoveFriend();
   const blockUser = useBlockUser();
 
-  const shown = (friends ?? []).filter((f) => !online || f.status === 'online');
+  // «Отошёл» и «не беспокоить» — это присутствие, а не офлайн: во вкладке
+  // «В сети» такие люди должны быть. Скрыт только тот, кто действительно ушёл
+  // или включил невидимку
+  const shown = (friends ?? []).filter((f) => !online || f.status !== 'offline');
 
   const write = (userId: string): void => {
     openDm
@@ -90,9 +93,7 @@ function FriendRows({ online }: { online: boolean }) {
             className="friend-avatar"
           />
           <span className="friend-name">{friend.displayName}</span>
-          <span className="friend-status">
-            {friend.status === 'online' ? t('members.online') : t('members.offline')}
-          </span>
+          <span className="friend-status">{t(`presence.${friend.status}`)}</span>
           <button className="icon-button" title={t('dm.write')} onClick={() => write(friend.id)}>
             <MessageSquare size={18} />
           </button>

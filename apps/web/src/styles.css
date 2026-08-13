@@ -60,18 +60,23 @@
 }
 
 /* Светлая тема: та же геометрия и тот же циан, но на дневных поверхностях.
-   Акцент затемнён — на белом ярко-циановый текст нечитаем. */
-:root[data-theme='light'] {
-  --bg: #eef1f7;
-  --panel: #ffffff;
-  --panel-raised: #f7f9fc;
-  --panel-hover: #e9eef6;
-  --border: #dfe5ee;
-  --border-strong: #c3ccdb;
+   Акцент затемнён — на белом ярко-циановый текст нечитаем.
 
-  --text: #101826;
-  --text-muted: #56657d;
-  --text-faint: #8593a8;
+   Чистого белого и почти чёрного текста здесь намеренно нет: от них светлая
+   тема и «резала глаза». Самая светлая поверхность приглушена, текст мягче
+   чёрного, а разница между соседними слоями меньше — глазу не нужно каждый
+   раз перестраиваться. */
+:root[data-theme='light'] {
+  --bg: #e7eaf1;
+  --panel: #f1f3f8;
+  --panel-raised: #f6f8fb;
+  --panel-hover: #e2e7f0;
+  --border: #d9dfe9;
+  --border-strong: #bcc5d4;
+
+  --text: #232b3a;
+  --text-muted: #5a6577;
+  --text-faint: #8b95a6;
 
   --accent: #0891b2;
   --accent-hover: #0e7490;
@@ -87,16 +92,16 @@
   --success: #059669;
   --warning: #d97706;
 
-  --shadow-sm: 0 1px 2px rgba(16, 24, 38, 0.08);
-  --shadow-md: 0 8px 24px rgba(16, 24, 38, 0.1);
-  --shadow-lg: 0 24px 64px rgba(16, 24, 38, 0.16);
+  --shadow-sm: 0 1px 2px rgba(16, 24, 38, 0.05);
+  --shadow-md: 0 8px 24px rgba(16, 24, 38, 0.07);
+  --shadow-lg: 0 24px 64px rgba(16, 24, 38, 0.12);
   --ring: 0 0 0 3px rgba(8, 145, 178, 0.22);
 
-  --tint: rgba(16, 24, 38, 0.025);
-  --overlay: rgba(24, 33, 48, 0.42);
-  --rail-bg: linear-gradient(180deg, #e3e8f1, var(--bg));
-  --code-bg: #f1f4f9;
-  --nav-bg: linear-gradient(180deg, var(--panel), #eaeff7);
+  --tint: rgba(16, 24, 38, 0.02);
+  --overlay: rgba(24, 33, 48, 0.38);
+  --rail-bg: linear-gradient(180deg, #dde3ed, var(--bg));
+  --code-bg: #eceff6;
+  --nav-bg: linear-gradient(180deg, var(--panel), #e6ebf3);
 
   color-scheme: light;
 }
@@ -2038,7 +2043,7 @@ h3 {
 @keyframes modal-in {
   from {
     opacity: 0;
-    transform: translateY(8px) scale(0.985);
+    transform: translateY(14px) scale(0.94);
   }
 }
 
@@ -5462,4 +5467,416 @@ h3 {
 .voice-form {
   max-width: 460px;
   gap: 14px;
+}
+
+/* ---------- Выбор облика ---------- */
+
+.skin-choices {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.skin-choice {
+  padding: 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--panel-raised);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition:
+    border-color var(--transition),
+    transform var(--transition);
+}
+
+.skin-choice:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+
+.skin-choice.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+/* Крошечный макет окна: видно разницу до переключения */
+.skin-preview {
+  position: relative;
+  display: flex;
+  height: 62px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.skin-preview i {
+  display: block;
+  position: relative;
+  z-index: 1;
+}
+
+.skin-preview .rail {
+  width: 14%;
+}
+
+.skin-preview .side {
+  width: 26%;
+}
+
+.skin-preview .main {
+  flex: 1;
+}
+
+.skin-preview .glow {
+  position: absolute;
+  inset: -40%;
+  z-index: 0;
+  background: radial-gradient(circle at 25% 25%, var(--accent), transparent 55%);
+  filter: blur(12px);
+}
+
+/* Поток: графит, рассеянное сияние по углам, волосяные линии */
+.skin-preview.flow {
+  background: #0b0e14;
+}
+
+.skin-preview.flow .glow {
+  inset: -30%;
+  background:
+    radial-gradient(50% 50% at 15% 10%, var(--accent), transparent 60%),
+    radial-gradient(45% 45% at 95% 95%, #2dd4bf, transparent 60%);
+  filter: blur(6px);
+  opacity: 0.7;
+}
+
+.skin-preview.flow .rail {
+  background: #0d1118;
+  border-right: 1px solid #1e2531;
+}
+
+.skin-preview.flow .side {
+  background: #10141c;
+  border-right: 1px solid #1e2531;
+}
+
+.skin-preview.flow .main {
+  background: transparent;
+}
+
+/* Классический: плотные непрозрачные панели, без подсвета */
+.skin-preview.classic .glow {
+  display: none;
+}
+
+.skin-preview.classic {
+  background: #0f1521;
+}
+
+.skin-preview.classic .rail {
+  background: #080b12;
+}
+
+.skin-preview.classic .side {
+  background: #0f1521;
+}
+
+.skin-preview.classic .main {
+  background: #131c2b;
+}
+
+/* ============================================================
+   Плотность интерфейса
+
+   Меняем метрики, а не вёрстку: строки и элементы управления садятся
+   плотнее или свободнее, но ничего не переезжает.
+   ============================================================ */
+
+:root[data-density='compact'] {
+  --control-h: 32px;
+  --control-h-sm: 26px;
+  --control-h-lg: 38px;
+  --control-pad: 0 13px;
+}
+
+:root[data-density='compact'] .message {
+  padding: 3px 8px;
+  gap: 10px;
+}
+
+:root[data-density='compact'] .channel-link {
+  padding: 4px 10px;
+}
+
+:root[data-density='compact'] .dm-link {
+  padding: 4px 8px;
+}
+
+:root[data-density='compact'] .member,
+:root[data-density='compact'] .friend-row {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+:root[data-density='compact'] .message-avatar {
+  width: 32px;
+  height: 32px;
+}
+
+:root[data-density='compact'] .dm-avatar {
+  width: 26px;
+  height: 26px;
+}
+
+/* Шапки задают высоту отступами, а не свойством height — жмём отступы */
+:root[data-density='compact'] .sidebar-header {
+  padding: 10px 14px;
+}
+
+:root[data-density='compact'] .channel-header {
+  padding: 9px 16px;
+}
+
+/* Просторный режим: воздуха больше, чем было по умолчанию */
+:root[data-density='cozy'] .message {
+  padding: 7px 8px;
+}
+
+/* ============================================================
+   Движение с пространственной логикой
+
+   Окна не появляются из ниоткуда: они вырастают оттуда, куда человек
+   только что смотрел. Глаз не ищет, что изменилось на экране.
+   ============================================================ */
+
+/* Карточка профиля вылетает из аватарки, по которой кликнули.
+   Смещение до точки клика считает сам компонент и кладёт в --dx/--dy. */
+.profile-modal.grows {
+  animation: fly-from 300ms cubic-bezier(0.2, 0.9, 0.25, 1.06);
+}
+
+@keyframes fly-from {
+  from {
+    opacity: 0;
+    transform: translate(var(--dx, 0), var(--dy, 0)) scale(0.24);
+  }
+  60% {
+    opacity: 1;
+  }
+}
+
+/* Затемнение появляется мягче окна: сначала фон, потом карточка */
+.settings-overlay {
+  animation: overlay-in 160ms ease-out;
+}
+
+/* Переключение сервера: колонка каналов разворачивается от иконки в рейле */
+.sidebar {
+  animation: unfold-left 240ms cubic-bezier(0.16, 0.9, 0.28, 1);
+  transform-origin: left var(--unfold-y, 50%);
+}
+
+@keyframes unfold-left {
+  from {
+    opacity: 0;
+    transform: translateX(-10px) scaleX(0.94);
+  }
+}
+
+/* Лента канала подхватывает движение чуть позже колонки */
+.message-list {
+  animation: settle-in 260ms cubic-bezier(0.16, 0.9, 0.28, 1);
+}
+
+@keyframes settle-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* Панель звонка вырастает снизу, откуда её и вызывают */
+.call-dock {
+  animation: rise-up 200ms cubic-bezier(0.16, 0.9, 0.28, 1);
+  transform-origin: bottom center;
+}
+
+@keyframes rise-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.94);
+  }
+}
+
+/* Кому мешает движение — всё появляется сразу */
+@media (prefers-reduced-motion: reduce) {
+  .profile-modal.grows,
+  .sidebar,
+  .message-list,
+  .call-dock {
+    animation: none;
+  }
+}
+
+/* Превью плотности: те же строки, разный шаг */
+.density-preview {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 62px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.density-preview i {
+  display: block;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--border-strong);
+}
+
+.density-preview i:first-child {
+  width: 60%;
+  background: var(--accent);
+}
+
+.density-preview.cozy {
+  gap: 8px;
+}
+
+.density-preview.compact {
+  gap: 4px;
+}
+
+/* ---------- Движение в остальных местах ---------- */
+
+/* Меню растут из своего угла — того, что у курсора, а не из середины */
+.context-menu,
+.profile-menu,
+.server-dropdown,
+.select-list {
+  transform-origin: top left;
+}
+
+.context-menu.flip-left {
+  transform-origin: top right;
+}
+
+.select-list.up {
+  transform-origin: bottom left;
+}
+
+/* Отправленное сообщение приезжает снизу, пока летит на сервер */
+.message.pending {
+  animation: message-in 220ms cubic-bezier(0.16, 0.9, 0.28, 1);
+}
+
+@keyframes message-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+/* Смена раздела настроек: содержимое сменяется, а не мигает */
+.settings-content > * {
+  animation: tab-in 200ms cubic-bezier(0.16, 0.9, 0.28, 1);
+}
+
+@keyframes tab-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* Нажатие на иконку сервера отзывается сразу */
+.rail-icon:active {
+  transform: scale(0.93);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message.pending,
+  .settings-content > * {
+    animation: none;
+  }
+
+  .rail-icon:active {
+    transform: none;
+  }
+}
+
+/* ---------- Отклик на действия ---------- */
+
+/* Блик пробегает по главной кнопке при наведении. Живёт поверх заливки и
+   не задевает текст: у надписи свой слой выше. */
+.btn-primary {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.28) 50%,
+    transparent 70%
+  );
+  transform: translateX(-120%);
+  pointer-events: none;
+}
+
+.btn-primary:hover:not(:disabled)::after {
+  animation: sheen 620ms ease-out;
+}
+
+@keyframes sheen {
+  to {
+    transform: translateX(120%);
+  }
+}
+
+/* Строки списков подаются вперёд под курсором — интерфейс отвечает на мышь */
+.friend-row.clickable:hover,
+.member:hover,
+.dm-link:hover {
+  transform: translateX(2px);
+}
+
+.friend-row.clickable,
+.member,
+.dm-link {
+  transition:
+    background var(--transition),
+    transform var(--transition);
+}
+
+/* Иконки действий слегка приподнимаются */
+.icon-button {
+  transition:
+    background var(--transition),
+    color var(--transition),
+    transform var(--transition);
+}
+
+.icon-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-primary:hover:not(:disabled)::after {
+    animation: none;
+  }
+
+  .friend-row.clickable:hover,
+  .member:hover,
+  .dm-link:hover,
+  .icon-button:hover:not(:disabled) {
+    transform: none;
+  }
 }

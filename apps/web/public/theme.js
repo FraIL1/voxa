@@ -8,3 +8,12 @@ try {
 } catch (e) {
   /* приватный режим без localStorage — останется тёмная тема */
 }
+
+// Облик — вторая ось оформления. Значение по умолчанию новое; «классический»
+// остаётся выбираемым в настройках.
+try {
+  var skin = localStorage.getItem('voxa-skin');
+  document.documentElement.dataset.skin = skin === 'classic' ? 'classic' : 'flow';
+} catch (e) {
+  document.documentElement.dataset.skin = 'flow';
+}

@@ -294,7 +294,7 @@ export default function DmView() {
         <button
           className="dm-header-title"
           title={isGroup ? t('dm.groupSettings') : t('dm.profileTitle')}
-          onClick={() => (isGroup ? setPanel('group') : peer && openProfile(peer.id))}
+          onClick={(e) => (isGroup ? setPanel('group') : peer && openProfile(peer.id, e))}
         >
           {isGroup ? <UsersRound size={18} /> : <AtSign size={18} />}
           {title}
