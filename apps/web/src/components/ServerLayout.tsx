@@ -20,7 +20,9 @@ export default function ServerLayout() {
 
   return (
     <div className="app-shell">
-      <Sidebar />
+      {/* Ключ по серверу: колонка пересоздаётся и заново разворачивается от
+          иконки — иначе переход между серверами проходит незаметно */}
+      <Sidebar key={guildId} />
       <main className="main-column">
         <Outlet />
       </main>

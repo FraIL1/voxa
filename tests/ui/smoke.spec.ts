@@ -453,6 +453,67 @@ test.describe('Облик', () => {
   });
 });
 
+test.describe('Плотность и движение', () => {
+  test('компактный режим сжимает строки и запоминается', async ({ owner }) => {
+    await owner.locator('.rail-icon.server').first().click();
+    await owner.waitForURL(/\/guilds\//);
+
+    // Сразу после перехода строка ещё нулевой высоты — ждём отрисовки,
+    // иначе сравниваем с нулём и тест врёт
+    const row = owner.locator('.channel-link').first();
+    await row.waitFor({ state: 'visible', timeout: 20_000 });
+    const rowHeight = async (): Promise<number> => {
+      await expect
+        .poll(() => row.evaluate((el) => el.getBoundingClientRect().height))
+        .toBeGreaterThan(0);
+      return row.evaluate((el) => el.getBoundingClientRect().height);
+    };
+    const cozy = await rowHeight();
+
+    await owner.locator('.user-card').getByTitle('Настройки').first().click();
+    await owner.getByRole('button', { name: 'Оформление' }).click();
+    await owner.getByRole('button', { name: 'Компактно' }).click();
+    await expect(owner.locator('html')).toHaveAttribute('data-density', 'compact');
+    await owner.locator('.settings-panel').getByTitle('Закрыть').click();
+
+    const compact = await rowHeight();
+    expect(compact).toBeLessThan(cozy);
+
+    await owner.reload();
+    await owner.locator('.user-card').waitFor({ state: 'visible', timeout: 20_000 });
+    await expect(owner.locator('html')).toHaveAttribute('data-density', 'compact');
+
+    // Возвращаем просторный режим следующим сценариям
+    await owner.locator('.user-card').getByTitle('Настройки').first().click();
+    await owner.getByRole('button', { name: 'Оформление' }).click();
+    await owner.getByRole('button', { name: 'Просторно' }).click();
+    await owner.locator('.settings-panel').getByTitle('Закрыть').click();
+  });
+
+  test('карточка профиля вырастает из того, по чему кликнули', async ({ owner }) => {
+    await owner.locator('.rail-icon.server').first().click();
+    await owner.waitForURL(/\/guilds\//);
+
+    const member = owner.locator('.member', { hasText: 'uitest_friend' }).first();
+    const box = await member.boundingBox();
+    await member.click();
+
+    const card = owner.locator('.profile-modal');
+    await expect(card).toBeVisible();
+    // Точка старта — центр строки, по которой кликнули
+    const origin = await card.evaluate((el) => ({
+      grows: el.classList.contains('grows'),
+      x: Number.parseFloat(getComputedStyle(el).getPropertyValue('--grow-x')),
+      y: Number.parseFloat(getComputedStyle(el).getPropertyValue('--grow-y')),
+    }));
+    expect(origin.grows).toBe(true);
+    expect(Math.abs(origin.x - (box!.x + box!.width / 2))).toBeLessThan(2);
+    expect(Math.abs(origin.y - (box!.y + box!.height / 2))).toBeLessThan(2);
+
+    await owner.keyboard.press('Escape');
+  });
+});
+
 test.describe('Панель владельца', () => {
   test('разделы переключаются, сводка и списки видны', async ({ owner }) => {
     await owner.locator('.rail-icon.owner').click();

@@ -5585,3 +5585,162 @@ h3 {
 .skin-preview.classic .main {
   background: #131c2b;
 }
+
+/* ============================================================
+   Плотность интерфейса
+
+   Меняем метрики, а не вёрстку: строки и элементы управления садятся
+   плотнее или свободнее, но ничего не переезжает.
+   ============================================================ */
+
+:root[data-density='compact'] {
+  --control-h: 32px;
+  --control-h-sm: 26px;
+  --control-h-lg: 38px;
+  --control-pad: 0 13px;
+}
+
+:root[data-density='compact'] .message {
+  padding: 3px 8px;
+  gap: 10px;
+}
+
+:root[data-density='compact'] .channel-link {
+  padding: 4px 10px;
+}
+
+:root[data-density='compact'] .dm-link {
+  padding: 4px 8px;
+}
+
+:root[data-density='compact'] .member,
+:root[data-density='compact'] .friend-row {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+:root[data-density='compact'] .message-avatar {
+  width: 32px;
+  height: 32px;
+}
+
+:root[data-density='compact'] .dm-avatar {
+  width: 26px;
+  height: 26px;
+}
+
+/* Шапки задают высоту отступами, а не свойством height — жмём отступы */
+:root[data-density='compact'] .sidebar-header {
+  padding: 10px 14px;
+}
+
+:root[data-density='compact'] .channel-header {
+  padding: 9px 16px;
+}
+
+/* Просторный режим: воздуха больше, чем было по умолчанию */
+:root[data-density='cozy'] .message {
+  padding: 7px 8px;
+}
+
+/* ============================================================
+   Движение с пространственной логикой
+
+   Окна не появляются из ниоткуда: они вырастают оттуда, куда человек
+   только что смотрел. Глаз не ищет, что изменилось на экране.
+   ============================================================ */
+
+/* Карточка профиля стартует из аватарки, по которой кликнули */
+.profile-modal.grows {
+  animation: grow-from 220ms cubic-bezier(0.16, 0.9, 0.28, 1);
+  transform-origin: var(--grow-x, 50%) var(--grow-y, 50%);
+}
+
+@keyframes grow-from {
+  from {
+    opacity: 0;
+    /* Точка старта задана в координатах экрана, а окно уже по центру —
+       поэтому сжимаем его к этой точке через transform-origin */
+    transform: scale(0.72);
+  }
+}
+
+/* Переключение сервера: колонка каналов разворачивается от иконки в рейле */
+.sidebar {
+  animation: unfold-left 240ms cubic-bezier(0.16, 0.9, 0.28, 1);
+  transform-origin: left var(--unfold-y, 50%);
+}
+
+@keyframes unfold-left {
+  from {
+    opacity: 0;
+    transform: translateX(-10px) scaleX(0.94);
+  }
+}
+
+/* Лента канала подхватывает движение чуть позже колонки */
+.message-list {
+  animation: settle-in 260ms cubic-bezier(0.16, 0.9, 0.28, 1);
+}
+
+@keyframes settle-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* Панель звонка вырастает снизу, откуда её и вызывают */
+.call-dock {
+  animation: rise-up 200ms cubic-bezier(0.16, 0.9, 0.28, 1);
+  transform-origin: bottom center;
+}
+
+@keyframes rise-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.94);
+  }
+}
+
+/* Кому мешает движение — всё появляется сразу */
+@media (prefers-reduced-motion: reduce) {
+  .profile-modal.grows,
+  .sidebar,
+  .message-list,
+  .call-dock {
+    animation: none;
+  }
+}
+
+/* Превью плотности: те же строки, разный шаг */
+.density-preview {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 62px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.density-preview i {
+  display: block;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--border-strong);
+}
+
+.density-preview i:first-child {
+  width: 60%;
+  background: var(--accent);
+}
+
+.density-preview.cozy {
+  gap: 8px;
+}
+
+.density-preview.compact {
+  gap: 4px;
+}

@@ -7,6 +7,7 @@ import { logout } from '../api/auth';
 import { api, ApiError } from '../api/client';
 import { getAutostart, isTauri, setAutostart } from '../lib/tauri';
 import { useAuthStore } from '../stores/auth';
+import { useDensityStore, type Density } from '../stores/density';
 import { useSkinStore, type Skin } from '../stores/skin';
 import { useThemeStore, type ThemeMode } from '../stores/theme';
 import AudioDeviceSelects from './AudioDeviceSelects';
@@ -27,6 +28,8 @@ const ACCENTS = [
 ] as const;
 
 const SKINS: Skin[] = ['prism', 'classic'];
+
+const DENSITIES: Density[] = ['cozy', 'compact'];
 
 const THEMES: ThemeMode[] = ['dark', 'light', 'auto'];
 
@@ -62,6 +65,8 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
+  const density = useDensityStore((s) => s.density);
+  const setDensity = useDensityStore((s) => s.setDensity);
   const skin = useSkinStore((s) => s.skin);
   const setSkin = useSkinStore((s) => s.setSkin);
   const themeMode = useThemeStore((s) => s.mode);
@@ -367,6 +372,27 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                   ))}
                 </div>
                 <p className="settings-hint">{t('settings.skinHint')}</p>
+
+                <label>{t('settings.density')}</label>
+                <div className="skin-choices">
+                  {DENSITIES.map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={`skin-choice${density === value ? ' active' : ''}`}
+                      onClick={() => setDensity(value)}
+                    >
+                      <span className={`density-preview ${value}`} aria-hidden>
+                        <i />
+                        <i />
+                        <i />
+                        <i />
+                      </span>
+                      <span className="theme-choice-label">{t(`settings.density_${value}`)}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="settings-hint">{t('settings.densityHint')}</p>
 
                 <label>{t('settings.theme')}</label>
                 <div className="theme-choices">

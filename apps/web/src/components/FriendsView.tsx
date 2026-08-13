@@ -28,14 +28,14 @@ type Tab = 'online' | 'all' | 'requests' | 'blocked' | 'add';
  * действий внутри: у них своё дело.
  */
 function PersonRow({ userId, children }: { userId: string; children: ReactNode }) {
-  const open = (): void => openProfile(userId);
+  const open = (event?: { currentTarget: Element }): void => openProfile(userId, event);
   return (
     <div
       className="friend-row clickable"
       role="button"
       tabIndex={0}
       onClick={(e) => {
-        if (!(e.target as HTMLElement).closest('button')) open();
+        if (!(e.target as HTMLElement).closest('button')) open(e);
       }}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {

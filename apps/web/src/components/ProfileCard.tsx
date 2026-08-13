@@ -9,7 +9,7 @@ import {
   UserPlus,
   X,
 } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 
@@ -22,6 +22,7 @@ import {
 } from '../hooks/useFriends';
 import { useProfile, useRefreshProfile } from '../hooks/useProfile';
 import { useCallStore } from '../stores/call';
+import { useProfileViewStore } from '../stores/profileView';
 import Avatar from './Avatar';
 
 const joinedFormat = new Intl.DateTimeFormat('ru', {
@@ -257,6 +258,16 @@ export default function ProfileModal({ userId, onClose }: { userId: string; onCl
   }, [onClose]);
 
   const { t } = useTranslation();
+  const origin = useProfileViewStore((s) => s.origin);
+  // Карточка вырастает из того места, по которому кликнули: взгляд не теряет,
+  // откуда она взялась. Без точки старта появляется по центру, как раньше.
+  const grow = origin
+    ? ({
+        '--grow-x': `${origin.x}px`,
+        '--grow-y': `${origin.y}px`,
+      } as CSSProperties)
+    : undefined;
+
   return (
     <div
       className="settings-overlay"
@@ -264,7 +275,7 @@ export default function ProfileModal({ userId, onClose }: { userId: string; onCl
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="profile-modal">
+      <div className={`profile-modal${origin ? ' grows' : ''}`} style={grow}>
         <button className="icon-button profile-close" title={t('settings.close')} onClick={onClose}>
           <X size={16} />
         </button>

@@ -1,5 +1,5 @@
 import { MessageCircle, Plus, Shield } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink, useLocation, useNavigate } from 'react-router';
 
@@ -37,6 +37,14 @@ export default function ServerRail() {
     next.splice(to, 0, ...next.splice(from, 1));
     reorder.mutate(next);
   };
+
+  // Колонка каналов разворачивается от выбранной иконки, а не от середины
+  useEffect(() => {
+    const active = document.querySelector('.rail-icon.active');
+    if (!active) return;
+    const box = active.getBoundingClientRect();
+    document.documentElement.style.setProperty('--unfold-y', `${box.top + box.height / 2}px`);
+  }, [location.pathname]);
 
   const homeActive = location.pathname.startsWith('/home') || location.pathname.startsWith('/dm');
   const dmUnread = (conversations ?? []).reduce((sum, c) => sum + c.unreadCount, 0);

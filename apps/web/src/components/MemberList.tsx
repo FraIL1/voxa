@@ -59,7 +59,7 @@ export default function MemberList() {
                 className={`member ${member.status}`}
                 role="button"
                 tabIndex={0}
-                onClick={() => openProfile(member.id)}
+                onClick={(e) => openProfile(member.id, e)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') openProfile(member.id);
                 }}

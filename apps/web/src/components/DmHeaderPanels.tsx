@@ -178,7 +178,7 @@ export function GroupPanel({
           role="button"
           tabIndex={0}
           onClick={(e) => {
-            if (!(e.target as HTMLElement).closest('button')) openProfile(m.id);
+            if (!(e.target as HTMLElement).closest('button')) openProfile(m.id, e);
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {

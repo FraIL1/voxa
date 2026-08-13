@@ -99,7 +99,7 @@ export default function DmMessageItem({
         name={authorName}
         url={message.author?.avatarUrl}
         className="message-avatar"
-        onClick={() => message.author && openProfile(message.author.id)}
+        onClick={(e) => message.author && openProfile(message.author.id, e)}
       />
 
       <div className="message-body">
@@ -126,7 +126,7 @@ export default function DmMessageItem({
             className="message-author"
             role="button"
             tabIndex={0}
-            onClick={() => message.author && openProfile(message.author.id)}
+            onClick={(e) => message.author && openProfile(message.author.id, e)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && message.author) openProfile(message.author.id);
             }}
