@@ -490,25 +490,31 @@ test.describe('Плотность и движение', () => {
     await owner.locator('.settings-panel').getByTitle('Закрыть').click();
   });
 
-  test('карточка профиля вырастает из того, по чему кликнули', async ({ owner }) => {
+  test('карточка профиля вылетает из того, по чему кликнули', async ({ owner }) => {
     await owner.locator('.rail-icon.server').first().click();
     await owner.waitForURL(/\/guilds\//);
 
     const member = owner.locator('.member', { hasText: 'uitest_friend' }).first();
     const box = await member.boundingBox();
+    const view = owner.viewportSize()!;
     await member.click();
 
     const card = owner.locator('.profile-modal');
     await expect(card).toBeVisible();
-    // Точка старта — центр строки, по которой кликнули
-    const origin = await card.evaluate((el) => ({
-      grows: el.classList.contains('grows'),
-      x: Number.parseFloat(getComputedStyle(el).getPropertyValue('--grow-x')),
-      y: Number.parseFloat(getComputedStyle(el).getPropertyValue('--grow-y')),
+    await expect(card).toHaveClass(/grows/);
+
+    /* Проверяем смещение, а не положение в кадре: положение зависит от того,
+       в какой момент замерили, а смещение задано один раз и не меняется.
+       Карточка стоит по центру, значит смещение — расстояние от центра
+       экрана до места клика. */
+    const shift = await card.evaluate((el) => ({
+      dx: Number.parseFloat(getComputedStyle(el).getPropertyValue('--dx')),
+      dy: Number.parseFloat(getComputedStyle(el).getPropertyValue('--dy')),
     }));
-    expect(origin.grows).toBe(true);
-    expect(Math.abs(origin.x - (box!.x + box!.width / 2))).toBeLessThan(2);
-    expect(Math.abs(origin.y - (box!.y + box!.height / 2))).toBeLessThan(2);
+    expect(Math.abs(shift.dx - (box!.x + box!.width / 2 - view.width / 2))).toBeLessThan(4);
+    expect(Math.abs(shift.dy - (box!.y + box!.height / 2 - view.height / 2))).toBeLessThan(4);
+    // Смещение не нулевое, иначе движения не видно — ради этого всё и затевалось
+    expect(Math.abs(shift.dx)).toBeGreaterThan(100);
 
     await owner.keyboard.press('Escape');
   });

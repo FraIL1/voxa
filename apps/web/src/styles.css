@@ -2043,7 +2043,7 @@ h3 {
 @keyframes modal-in {
   from {
     opacity: 0;
-    transform: translateY(8px) scale(0.985);
+    transform: translateY(14px) scale(0.94);
   }
 }
 
@@ -5650,19 +5650,25 @@ h3 {
    только что смотрел. Глаз не ищет, что изменилось на экране.
    ============================================================ */
 
-/* Карточка профиля стартует из аватарки, по которой кликнули */
+/* Карточка профиля вылетает из аватарки, по которой кликнули.
+   Смещение до точки клика считает сам компонент и кладёт в --dx/--dy. */
 .profile-modal.grows {
-  animation: grow-from 220ms cubic-bezier(0.16, 0.9, 0.28, 1);
-  transform-origin: var(--grow-x, 50%) var(--grow-y, 50%);
+  animation: fly-from 300ms cubic-bezier(0.2, 0.9, 0.25, 1.06);
 }
 
-@keyframes grow-from {
+@keyframes fly-from {
   from {
     opacity: 0;
-    /* Точка старта задана в координатах экрана, а окно уже по центру —
-       поэтому сжимаем его к этой точке через transform-origin */
-    transform: scale(0.72);
+    transform: translate(var(--dx, 0), var(--dy, 0)) scale(0.24);
   }
+  60% {
+    opacity: 1;
+  }
+}
+
+/* Затемнение появляется мягче окна: сначала фон, потом карточка */
+.settings-overlay {
+  animation: overlay-in 160ms ease-out;
 }
 
 /* Переключение сервера: колонка каналов разворачивается от иконки в рейле */
@@ -5743,4 +5749,62 @@ h3 {
 
 .density-preview.compact {
   gap: 4px;
+}
+
+/* ---------- Движение в остальных местах ---------- */
+
+/* Меню растут из своего угла — того, что у курсора, а не из середины */
+.context-menu,
+.profile-menu,
+.server-dropdown,
+.select-list {
+  transform-origin: top left;
+}
+
+.context-menu.flip-left {
+  transform-origin: top right;
+}
+
+.select-list.up {
+  transform-origin: bottom left;
+}
+
+/* Отправленное сообщение приезжает снизу, пока летит на сервер */
+.message.pending {
+  animation: message-in 220ms cubic-bezier(0.16, 0.9, 0.28, 1);
+}
+
+@keyframes message-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+/* Смена раздела настроек: содержимое сменяется, а не мигает */
+.settings-content > * {
+  animation: tab-in 200ms cubic-bezier(0.16, 0.9, 0.28, 1);
+}
+
+@keyframes tab-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* Нажатие на иконку сервера отзывается сразу */
+.rail-icon:active {
+  transform: scale(0.93);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message.pending,
+  .settings-content > * {
+    animation: none;
+  }
+
+  .rail-icon:active {
+    transform: none;
+  }
 }
