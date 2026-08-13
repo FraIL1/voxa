@@ -16,10 +16,26 @@ import {
 import { create } from 'zustand';
 
 import { api } from '../api/client';
-import { playJoinSound, playLeaveSound } from '../lib/sounds';
+import {
+  playCallConnected,
+  playCallEnded,
+  playDeafen,
+  playMicOff,
+  playMicOn,
+  playUndeafen,
+  startDialTone,
+} from '../lib/sounds';
 import { useVoiceStore } from './voice';
 
 /** Комната звонка живёт вне стора: LiveKit-объекты не для рендера */
+/** Гудок исходящего вызова живёт вне стора: он не для рендера */
+let stopDialTone: (() => void) | null = null;
+
+function silenceDialTone(): void {
+  stopDialTone?.();
+  stopDialTone = null;
+}
+
 /** Камеру выбирают в настройках; здесь только читаем выбранное */
 function cameraOptions(): { deviceId: string } | undefined {
   const deviceId = useVoiceStore.getState().cameraDeviceId;
@@ -147,6 +163,7 @@ export const useCallStore = create<CallState>()((set, get) => ({
 
   startCall: async (conversationId, peerName, video, peerAvatar = null, isGroup = false) => {
     if (get().status !== 'idle') return;
+    stopDialTone = startDialTone();
     set({
       status: 'outgoing',
       conversationId,
@@ -242,8 +259,9 @@ export const useCallStore = create<CallState>()((set, get) => ({
     room = null;
     if (current) await current.disconnect();
     cleanup();
+    silenceDialTone();
     set(IDLE_STATE);
-    playLeaveSound();
+    playCallEnded();
     if (conversationId) {
       await api<void>(`/dm/conversations/${conversationId}/call/end`, { method: 'POST' }).catch(
         () => undefined,
@@ -258,6 +276,9 @@ export const useCallStore = create<CallState>()((set, get) => ({
     const nextDeafened = next ? deafened : false;
     set({ muted: next, deafened: nextDeafened });
     applyDeafen(nextDeafened);
+    if (deafened && !nextDeafened) playUndeafen();
+    else if (next) playMicOff();
+    else playMicOn();
     await room?.localParticipant.setMicrophoneEnabled(!next).catch(() => undefined);
   },
 
@@ -266,6 +287,8 @@ export const useCallStore = create<CallState>()((set, get) => ({
     // Выключенный звук выключает и микрофон, включение — возвращает его
     set({ deafened: next, muted: next });
     applyDeafen(next);
+    if (next) playDeafen();
+    else playUndeafen();
     await room?.localParticipant.setMicrophoneEnabled(!next).catch(() => undefined);
   },
 
@@ -289,7 +312,9 @@ export const useCallStore = create<CallState>()((set, get) => ({
   },
 
   onAccepted: () => {
-    if (get().status === 'outgoing') set({ status: 'active', startedAt: Date.now() });
+    if (get().status !== 'outgoing') return;
+    silenceDialTone();
+    set({ status: 'active', startedAt: Date.now() });
   },
 
   onState: (conversationId, participants) => {
@@ -314,7 +339,9 @@ export const useCallStore = create<CallState>()((set, get) => ({
     room = null;
     void current?.disconnect();
     cleanup();
+    silenceDialTone();
     set({ ...IDLE_STATE, incoming: null, endedReason: reason });
+    playCallEnded();
   },
 
   clearEndedReason: () => set({ endedReason: null }),
@@ -364,7 +391,8 @@ async function connect(
   next.on(RoomEvent.ParticipantConnected, () => {
     if (get().status !== 'idle')
       set({ status: 'active', startedAt: get().startedAt ?? Date.now() });
-    playJoinSound();
+    silenceDialTone();
+    playCallConnected();
   });
 
   next.on(RoomEvent.Disconnected, () => {

@@ -1,8 +1,9 @@
 import { createLocalVideoTrack, Room, type LocalVideoTrack } from 'livekit-client';
-import { Video, VideoOff } from 'lucide-react';
+import { Bell, BellOff, Play, Video, VideoOff } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { playPreview, setSoundsEnabled, soundsEnabled } from '../lib/sounds';
 import { useVoiceStore } from '../stores/voice';
 import Select from './Select';
 
@@ -19,6 +20,7 @@ export default function AudioDeviceSelects({ withCamera = false }: { withCamera?
   const [outputs, setOutputs] = useState<DeviceOption[]>([]);
   const [cameras, setCameras] = useState<DeviceOption[]>([]);
   const [preview, setPreview] = useState(false);
+  const [sounds, setSounds] = useState(soundsEnabled);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -90,6 +92,35 @@ export default function AudioDeviceSelects({ withCamera = false }: { withCamera?
 
       {withCamera && (
         <>
+          <label className="sound-toggle">
+            {sounds ? <Bell size={16} /> : <BellOff size={16} />}
+            <span className="sound-toggle-text">
+              <span className="owner-setting-name">{t('voice.sounds')}</span>
+              <span className="settings-hint">{t('voice.soundsHint')}</span>
+            </span>
+            <button
+              type="button"
+              className="btn-secondary"
+              title={t('voice.soundsPreview')}
+              disabled={!sounds}
+              onClick={() => playPreview()}
+            >
+              <Play size={15} />
+            </button>
+            <span className="owner-switch">
+              <input
+                type="checkbox"
+                checked={sounds}
+                onChange={(e) => {
+                  setSounds(e.target.checked);
+                  setSoundsEnabled(e.target.checked);
+                  if (e.target.checked) playPreview();
+                }}
+              />
+              <span className="owner-switch-track" />
+            </span>
+          </label>
+
           <label>
             {t('voice.camera')}
             <Select

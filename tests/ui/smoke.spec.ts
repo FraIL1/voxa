@@ -284,6 +284,58 @@ test.describe('Кликабельность', () => {
   });
 });
 
+test.describe('Звуки', () => {
+  test('вход в голосовой канал действительно звучит и выключается', async ({ owner }) => {
+    // Считаем запущенные источники звука: так видно, что синтез сработал
+    await owner.addInitScript(() => {
+      const w = window as unknown as { __notes: number };
+      w.__notes = 0;
+      const start = OscillatorNode.prototype.start;
+      OscillatorNode.prototype.start = function (...args: [number?]) {
+        w.__notes += 1;
+        return start.apply(this, args);
+      };
+    });
+    await owner.reload();
+    await owner.locator('.user-card').waitFor({ state: 'visible', timeout: 20_000 });
+
+    const notes = (): Promise<number> =>
+      owner.evaluate(() => (window as unknown as { __notes: number }).__notes);
+
+    // Кнопка «послушать» в настройках — самый короткий путь к звуку
+    await owner.locator('.user-card').getByTitle('Настройки').first().click();
+    await owner.getByRole('button', { name: 'Голос и видео' }).click();
+    const preview = owner.locator('.sound-toggle').getByTitle('Послушать');
+    await preview.click();
+    await expect.poll(notes).toBeGreaterThan(0);
+
+    // Звук не просто синтезируется, а действительно идёт в динамики:
+    // до жеста пользователя браузер держит вывод на паузе
+    const state = await owner.evaluate(async () => {
+      const probe = new AudioContext();
+      const value = probe.state;
+      await probe.close();
+      return value;
+    });
+    expect(state).toBe('running');
+
+    // Выключатель гасит звуки целиком, и выбор переживает перезагрузку
+    const played = await notes();
+    await owner.locator('.sound-toggle .owner-switch input').setChecked(false);
+    await expect(preview).toBeDisabled();
+    await owner.reload();
+    await owner.locator('.user-card').waitFor({ state: 'visible', timeout: 20_000 });
+    await owner.locator('.user-card').getByTitle('Настройки').first().click();
+    await owner.getByRole('button', { name: 'Голос и видео' }).click();
+    await expect(owner.locator('.sound-toggle .owner-switch input')).not.toBeChecked();
+    expect(await notes()).toBeLessThanOrEqual(played);
+
+    // Возвращаем звуки, чтобы следующий сценарий начинал с обычного состояния
+    await owner.locator('.sound-toggle .owner-switch input').setChecked(true);
+    await owner.locator('.settings-panel').getByTitle('Закрыть').click();
+  });
+});
+
 test.describe('Панель владельца', () => {
   test('разделы переключаются, сводка и списки видны', async ({ owner }) => {
     await owner.locator('.rail-icon.owner').click();

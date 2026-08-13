@@ -42,7 +42,7 @@ import {
 import { bumpUnread, READ_STATES_KEY, setReadState } from '../api/read-states-cache';
 import { connectSocket, disconnectSocket, emitVoiceState } from '../api/socket';
 import { notify } from '../lib/notify';
-import { playJoinSound, playLeaveSound } from '../lib/sounds';
+import { playFriendly, playMention, playPeerJoin, playPeerLeave } from '../lib/sounds';
 import { BLOCKED_KEY, FRIEND_REQUESTS_KEY, FRIENDS_KEY } from './useFriends';
 import { GUILDS_KEY } from './useGuilds';
 import { MEMBERS_KEY } from './useMembers';
@@ -97,6 +97,8 @@ export function useRealtime(): void {
         const shouldNotify = mentioned
           ? !channelMuted && mode !== 'NONE'
           : !silent && mode === 'ALL';
+        // Упоминание слышно и при открытом окне: его легко пропустить глазами
+        if (mentioned && !channelMuted && mode !== 'NONE') playMention();
         if (shouldNotify && document.hidden) {
           void notify(message.author?.username ?? 'Voxa', message.content.slice(0, 120) || '…');
         }
@@ -135,8 +137,8 @@ export function useRealtime(): void {
           ),
         );
         const after = new Set(update.participants.map((p) => p.userId));
-        if ([...after].some((id) => !before.has(id) && id !== myId)) playJoinSound();
-        else if ([...before].some((id) => !after.has(id) && id !== myId)) playLeaveSound();
+        if ([...after].some((id) => !before.has(id) && id !== myId)) playPeerJoin();
+        else if ([...before].some((id) => !after.has(id) && id !== myId)) playPeerLeave();
       }
 
       queryClient.setQueryData<VoiceChannelStateDto[]>(VOICE_STATES_KEY, (data) => {
@@ -250,8 +252,14 @@ export function useRealtime(): void {
       addDmMessage(queryClient, message);
       const myId = useAuthStore.getState().user?.id;
       // Уведомление, если пришло от собеседника и окно скрыто (раздел 5.8 PRD)
-      if (myId && message.author?.id !== myId && document.hidden) {
-        void notify(message.author?.username ?? 'Voxa', message.content.slice(0, 120) || '…');
+      if (myId && message.author?.id !== myId) {
+        // Пока диалог открыт перед глазами, пикать на каждое сообщение незачем
+        const looking =
+          !document.hidden && window.location.pathname === `/dm/${message.conversationId}`;
+        if (!looking) playMention();
+        if (document.hidden) {
+          void notify(message.author?.username ?? 'Voxa', message.content.slice(0, 120) || '…');
+        }
       }
     });
     socket.on(WsEvents.DmMessageEdited, (message: DmMessageDto) => {
@@ -302,6 +310,7 @@ export function useRealtime(): void {
 
     // Друзья: новая заявка — уведомление; любое изменение — перечитать списки
     socket.on(WsEvents.FriendRequestNew, (request: FriendRequestDto) => {
+      playFriendly();
       if (document.hidden) {
         void notify('Voxa', `${request.user.username}: заявка в друзья`);
       }

@@ -13,7 +13,16 @@ import { create } from 'zustand';
 
 import { api } from '../api/client';
 import { emitVoiceState } from '../api/socket';
-import { playJoinSound, playLeaveSound } from '../lib/sounds';
+import {
+  playDeafen,
+  playMicOff,
+  playMicOn,
+  playSelfJoin,
+  playSelfLeave,
+  playShareStart,
+  playShareStop,
+  playUndeafen,
+} from '../lib/sounds';
 
 const DEVICES_KEY = 'voxa-audio-devices';
 const SHARE_KEY = 'voxa-share-options';
@@ -246,7 +255,7 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
 
       set({ connecting: false, muted: false, deafened: false });
       emitVoiceState({ channelId, muted: false, deafened: false });
-      playJoinSound();
+      playSelfJoin();
     } catch (error) {
       cleanupRoom();
       set({
@@ -278,7 +287,7 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
       watching: null,
     });
     emitVoiceState({ channelId: null, muted: false, deafened: false });
-    playLeaveSound();
+    playSelfLeave();
   },
 
   /** Таймаут: мгновенный мут без права размутиться (сервер дублирует на SFU) */
@@ -304,6 +313,10 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
     await room.localParticipant.setMicrophoneEnabled(!nextMuted);
     set({ muted: nextMuted, deafened: nextDeafened });
     emitVoiceState({ channelId, muted: nextMuted, deafened: nextDeafened });
+    // Снятие мьюта вывело и из deafen — звучит возвращение звука, оно главнее
+    if (deafened && !nextDeafened) playUndeafen();
+    else if (nextMuted) playMicOff();
+    else playMicOn();
   },
 
   toggleDeafen: async () => {
@@ -316,6 +329,8 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
     await room.localParticipant.setMicrophoneEnabled(!nextMuted);
     set({ deafened: nextDeafened, muted: nextMuted });
     emitVoiceState({ channelId, muted: nextMuted, deafened: nextDeafened });
+    if (nextDeafened) playDeafen();
+    else playUndeafen();
   },
 
   setAudioDevice: async (kind, deviceId) => {
@@ -359,12 +374,15 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
       });
       if (sharing) {
         localScreenTrack = null;
+        playShareStop();
         set((s) => ({
           sharing: false,
           watching: s.watching === SELF_SCREEN ? (s.screenSharers[0] ?? null) : s.watching,
         }));
       } else {
         localScreenTrack = (publication?.videoTrack as LocalVideoTrack | undefined) ?? null;
+        // Звучит только если человек действительно выбрал экран, а не закрыл диалог
+        if (publication) playShareStart();
         // самопросмотр открываем сразу — видно, что именно стримишь
         set({
           sharing: Boolean(publication),
