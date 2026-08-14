@@ -46,7 +46,12 @@ import { useVoiceStore } from './voice';
  * человек оказывался в двух разговорах сразу и не понимал, кто его слышит.
  */
 async function leaveVoiceChannel(): Promise<void> {
-  if (useVoiceStore.getState().channelId) await useVoiceStore.getState().leave();
+  if (!useVoiceStore.getState().channelId) return;
+  try {
+    await useVoiceStore.getState().leave();
+  } catch {
+    // Даже если выход сорвался, звонок начинать можно: сторож ниже добьёт
+  }
 }
 
 /** Гудок исходящего вызова живёт вне стора: он не для рендера */
@@ -324,7 +329,14 @@ export const useCallStore = create<CallState>()((set, get) => ({
     const conversationId = get().conversationId;
     const current = room;
     room = null;
-    if (current) await current.disconnect();
+    /* Та же защита, что и при выходе из канала: если разрыв соединения упал,
+       весь код ниже не выполнялся — панель звонка оставалась на экране,
+       а собеседник не узнавал о завершении. */
+    try {
+      if (current) await current.disconnect();
+    } catch {
+      // соединение всё равно рвётся; важно довести уборку до конца
+    }
     cleanup();
     silenceDialTone();
     set(IDLE_STATE);
@@ -446,7 +458,8 @@ export const useCallStore = create<CallState>()((set, get) => ({
       return;
     const current = room;
     room = null;
-    void current?.disconnect();
+    // Разрыв может упасть — уборка не должна от этого зависеть
+    void current?.disconnect().catch(() => undefined);
     cleanup();
     silenceDialTone();
     set({ ...IDLE_STATE, incoming: null, endedReason: reason });
@@ -455,6 +468,21 @@ export const useCallStore = create<CallState>()((set, get) => ({
 
   clearEndedReason: () => set({ endedReason: null }),
 }));
+
+/**
+ * Сторож на случай, если какой-то путь начала разговора обошёл выход из
+ * канала: как только звонок перестал быть бездействующим, а канал всё ещё
+ * держится — выходим. Проверять каждую точку входа по отдельности оказалось
+ * ненадёжно, а состояния «и там и там» быть не должно ни при каких условиях.
+ */
+useCallStore.subscribe((state) => {
+  if (state.status === 'idle') return;
+  if (!useVoiceStore.getState().channelId) return;
+  void useVoiceStore
+    .getState()
+    .leave()
+    .catch(() => undefined);
+});
 
 /** Подключение к комнате разговора и подписка на дорожки участников */
 async function connect(

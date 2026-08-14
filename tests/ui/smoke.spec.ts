@@ -743,6 +743,51 @@ test.describe('Меню сервера закрывается', () => {
   });
 });
 
+test.describe('Один разговор', () => {
+  /**
+   * Воспроизводит жалобу: человек оставался и в канале, и в звонке. Причина
+   * оказалась в том, что разрыв соединения может упасть — тогда весь код
+   * уборки после него не выполнялся. Здесь разрыв ломается нарочно, потому
+   * что при исправном соединении ошибка не воспроизводится вовсе.
+   */
+  test('сторож выкидывает из канала, даже если выход сорвался', async ({ owner, friend }) => {
+    await owner.locator('.rail-icon.server').first().click();
+    await owner.waitForURL(/\/guilds\//);
+    await owner.locator('.channel-link.voice-link').first().click();
+    await expect(owner.locator('.voice-panel')).toBeVisible();
+
+    await friend.locator('.rail-icon.server').first().click();
+    await friend.waitForURL(/\/guilds\//);
+    const inChannel = friend.locator('.voice-participant', { hasText: 'uitest_owner' });
+    await expect(inChannel).toHaveCount(1);
+
+    // Ломаем разрыв соединения: так вёл бы себя мёртвый трек демонстрации
+    await owner.evaluate(() => {
+      const proto = RTCPeerConnection.prototype as unknown as { close: () => void };
+      const original = proto.close;
+      proto.close = function () {
+        original.call(this);
+        throw new Error('нарочно сломанный разрыв');
+      };
+    });
+
+    await owner.locator('.rail-icon.home').click();
+    await owner.getByRole('button', { name: 'Все', exact: true }).click();
+    await owner.getByTitle('Написать').first().click();
+    await owner.waitForURL(/\/dm\//);
+    await owner.locator('.dm-header-actions').getByTitle('Голосовой звонок').click();
+
+    // Панель одна и она про звонок, в канале человека больше нет
+    await expect(owner.locator('.voice-panel.call')).toBeVisible();
+    await expect(owner.locator('.voice-panel-guild')).toHaveCount(0);
+    await expect(inChannel).toHaveCount(0);
+
+    await owner.locator('.call-controls').getByTitle('Завершить звонок').click();
+    await expect(owner.locator('.voice-panel')).toHaveCount(0);
+    await expect(inChannel).toHaveCount(0);
+  });
+});
+
 test.describe('Панель владельца', () => {
   test('разделы переключаются, сводка и списки видны', async ({ owner }) => {
     await owner.locator('.rail-icon.owner').click();

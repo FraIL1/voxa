@@ -388,7 +388,15 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
   leave: async () => {
     const current = room;
     room = null; // до disconnect: обработчик Disconnected не должен дублировать
-    if (current) await current.disconnect();
+    /* Разрыв соединения может упасть или зависнуть — например, если дорожка
+       демонстрации уже мертва. Раньше в этом случае весь код ниже не
+       выполнялся, и человек оставался в канале навсегда: ни состояние не
+       сбрасывалось, ни сервер об уходе не узнавал. */
+    try {
+      if (current) await current.disconnect();
+    } catch {
+      // соединение и так рвётся — важно не то, как оно закрылось, а что дальше
+    }
     for (const element of audioElements.values()) {
       unregisterOutput(element);
       element.remove();
