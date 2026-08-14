@@ -161,6 +161,11 @@ button {
   cursor: pointer;
   border-radius: var(--radius);
   color: inherit;
+  /* Прозрачный фон по умолчанию не косметика, а защита: без него кнопка,
+     которой забыли задать фон, рисуется серой системной. На этом уже
+     погорели панель владельца и не только. Теперь такая кнопка будет
+     незаметной, но не чужеродной. */
+  background: transparent;
   transition:
     background var(--transition),
     border-color var(--transition),
@@ -2128,7 +2133,12 @@ h3 {
 }
 
 .audit-action {
-  color: var(--accent);
+  color: var(--text);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .audit-meta {

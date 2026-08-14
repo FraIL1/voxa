@@ -362,7 +362,6 @@ function RegistrationInvites() {
           onChange={(e) => setMaxUses(e.target.value)}
         />
         <Select
-          className="invite-expires"
           value={expires}
           options={[
             { value: '', label: t('community.expiresNever') },

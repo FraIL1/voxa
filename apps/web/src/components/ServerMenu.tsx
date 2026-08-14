@@ -9,7 +9,7 @@ import {
   Settings,
   UserPlus,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useGuild, useLeaveGuild } from '../hooks/useGuilds';
@@ -44,6 +44,18 @@ export default function ServerMenu({ guildId }: { guildId: string }) {
   const myNickname = members?.find((m) => m.id === myId)?.nickname ?? '';
 
   const close = (): void => setOpen(false);
+
+  /* Escape закрывает это меню, как и все остальные в приложении. Раньше оно
+     оставалось открытым и перекрывало собой заголовок сервера — кликнуть по
+     нему снова было невозможно. */
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open]);
 
   return (
     <>

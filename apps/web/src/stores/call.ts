@@ -198,6 +198,8 @@ const IDLE_STATE = {
   latencyMs: null,
   sharing: false,
   screenSharers: [] as string[],
+  // Ошибка прошлого разговора не должна встречать в следующем
+  error: null as string | null,
 };
 
 export const useCallStore = create<CallState>()((set, get) => ({

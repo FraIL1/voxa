@@ -162,7 +162,6 @@ export default function ServerProfileTab({
           <p className="settings-hint">{t('serverSettings.transferHint')}</p>
           <div className="invite-form">
             <Select
-              className="invite-expires"
               value={heir}
               placeholder={t('serverSettings.pickHeir')}
               options={[

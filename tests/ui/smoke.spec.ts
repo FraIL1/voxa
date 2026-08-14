@@ -703,6 +703,46 @@ test.describe('Эфир', () => {
   });
 });
 
+test.describe('Журнал действий', () => {
+  test('показывает понятные названия, а не технические имена событий', async ({ owner }) => {
+    await owner.locator('.rail-icon.server').first().click();
+    await owner.waitForURL(/\/guilds\//);
+    await owner.locator('.server-header').click();
+    await owner.getByRole('button', { name: 'Настройки сервера' }).click();
+    await owner
+      .locator('.settings-nav')
+      .getByRole('button', { name: 'Журнал действий', exact: true })
+      .click();
+
+    const row = owner.locator('.audit-row').first();
+    await expect(row).toBeVisible();
+    const action = await row.locator('.audit-action').innerText();
+    // Техническое имя вида invite.create читать невозможно
+    expect(action).not.toMatch(/^[a-z]+\.[a-z.]+$/);
+    expect(action.length).toBeGreaterThan(3);
+
+    await owner.locator('.settings-panel').getByTitle('Закрыть').click();
+  });
+});
+
+test.describe('Меню сервера закрывается', () => {
+  test('Escape убирает выпадающее меню и заголовок снова доступен', async ({ owner }) => {
+    await owner.locator('.rail-icon.server').first().click();
+    await owner.waitForURL(/\/guilds\//);
+
+    await owner.locator('.server-header').click();
+    await expect(owner.locator('.server-dropdown')).toBeVisible();
+
+    await owner.keyboard.press('Escape');
+    await expect(owner.locator('.server-dropdown')).toBeHidden();
+
+    // Заголовок больше ничем не перекрыт — меню открывается снова
+    await owner.locator('.server-header').click();
+    await expect(owner.locator('.server-dropdown')).toBeVisible();
+    await owner.keyboard.press('Escape');
+  });
+});
+
 test.describe('Панель владельца', () => {
   test('разделы переключаются, сводка и списки видны', async ({ owner }) => {
     await owner.locator('.rail-icon.owner').click();

@@ -534,5 +534,27 @@
     "confirm": "Подтвердить",
     "gotIt": "Понятно",
     "errorTitle": "Не получилось"
+  },
+  "audit": {
+    "unknown": "Действие",
+    "systemActor": "Удалённый аккаунт",
+    "channel.delete": "Удалил канал",
+    "category.delete": "Удалил категорию",
+    "invite.create": "Создал приглашение",
+    "invite.revoke": "Отозвал приглашение",
+    "guild.join.approve": "Принял заявку на сервер",
+    "guild.join.reject": "Отклонил заявку на сервер",
+    "user.kick": "Кикнул участника",
+    "user.ban": "Забанил участника",
+    "user.unban": "Разбанил участника",
+    "user.timeout": "Выдал таймаут",
+    "user.timeout.clear": "Снял таймаут",
+    "instance.user.unban": "Вернул доступ к приложению",
+    "instance.user.logout": "Завершил чужие сессии",
+    "instance.guild.delete": "Удалил сервер",
+    "instance.settings.update": "Изменил настройки приложения",
+    "instance.registration.create": "Создал код регистрации",
+    "instance.registration.revoke": "Отозвал код регистрации",
+    "instance.storage.cleanup": "Очистил хранилище"
   }
 }

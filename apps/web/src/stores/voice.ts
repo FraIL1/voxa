@@ -415,6 +415,11 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
       cameraUsers: [],
       screenSharers: [],
       watching: null,
+      /* Предупреждение и ошибка привязаны к прошлому сеансу. Без сброса при
+         возврате в канал висело «экран идёт без звука», хотя показ давно
+         кончился и никто ничего не включал. */
+      shareAudioMissing: false,
+      error: null,
     });
     emitVoiceState({ channelId: null, muted: false, deafened: false, sharing: false });
     playSelfLeave();

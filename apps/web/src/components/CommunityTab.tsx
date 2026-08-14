@@ -100,7 +100,6 @@ export function Invites() {
           onChange={(e) => setMaxUses(e.target.value)}
         />
         <Select
-          className="invite-expires"
           value={expires}
           options={[
             { value: '', label: t('community.expiresNever') },
@@ -183,9 +182,14 @@ export function Audit() {
       {items.map((entry) => (
         <div key={entry.id} className="audit-row">
           <span className="audit-time">{timeFormat.format(new Date(entry.createdAt))}</span>
-          <span className="audit-actor">{entry.actorUsername ?? '—'}</span>
-          <code className="audit-action">{entry.action}</code>
-          {entry.meta && <span className="audit-meta">{JSON.stringify(entry.meta)}</span>}
+          <span className="audit-actor">
+            {/* Автора нет — значит аккаунт удалили; это не системное действие */}
+            {entry.actorUsername ?? t('audit.systemActor')}
+          </span>
+          {/* Показываем понятное название, а не техническое имя события.
+              Для незнакомого события падаем обратно на само имя — лучше
+              непонятная строка, чем пустая. */}
+          <span className="audit-action">{t([`audit.${entry.action}`, 'audit.unknown'])}</span>
         </div>
       ))}
       {hasNextPage && (
