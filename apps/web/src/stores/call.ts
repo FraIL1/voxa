@@ -16,7 +16,15 @@ import {
 import { create } from 'zustand';
 
 import { api } from '../api/client';
-import { applyMicGain, registerOutput, unregisterOutput } from '../lib/audio-io';
+import {
+  applyMicGain,
+  micCaptureOptions,
+  noiseSuppression,
+  registerOutput,
+  setNoiseSuppression,
+  unregisterOutput,
+  watchLatency,
+} from '../lib/audio-io';
 import type { ShareOptions } from './voice';
 import {
   playCallConnected,
@@ -52,6 +60,7 @@ let localVideo: LocalVideoTrack | null = null;
 const remoteVideos = new Map<string, RemoteVideoTrack>();
 const remoteScreens = new Map<string, RemoteVideoTrack>();
 let localScreen: LocalVideoTrack | null = null;
+let stopLatency: (() => void) | null = null;
 
 /** Ключ собственного экрана в списке показывающих */
 export const SELF_SCREEN_CALL = 'self-screen';
@@ -92,6 +101,8 @@ function cleanup(): void {
   audioElements.clear();
   remoteScreens.clear();
   localScreen = null;
+  stopLatency?.();
+  stopLatency = null;
   remoteVideos.clear();
   localVideo = null;
   room = null;
@@ -130,6 +141,10 @@ interface CallState {
   endedReason: DmCallEndReason | null;
   /** Кто говорит прямо сейчас: в групповом звонке иначе не разобрать */
   speaking: Record<string, boolean>;
+  /** Задержка до сервера, мс */
+  latencyMs: number | null;
+  /** Подавление шума включено */
+  noiseOn: boolean;
   /** Своя демонстрация экрана идёт */
   sharing: boolean;
   /** Кто показывает экран */
@@ -151,6 +166,7 @@ interface CallState {
   toggleDeafen: () => Promise<void>;
   toggleCamera: () => Promise<void>;
   toggleScreenShare: (options?: ShareOptions) => Promise<void>;
+  toggleNoiseSuppression: () => Promise<void>;
   /** Обработчики WS-событий */
   onIncoming: (payload: DmCallIncomingPayload) => void;
   onAccepted: () => void;
@@ -170,6 +186,7 @@ const IDLE_STATE = {
   deafened: false,
   startedAt: null,
   speaking: {} as Record<string, boolean>,
+  latencyMs: null,
   sharing: false,
   screenSharers: [] as string[],
 };
@@ -186,7 +203,9 @@ export const useCallStore = create<CallState>()((set, get) => ({
   muted: false,
   deafened: false,
   cameraOn: false,
+  noiseOn: noiseSuppression(),
   speaking: {},
+  latencyMs: null,
   sharing: false,
   screenSharers: [],
   videoUserIds: [],
@@ -339,6 +358,18 @@ export const useCallStore = create<CallState>()((set, get) => ({
     }
   },
 
+  /** Подавление шума общее с каналами: настройка одна на приложение */
+  toggleNoiseSuppression: async () => {
+    const next = !noiseSuppression();
+    setNoiseSuppression(next);
+    const track = room?.localParticipant.getTrackPublication(Track.Source.Microphone)?.audioTrack;
+    await track
+      ?.restartTrack(micCaptureOptions(useVoiceStore.getState().micDeviceId))
+      .catch(() => undefined);
+    await applyMicGain(track);
+    set({ noiseOn: next });
+  },
+
   /** Демонстрация экрана в звонке — те же настройки качества, что и в канале */
   toggleScreenShare: async (options) => {
     if (!room) return;
@@ -412,7 +443,10 @@ async function connect(
   set: (partial: Partial<CallState> | ((s: CallState) => Partial<CallState>)) => void,
   get: () => CallState,
 ): Promise<void> {
-  const next = new Room();
+  // Настройки захвата те же, что в каналах: подавление шума одно на приложение
+  const next = new Room({
+    audioCaptureDefaults: micCaptureOptions(useVoiceStore.getState().micDeviceId),
+  });
   room = next;
 
   next.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, _pub, participant: RemoteParticipant) => {
@@ -473,6 +507,13 @@ async function connect(
   next.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
     set({ speaking: Object.fromEntries(speakers.map((p) => [p.identity, true])) });
   });
+
+  stopLatency?.();
+  stopLatency = watchLatency(
+    () =>
+      room?.localParticipant.getTrackPublication(Track.Source.Microphone)?.audioTrack ?? undefined,
+    (latencyMs) => set({ latencyMs }),
+  );
 
   // Кто-то вошёл в комнату — разговор реально начался
   next.on(RoomEvent.ParticipantConnected, () => {

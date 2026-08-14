@@ -846,29 +846,139 @@ h3 {
 }
 
 /* Панель текущего голосового подключения */
+/* Панель связи над карточкой: состояние, где сидишь и что можно включить */
 .voice-panel {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
   gap: 8px;
   border-top: 1px solid var(--border);
-  padding: 8px 12px;
-  color: var(--success);
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--success) 8%, transparent);
   font-size: 13px;
-  font-weight: 600;
 }
 
-.voice-panel-info {
+.voice-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--success);
+  font-weight: 700;
+}
+
+.voice-panel-state {
   display: flex;
   align-items: center;
   gap: 7px;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Задержка моноширинными: число меняется каждые три секунды и не должно прыгать */
+.voice-panel-ping {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+}
+
+.voice-panel-leave {
+  flex: none;
+}
+
+/* Столбики качества связи: чем меньше задержка, тем больше горит */
+.signal-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 12px;
+  flex: none;
+}
+
+.signal-bars i {
+  width: 3px;
+  border-radius: 1px;
+  background: var(--text-faint);
+}
+
+.signal-bars i:nth-child(1) {
+  height: 40%;
+}
+.signal-bars i:nth-child(2) {
+  height: 70%;
+}
+.signal-bars i:nth-child(3) {
+  height: 100%;
+}
+
+.signal-bars.level-1 i:nth-child(1),
+.signal-bars.level-2 i:nth-child(-n + 2),
+.signal-bars.level-3 i {
+  background: currentColor;
+}
+
+/* Где именно сидишь: канал и через дробь сервер */
+.voice-panel-where {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 12px;
 }
 
 .voice-panel-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.voice-panel-guild {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.voice-panel-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.voice-panel-button {
+  flex: 1;
+  min-height: var(--control-h-sm);
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  transition:
+    background var(--transition),
+    color var(--transition),
+    border-color var(--transition);
+}
+
+.voice-panel-button:hover {
+  background: var(--panel-hover);
+  color: var(--text);
+}
+
+.voice-panel-button.engaged {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* Своя аватарка светится, пока говоришь */
+.me-avatar.speaking {
+  box-shadow:
+    0 0 0 2px var(--success),
+    0 0 14px -2px var(--success);
 }
 
 .icon-button.engaged {

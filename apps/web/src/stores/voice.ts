@@ -2,6 +2,7 @@ import type { VoiceTokenDto } from '@voxa/shared';
 import {
   Room,
   RoomEvent,
+  ConnectionQuality,
   Track,
   type LocalTrackPublication,
   type LocalVideoTrack,
@@ -13,7 +14,15 @@ import { create } from 'zustand';
 
 import { api } from '../api/client';
 import { emitVoiceState } from '../api/socket';
-import { applyMicGain, registerOutput, unregisterOutput } from '../lib/audio-io';
+import {
+  applyMicGain,
+  micCaptureOptions,
+  noiseSuppression,
+  registerOutput,
+  setNoiseSuppression,
+  unregisterOutput,
+  watchLatency,
+} from '../lib/audio-io';
 import {
   playDeafen,
   playMicOff,
@@ -65,6 +74,12 @@ const DEFAULT_SHARE: ShareOptions = { width: 1280, height: 720, frameRate: 30, a
 
 interface VoiceState {
   channelId: string | null;
+  /** Имя сервера — во второй строке панели связи */
+  guildName: string | null;
+  /** Задержка до сервера, мс; null — ещё не измерена */
+  latencyMs: number | null;
+  /** Качество связи глазами сервера */
+  quality: ConnectionQuality;
   /** Имя канала на момент входа (для панели вне контекста сервера) */
   channelName: string | null;
   connecting: boolean;
@@ -84,6 +99,8 @@ interface VoiceState {
   sharing: boolean;
   /** Своя камера включена */
   cameraOn: boolean;
+  /** Подавление шума включено */
+  noiseOn: boolean;
   /** Кто из участников показывает камеру */
   cameraUsers: string[];
   /** Счётчик для перепривязки видео: треки живут вне стора */
@@ -93,7 +110,7 @@ interface VoiceState {
   /** Чей экран смотрим */
   watching: string | null;
 
-  join: (channelId: string, channelName?: string) => Promise<void>;
+  join: (channelId: string, channelName?: string, guildName?: string) => Promise<void>;
   /** Принудительный мут при таймауте */
   forceMuteLocal: () => Promise<void>;
   leave: () => Promise<void>;
@@ -106,6 +123,7 @@ interface VoiceState {
   shareOptions: ShareOptions;
   toggleScreenShare: (options?: ShareOptions) => Promise<void>;
   toggleCamera: () => Promise<void>;
+  toggleNoiseSuppression: () => Promise<void>;
   watch: (userId: string | null) => void;
 }
 
@@ -115,6 +133,7 @@ export const SELF_SCREEN = 'self';
 /** Комната LiveKit, аудиоэлементы и видеотреки живут вне стора: они не для рендера */
 let room: Room | null = null;
 let localScreenTrack: LocalVideoTrack | null = null;
+let stopLatency: (() => void) | null = null;
 const audioElements = new Map<string, HTMLMediaElement>();
 const screenVideoTracks = new Map<string, RemoteVideoTrack>();
 const cameraTracks = new Map<string, RemoteVideoTrack>();
@@ -163,6 +182,8 @@ function cleanupRoom(): void {
   cameraTracks.clear();
   localScreenTrack = null;
   localCameraTrack = null;
+  stopLatency?.();
+  stopLatency = null;
   room = null;
 }
 
@@ -175,6 +196,9 @@ const savedDevices = loadJson<SavedDevices>(DEVICES_KEY, {
 export const useVoiceStore = create<VoiceState>()((set, get) => ({
   channelId: null,
   channelName: null,
+  guildName: null,
+  latencyMs: null,
+  quality: ConnectionQuality.Unknown,
   connecting: false,
   muted: false,
   deafened: false,
@@ -188,16 +212,23 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
   cameraOn: false,
   cameraUsers: [],
   videoVersion: 0,
+  noiseOn: noiseSuppression(),
   screenSharers: [],
   watching: null,
   shareOptions: loadJson<ShareOptions>(SHARE_KEY, DEFAULT_SHARE),
 
-  join: async (channelId, channelName) => {
+  join: async (channelId, channelName, guildName) => {
     const state = get();
     if (state.channelId === channelId || state.connecting) return;
     if (room) await get().leave();
 
-    set({ connecting: true, channelId, channelName: channelName ?? null, error: null });
+    set({
+      connecting: true,
+      channelId,
+      channelName: channelName ?? null,
+      guildName: guildName ?? null,
+      error: null,
+    });
     try {
       const grant = await api<VoiceTokenDto>(`/channels/${channelId}/voice-token`, {
         method: 'POST',
@@ -205,7 +236,7 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
 
       const { micDeviceId, outputDeviceId } = get();
       const next = new Room({
-        ...(micDeviceId ? { audioCaptureDefaults: { deviceId: micDeviceId } } : {}),
+        audioCaptureDefaults: micCaptureOptions(micDeviceId),
         ...(outputDeviceId ? { audioOutput: { deviceId: outputDeviceId } } : {}),
       });
       room = next;
@@ -269,6 +300,18 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
         set({ speaking: Object.fromEntries(speakers.map((p) => [p.identity, true])) });
       });
 
+      next.on(RoomEvent.ConnectionQualityChanged, (quality, participant) => {
+        if (participant.identity === next.localParticipant.identity) set({ quality });
+      });
+
+      stopLatency?.();
+      stopLatency = watchLatency(
+        () =>
+          room?.localParticipant.getTrackPublication(Track.Source.Microphone)?.audioTrack ??
+          undefined,
+        (latencyMs) => set({ latencyMs }),
+      );
+
       // «Остановить демонстрацию» из панели браузера
       next.on(RoomEvent.LocalTrackUnpublished, (pub: LocalTrackPublication) => {
         if (pub.source === Track.Source.ScreenShare) {
@@ -330,8 +373,13 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
     cameraTracks.clear();
     localScreenTrack = null;
     localCameraTrack = null;
+    stopLatency?.();
+    stopLatency = null;
     set({
       channelId: null,
+      guildName: null,
+      latencyMs: null,
+      quality: ConnectionQuality.Unknown,
       channelName: null,
       connecting: false,
       speaking: {},
@@ -414,6 +462,17 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
     saveJson(VOLUMES_KEY, volumes);
     set({ participantVolumes: volumes });
     room?.remoteParticipants.get(userId)?.setVolume(volume);
+  },
+
+  /** Подавление шума меняется на лету: дорожка пересоздаётся с новой настройкой */
+  toggleNoiseSuppression: async () => {
+    const next = !noiseSuppression();
+    setNoiseSuppression(next);
+    const track = room?.localParticipant.getTrackPublication(Track.Source.Microphone)?.audioTrack;
+    await track?.restartTrack(micCaptureOptions(get().micDeviceId)).catch(() => undefined);
+    // Пересозданная дорожка теряет усиление — вешаем заново
+    await applyMicGain(track);
+    set({ noiseOn: next });
   },
 
   /** Камера в канале — то же самое, что в звонке: устройство берём из настроек */

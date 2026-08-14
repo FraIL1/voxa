@@ -66,6 +66,8 @@ function ChannelItem({
   const navigate = useNavigate();
   const join = useVoiceStore((s) => s.join);
   const myVoiceChannel = useVoiceStore((s) => s.channelId);
+  // Имя сервера нужно панели связи: во второй строке «канал / сервер»
+  const guildName = useGuild(channel.guildId)?.name;
 
   const gear = canManage && (
     <button
@@ -90,7 +92,7 @@ function ChannelItem({
             title={t('voice.join')}
             onClick={() => {
               void navigate(`/guilds/${channel.guildId}/channels/${channel.id}`);
-              void join(channel.id, channel.name).catch(() => undefined);
+              void join(channel.id, channel.name, guildName).catch(() => undefined);
             }}
           >
             <Volume2 size={16} />

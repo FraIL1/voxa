@@ -13,6 +13,8 @@ interface Saved {
   micGain: number;
   /** Громкость собеседников: 0…1 */
   output: number;
+  /** Подавление шума на микрофоне */
+  noise: boolean;
 }
 
 function load(): Saved {
@@ -22,9 +24,10 @@ function load(): Saved {
     return {
       micGain: clamp(saved.micGain ?? 1, 0, 3),
       output: clamp(saved.output ?? 1, 0, 1),
+      noise: saved.noise ?? true,
     };
   } catch {
-    return { micGain: 1, output: 1 };
+    return { micGain: 1, output: 1, noise: true };
   }
 }
 
@@ -175,6 +178,58 @@ export function measureMicLevel(
     .catch(() => onLevel(0));
 
   return () => stop();
+}
+
+/** Подавление шума: клавиатура и вентилятор не летят собеседникам */
+export function noiseSuppression(): boolean {
+  return levels.noise;
+}
+
+export function setNoiseSuppression(value: boolean): void {
+  levels = { ...levels, noise: value };
+  save(levels);
+}
+
+/** Настройки захвата микрофона — одинаковые в каналах и в звонках */
+export function micCaptureOptions(deviceId: string | null): {
+  deviceId?: string;
+  noiseSuppression: boolean;
+  echoCancellation: boolean;
+  autoGainControl: boolean;
+} {
+  return {
+    ...(deviceId ? { deviceId } : {}),
+    noiseSuppression: levels.noise,
+    echoCancellation: true,
+    // Своё усиление ниже по цепочке, автоматика с ним боролась бы
+    autoGainControl: false,
+  };
+}
+
+/**
+ * Задержка до сервера в миллисекундах. Берём из отчёта о своей же дорожке:
+ * это время туда-обратно, то самое, что показывают значком связи.
+ */
+export function watchLatency(
+  getTrack: () => LocalAudioTrack | undefined,
+  onValue: (ms: number | null) => void,
+): () => void {
+  const tick = (): void => {
+    const track = getTrack();
+    if (!track) {
+      onValue(null);
+      return;
+    }
+    void track
+      .getSenderStats()
+      .then((stats) =>
+        onValue(stats?.roundTripTime ? Math.round(stats.roundTripTime * 1000) : null),
+      )
+      .catch(() => onValue(null));
+  };
+  tick();
+  const timer = setInterval(tick, 3000);
+  return () => clearInterval(timer);
 }
 
 // ---------- Вывод ----------

@@ -575,6 +575,37 @@ test.describe('Управление звуком и видео', () => {
   });
 });
 
+test.describe('Панель связи', () => {
+  test('показывает канал, сервер и управление голосом', async ({ owner }) => {
+    await owner.locator('.rail-icon.server').first().click();
+    await owner.waitForURL(/\/guilds\//);
+    await owner.locator('.channel-link.voice-link').first().click();
+
+    const panel = owner.locator('.voice-panel');
+    await expect(panel).toBeVisible();
+
+    // Где сижу: канал и через дробь сервер
+    await expect(panel.locator('.voice-panel-name')).toHaveText('Общий');
+    await expect(panel.locator('.voice-panel-guild')).toContainText('Сервер');
+    await expect(panel.locator('.signal-bars')).toBeVisible();
+
+    // Камера, демонстрация и шумоподавление — прямо в панели
+    await expect(panel.getByTitle('Включить камеру')).toBeVisible();
+    await expect(panel.getByTitle('Демонстрация экрана')).toBeVisible();
+    const noise = panel.getByTitle('Выключить шумоподавление');
+    await expect(noise).toBeVisible();
+
+    // Шумоподавление включено по умолчанию и переключается
+    await noise.click();
+    await expect(panel.getByTitle('Включить шумоподавление')).toBeVisible();
+    await panel.getByTitle('Включить шумоподавление').click();
+    await expect(panel.getByTitle('Выключить шумоподавление')).toBeVisible();
+
+    await panel.getByTitle('Отключиться').click();
+    await expect(panel).toBeHidden();
+  });
+});
+
 test.describe('Панель владельца', () => {
   test('разделы переключаются, сводка и списки видны', async ({ owner }) => {
     await owner.locator('.rail-icon.owner').click();
