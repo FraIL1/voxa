@@ -165,6 +165,10 @@ export default function VoiceView({ channel }: { channel: ChannelDto }) {
         ))}
       </div>
 
+      {voice.shareAudioMissing && (
+        <p className="voice-error share-hint">{t('voice.shareNoAudio')}</p>
+      )}
+
       {voice.error && (
         <p className="auth-error voice-error">
           {t('voice.failed')}: {voice.error}

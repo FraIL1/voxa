@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router';
 
 import { useMembers } from '../hooks/useMembers';
+import { allChannelsOf, useStructure } from '../hooks/useStructure';
 import { useVoiceStates } from '../hooks/useVoiceStates';
 import { openProfile } from '../stores/profileView';
 import Avatar from './Avatar';
@@ -38,13 +39,16 @@ export default function MemberList() {
   const { guildId } = useParams<{ guildId: string }>();
   const { data: members } = useMembers(guildId);
   const { data: voiceStates } = useVoiceStates();
+  const { data: structure } = useStructure(guildId);
 
-  /* Кто сейчас показывает экран. Берём из состояний голоса, а не из списка
-     участников: список приходит запросом и не знает про эфир. */
+  /* Кто показывает экран именно здесь. Состояния голоса приходят по всем
+     каналам сразу, поэтому отбираем только каналы этого сервера: иначе показ
+     на одном сервере отмечался у человека на всех остальных. */
+  const guildChannels = new Set(allChannelsOf(structure).map((c) => c.id));
   const sharingUsers = new Set(
-    (voiceStates ?? []).flatMap((state) =>
-      state.participants.filter((p) => p.sharing).map((p) => p.userId),
-    ),
+    (voiceStates ?? [])
+      .filter((state) => guildChannels.has(state.channelId))
+      .flatMap((state) => state.participants.filter((p) => p.sharing).map((p) => p.userId)),
   );
   const [menu, setMenu] = useState<MenuState | null>(null);
 

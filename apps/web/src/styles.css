@@ -6069,3 +6069,12 @@ h3 {
   gap: 4px;
   color: var(--danger);
 }
+
+/* Подсказка про звук демонстрации: предупреждение, а не ошибка */
+.share-hint {
+  color: var(--warning);
+  font-size: 13px;
+  text-align: center;
+  margin: 8px 16px 0;
+  line-height: 1.5;
+}

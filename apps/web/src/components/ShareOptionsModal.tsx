@@ -84,7 +84,9 @@ export default function ShareOptionsModal({
           {audio ? <Volume2 size={16} /> : <VolumeX size={16} />}
           <span className="share-sound-text">
             <span className="share-sound-name">{t('voice.shareSound')}</span>
-            <span className="settings-hint">{t('voice.shareSoundHint')}</span>
+            <span className="settings-hint">
+              {audio ? t('voice.shareSoundCheck') : t('voice.shareSoundHint')}
+            </span>
           </span>
           {/* Переключатель нарисован, а не поле: поле внутри кнопки —
               вложенный интерактивный элемент, так делать нельзя */}

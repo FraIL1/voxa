@@ -101,6 +101,8 @@ interface VoiceState {
   cameraOn: boolean;
   /** Подавление шума включено */
   noiseOn: boolean;
+  /** Звук просили, но браузер его не дал — галочку не поставили */
+  shareAudioMissing: boolean;
   /** Кто из участников показывает камеру */
   cameraUsers: string[];
   /** Счётчик для перепривязки видео: треки живут вне стора */
@@ -227,6 +229,7 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
   cameraUsers: [],
   videoVersion: 0,
   noiseOn: noiseSuppression(),
+  shareAudioMissing: false,
   screenSharers: [],
   watching: null,
   shareOptions: loadJson<ShareOptions>(SHARE_KEY, DEFAULT_SHARE),
@@ -534,12 +537,19 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
     try {
       const publication = await room.localParticipant.setScreenShareEnabled(!sharing, {
         audio: next.audio,
+        /* Звук системы браузер предлагает, только если его явно попросить.
+           Поставить галочку за человека нельзя — это его решение, окно выбора
+           рисует браузер. Мы лишь делаем так, чтобы галочка вообще была. */
+        systemAudio: next.audio ? 'include' : 'exclude',
+        // Можно переключить показываемое окно, не начиная заново
+        surfaceSwitching: 'include',
         resolution: { width: next.width, height: next.height, frameRate: next.frameRate },
       });
       if (sharing) {
         localScreenTrack = null;
         playShareStop();
         announceSharing(false);
+        set({ shareAudioMissing: false });
         set((s) => ({
           sharing: false,
           watching: s.watching === SELF_SCREEN ? (s.screenSharers[0] ?? null) : s.watching,
@@ -549,6 +559,10 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
         // Звучит только если человек действительно выбрал экран, а не закрыл диалог
         if (publication) playShareStart();
         announceSharing(Boolean(publication));
+        /* Просили звук, а его нет — значит галочку в окне браузера не
+           поставили. Молчать нельзя: человек будет думать, что звук идёт. */
+        const withAudio = room.localParticipant.getTrackPublication(Track.Source.ScreenShareAudio);
+        set({ shareAudioMissing: Boolean(publication) && next.audio && !withAudio });
         // самопросмотр открываем сразу — видно, что именно стримишь
         set({
           sharing: Boolean(publication),

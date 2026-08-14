@@ -390,6 +390,12 @@ export const useCallStore = create<CallState>()((set, get) => ({
     try {
       const publication = await room.localParticipant.setScreenShareEnabled(!sharing, {
         audio: next.audio,
+        /* Звук системы браузер предлагает, только если его явно попросить.
+           Поставить галочку за человека нельзя — это его решение, окно выбора
+           рисует браузер. Мы лишь делаем так, чтобы галочка вообще была. */
+        systemAudio: next.audio ? 'include' : 'exclude',
+        // Можно переключить показываемое окно, не начиная заново
+        surfaceSwitching: 'include',
         resolution: { width: next.width, height: next.height, frameRate: next.frameRate },
       });
       if (sharing) {
