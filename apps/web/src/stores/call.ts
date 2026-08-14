@@ -40,6 +40,15 @@ import {
 import { useVoiceStore } from './voice';
 
 /** Комната звонка живёт вне стора: LiveKit-объекты не для рендера */
+/**
+ * Разговор может быть только один. Микрофон, наушники и панель связи общие,
+ * поэтому одновременно сидеть в голосовом канале и звонить в личку нельзя:
+ * человек оказывался в двух разговорах сразу и не понимал, кто его слышит.
+ */
+async function leaveVoiceChannel(): Promise<void> {
+  if (useVoiceStore.getState().channelId) await useVoiceStore.getState().leave();
+}
+
 /** Гудок исходящего вызова живёт вне стора: он не для рендера */
 let stopDialTone: (() => void) | null = null;
 
@@ -216,6 +225,7 @@ export const useCallStore = create<CallState>()((set, get) => ({
 
   startCall: async (conversationId, peerName, video, peerAvatar = null, isGroup = false) => {
     if (get().status !== 'idle') return;
+    await leaveVoiceChannel();
     stopDialTone = startDialTone();
     set({
       status: 'outgoing',
@@ -245,6 +255,7 @@ export const useCallStore = create<CallState>()((set, get) => ({
 
   joinCall: async (conversationId, title) => {
     if (get().status !== 'idle') return;
+    await leaveVoiceChannel();
     set({
       status: 'active',
       conversationId,
@@ -272,6 +283,7 @@ export const useCallStore = create<CallState>()((set, get) => ({
   acceptIncoming: async (peerName) => {
     const incoming = get().incoming;
     if (!incoming) return;
+    await leaveVoiceChannel();
     const conversationId = incoming.conversationId;
     set({
       status: 'active',
@@ -363,10 +375,10 @@ export const useCallStore = create<CallState>()((set, get) => ({
     const next = !noiseSuppression();
     setNoiseSuppression(next);
     const track = room?.localParticipant.getTrackPublication(Track.Source.Microphone)?.audioTrack;
+    // Обработчик усиления LiveKit перезапускает сам — второй сверху рвёт цепочку
     await track
       ?.restartTrack(micCaptureOptions(useVoiceStore.getState().micDeviceId))
       .catch(() => undefined);
-    await applyMicGain(track);
     set({ noiseOn: next });
   },
 
@@ -510,8 +522,7 @@ async function connect(
 
   stopLatency?.();
   stopLatency = watchLatency(
-    () =>
-      room?.localParticipant.getTrackPublication(Track.Source.Microphone)?.audioTrack ?? undefined,
+    () => room,
     (latencyMs) => set({ latencyMs }),
   );
 

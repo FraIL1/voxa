@@ -884,8 +884,15 @@ h3 {
   color: var(--text-faint);
 }
 
-.voice-panel-leave {
-  flex: none;
+/* Отключиться — в самом правом краю строки кнопок и красным */
+.voice-panel-button.leave {
+  color: var(--danger);
+}
+
+.voice-panel-button.leave:hover {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+  color: var(--danger);
 }
 
 /* Столбики качества связи: чем меньше задержка, тем больше горит */

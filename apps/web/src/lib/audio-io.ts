@@ -1,4 +1,10 @@
-import type { AudioProcessorOptions, LocalAudioTrack, Track, TrackProcessor } from 'livekit-client';
+import type {
+  AudioProcessorOptions,
+  LocalAudioTrack,
+  Room,
+  Track,
+  TrackProcessor,
+} from 'livekit-client';
 
 /**
  * Громкость входа и выхода. Живёт отдельно от сторов: значения нужны и
@@ -207,24 +213,37 @@ export function micCaptureOptions(deviceId: string | null): {
 }
 
 /**
- * Задержка до сервера в миллисекундах. Берём из отчёта о своей же дорожке:
- * это время туда-обратно, то самое, что показывают значком связи.
+ * Задержка до сервера в миллисекундах.
+ *
+ * Берём её из ICE-пары соединения, а не из отчёта о своей дорожке: тот
+ * показывает время туда-обратно по данным собеседника, и пока в канале никого
+ * нет, он пуст. Проверил замерами — в пустом канале число не появлялось вовсе.
+ * ICE-пара же есть всегда, как только соединение установлено.
  */
 export function watchLatency(
-  getTrack: () => LocalAudioTrack | undefined,
+  getRoom: () => Room | null,
   onValue: (ms: number | null) => void,
 ): () => void {
   const tick = (): void => {
-    const track = getTrack();
-    if (!track) {
+    const transport = getRoom()?.engine?.pcManager?.publisher;
+    if (!transport) {
       onValue(null);
       return;
     }
-    void track
-      .getSenderStats()
-      .then((stats) =>
-        onValue(stats?.roundTripTime ? Math.round(stats.roundTripTime * 1000) : null),
-      )
+    void transport
+      .getStats()
+      .then((report) => {
+        let rtt: number | null = null;
+        report.forEach((entry) => {
+          const pair = entry as RTCIceCandidatePairStats;
+          if (pair.type === 'candidate-pair' && pair.state === 'succeeded') {
+            if (typeof pair.currentRoundTripTime === 'number') {
+              rtt = Math.round(pair.currentRoundTripTime * 1000);
+            }
+          }
+        });
+        onValue(rtt);
+      })
       .catch(() => onValue(null));
   };
   tick();

@@ -604,6 +604,33 @@ test.describe('Панель связи', () => {
     await panel.getByTitle('Отключиться').click();
     await expect(panel).toBeHidden();
   });
+
+  /**
+   * Микрофон, наушники и сама панель связи одни на всё приложение. Быть
+   * одновременно в канале и в звонке нельзя: человек оказывался в двух
+   * разговорах сразу и не понимал, кто его слышит.
+   */
+  test('звонок из лички выходит из голосового канала', async ({ owner }) => {
+    await owner.locator('.rail-icon.server').first().click();
+    await owner.waitForURL(/\/guilds\//);
+    await owner.locator('.channel-link.voice-link').first().click();
+    await expect(owner.locator('.voice-panel-guild')).toBeVisible();
+
+    // Звоним другу, не выходя из канала руками
+    await owner.locator('.rail-icon.home').click();
+    await owner.getByRole('button', { name: 'Все', exact: true }).click();
+    await owner.getByTitle('Написать').first().click();
+    await owner.waitForURL(/\/dm\//);
+    await owner.locator('.dm-header-actions').getByTitle('Голосовой звонок').click();
+
+    // Панель осталась одна и она про звонок: строки с сервером больше нет
+    await expect(owner.locator('.voice-panel')).toHaveCount(1);
+    await expect(owner.locator('.voice-panel-guild')).toHaveCount(0);
+    await expect(owner.locator('.voice-panel.call')).toBeVisible();
+
+    await owner.locator('.call-controls').getByTitle('Завершить звонок').click();
+    await expect(owner.locator('.voice-panel')).toHaveCount(0);
+  });
 });
 
 test.describe('Панель владельца', () => {

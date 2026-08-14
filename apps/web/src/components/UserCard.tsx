@@ -21,6 +21,7 @@ import { usePresenceStore } from '../stores/presence';
 import { useVoiceStore } from '../stores/voice';
 import Avatar from './Avatar';
 import SettingsModal from './SettingsModal';
+import ShareOptionsModal from './ShareOptionsModal';
 import ProfileMenu from './ProfileMenu';
 
 /** Карточка пользователя внизу боковой панели: голос, микрофон, настройки.
@@ -49,6 +50,8 @@ export default function UserCard() {
   const myStatus = usePresenceStore((s) => s.myStatus);
   const audio = useAudioSession();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const shareOptions = useVoiceStore((s) => s.shareOptions);
   const [statusOpen, setStatusOpen] = useState(false);
 
   return (
@@ -60,16 +63,9 @@ export default function UserCard() {
               <SignalBars latencyMs={audio.latencyMs} connecting={connecting} />
               {connecting && audio.kind === 'voice' ? t('voice.connecting') : t('voice.connected')}
             </span>
-            {audio.latencyMs !== null && (
-              <span className="voice-panel-ping">{audio.latencyMs} мс</span>
-            )}
-            <button
-              className="icon-button danger voice-panel-leave"
-              title={audio.kind === 'call' ? t('call.hangUp') : t('voice.leave')}
-              onClick={audio.leave}
-            >
-              <PhoneOff size={16} />
-            </button>
+            <span className="voice-panel-ping">
+              {audio.latencyMs === null ? '—' : `${audio.latencyMs} мс`}
+            </span>
           </div>
 
           <div className="voice-panel-where">
@@ -93,7 +89,7 @@ export default function UserCard() {
             <button
               className={`voice-panel-button${audio.sharing ? ' engaged' : ''}`}
               title={audio.sharing ? t('voice.stopShare') : t('voice.shareScreen')}
-              onClick={audio.toggleShare}
+              onClick={() => (audio.sharing ? audio.toggleShare() : setShareOpen(true))}
             >
               <MonitorUp size={16} />
             </button>
@@ -104,8 +100,23 @@ export default function UserCard() {
             >
               <Waves size={16} />
             </button>
+            <button
+              className="voice-panel-button leave"
+              title={audio.kind === 'call' ? t('call.hangUp') : t('voice.leave')}
+              onClick={audio.leave}
+            >
+              <PhoneOff size={16} />
+            </button>
           </div>
         </div>
+      )}
+
+      {shareOpen && (
+        <ShareOptionsModal
+          initial={shareOptions}
+          onStart={(options) => audio.startShare(options)}
+          onClose={() => setShareOpen(false)}
+        />
       )}
 
       <div className="user-card">

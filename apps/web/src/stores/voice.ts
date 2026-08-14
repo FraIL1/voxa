@@ -222,6 +222,15 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
     if (state.channelId === channelId || state.connecting) return;
     if (room) await get().leave();
 
+    /* Разговор может быть только один: вход в канал завершает звонок в личке.
+       Импорт динамический — стор звонков сам знает про голосовой, и обычный
+       импорт замкнул бы их друг на друга. */
+    const { useCallStore } = await import('./call');
+    const callStatus = useCallStore.getState().status;
+    if (callStatus === 'outgoing' || callStatus === 'active') {
+      await useCallStore.getState().hangUp();
+    }
+
     set({
       connecting: true,
       channelId,
@@ -306,9 +315,7 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
 
       stopLatency?.();
       stopLatency = watchLatency(
-        () =>
-          room?.localParticipant.getTrackPublication(Track.Source.Microphone)?.audioTrack ??
-          undefined,
+        () => room,
         (latencyMs) => set({ latencyMs }),
       );
 
@@ -469,9 +476,10 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
     const next = !noiseSuppression();
     setNoiseSuppression(next);
     const track = room?.localParticipant.getTrackPublication(Track.Source.Microphone)?.audioTrack;
+    /* Обработчик усиления заново не вешаем: LiveKit перезапускает его сам
+       вместе с дорожкой. Второй обработчик поверх живого рвал цепочку —
+       микрофон переставал передавать что-либо. */
     await track?.restartTrack(micCaptureOptions(get().micDeviceId)).catch(() => undefined);
-    // Пересозданная дорожка теряет усиление — вешаем заново
-    await applyMicGain(track);
     set({ noiseOn: next });
   },
 

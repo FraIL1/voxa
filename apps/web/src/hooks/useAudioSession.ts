@@ -1,6 +1,6 @@
 import { useAuthStore } from '../stores/auth';
 import { useCallStore } from '../stores/call';
-import { useVoiceStore } from '../stores/voice';
+import { useVoiceStore, type ShareOptions } from '../stores/voice';
 
 /** Где сейчас идёт разговор: в голосовом канале, в личном звонке или нигде */
 export type AudioSessionKind = 'voice' | 'call' | null;
@@ -26,6 +26,8 @@ export interface AudioSession {
   toggleDeafen: () => void;
   toggleCamera: () => void;
   toggleShare: () => void;
+  /** Запуск показа с выбранным качеством — из нашего окна настроек */
+  startShare: (options: ShareOptions) => void;
   toggleNoise: () => void;
   leave: () => void;
 }
@@ -96,6 +98,7 @@ export function useAudioSession(): AudioSession {
       toggleDeafen: () => void useCallStore.getState().toggleDeafen(),
       toggleCamera: () => void useCallStore.getState().toggleCamera(),
       toggleShare: () => void useCallStore.getState().toggleScreenShare(),
+      startShare: (options) => void useCallStore.getState().toggleScreenShare(options),
       toggleNoise: () => void useCallStore.getState().toggleNoiseSuppression(),
       leave: () => void useCallStore.getState().hangUp(),
     };
@@ -117,6 +120,7 @@ export function useAudioSession(): AudioSession {
     toggleDeafen: () => void useVoiceStore.getState().toggleDeafen(),
     toggleCamera: () => void useVoiceStore.getState().toggleCamera(),
     toggleShare: () => void useVoiceStore.getState().toggleScreenShare(),
+    startShare: (options) => void useVoiceStore.getState().toggleScreenShare(options),
     toggleNoise: () => void useVoiceStore.getState().toggleNoiseSuppression(),
     leave: () => void useVoiceStore.getState().leave(),
   };
