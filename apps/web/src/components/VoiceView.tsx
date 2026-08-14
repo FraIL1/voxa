@@ -141,6 +141,11 @@ export default function VoiceView({ channel }: { channel: ChannelDto }) {
             />
             <span className="voice-tile-name">{p.username}</span>
             <span className="voice-tile-icons">
+              {p.sharing && (
+                <span className="live-badge" title={t('voice.live')}>
+                  <MonitorUp size={11} /> {t('voice.live')}
+                </span>
+              )}
               {p.muted && <MicOff size={14} />}
               {p.deafened && <HeadphoneOff size={14} />}
             </span>

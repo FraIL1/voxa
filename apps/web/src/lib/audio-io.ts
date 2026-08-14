@@ -56,6 +56,16 @@ let levels = load();
 /** Живые узлы усиления: и у публикуемой дорожки, и у проверки в настройках */
 const gainNodes = new Set<GainNode>();
 
+/**
+ * Настоящая дорожка микрофона — та, что пришла от устройства.
+ *
+ * Хранить её приходится отдельно: у LiveKit свойство mediaStreamTrack с
+ * подключённым обработчиком отдаёт не микрофон, а синтетическую дорожку из
+ * Web Audio. У неё нет свойств устройства, и любая попытка настроить на ней
+ * шумоподавление падала с «Cannot satisfy constraints».
+ */
+let deviceMicTrack: MediaStreamTrack | null = null;
+
 export function micGain(): number {
   return levels.micGain;
 }
@@ -88,6 +98,7 @@ class MicGainProcessor implements TrackProcessor<Track.Kind.Audio, AudioProcesso
     this.source.connect(this.gain).connect(this.destination);
     this.processedTrack = this.destination.stream.getAudioTracks()[0];
     gainNodes.add(this.gain);
+    deviceMicTrack = options.track;
   }
 
   async restart(options: AudioProcessorOptions): Promise<void> {
@@ -96,6 +107,7 @@ class MicGainProcessor implements TrackProcessor<Track.Kind.Audio, AudioProcesso
   }
 
   async destroy(): Promise<void> {
+    deviceMicTrack = null;
     if (this.gain) gainNodes.delete(this.gain);
     this.source?.disconnect();
     this.gain?.disconnect();
@@ -191,9 +203,18 @@ export function noiseSuppression(): boolean {
   return levels.noise;
 }
 
-export function setNoiseSuppression(value: boolean): void {
+/**
+ * Меняет подавление шума на живой дорожке устройства.
+ *
+ * Настраиваем только само шумоподавление: эхоподавление и автогромкость
+ * задаются при захвате, и требовать их повторно нельзя — applyConstraints
+ * считает такие условия обязательными и падает, если устройство их не тянет.
+ */
+export async function applyNoiseSuppression(value: boolean): Promise<void> {
   levels = { ...levels, noise: value };
   save(levels);
+  if (!deviceMicTrack) return;
+  await deviceMicTrack.applyConstraints({ noiseSuppression: value });
 }
 
 /** Настройки захвата микрофона — одинаковые в каналах и в звонках */

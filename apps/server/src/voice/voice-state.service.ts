@@ -27,6 +27,7 @@ export class VoiceStateService {
     channelId: string | null,
     muted: boolean,
     deafened: boolean,
+    sharing = false,
   ): string[] {
     const affected = new Set<string>();
     const previous = this.states.get(userId);
@@ -37,7 +38,7 @@ export class VoiceStateService {
     } else {
       this.states.set(userId, {
         channelId,
-        participant: { userId, username, muted, deafened },
+        participant: { userId, username, muted, deafened, sharing },
       });
       affected.add(channelId);
     }

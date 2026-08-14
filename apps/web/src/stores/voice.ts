@@ -19,7 +19,7 @@ import {
   micCaptureOptions,
   noiseSuppression,
   registerOutput,
-  setNoiseSuppression,
+  applyNoiseSuppression,
   unregisterOutput,
   watchLatency,
 } from '../lib/audio-io';
@@ -134,6 +134,20 @@ export const SELF_SCREEN = 'self';
 let room: Room | null = null;
 let localScreenTrack: LocalVideoTrack | null = null;
 let stopLatency: (() => void) | null = null;
+
+/** Остальным участникам канала нужно знать, кто сейчас в эфире */
+function announceSharing(sharing: boolean): void {
+  const { channelId, muted, deafened } = useVoiceStore.getState();
+  if (!channelId) return;
+  emitVoiceState({ channelId, muted, deafened, sharing });
+}
+
+/* Точка входа для тестов: сам показ экрана автоматикой не запустить — окно
+   выбора рисует браузер. Проверять же передачу состояния по сети надо. */
+if (import.meta.env.DEV) {
+  (window as unknown as { __voxaAnnounceSharing: typeof announceSharing }).__voxaAnnounceSharing =
+    announceSharing;
+}
 const audioElements = new Map<string, HTMLMediaElement>();
 const screenVideoTracks = new Map<string, RemoteVideoTrack>();
 const cameraTracks = new Map<string, RemoteVideoTrack>();
@@ -323,6 +337,7 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
       next.on(RoomEvent.LocalTrackUnpublished, (pub: LocalTrackPublication) => {
         if (pub.source === Track.Source.ScreenShare) {
           localScreenTrack = null;
+          announceSharing(false);
           set((s) => ({
             sharing: false,
             watching: s.watching === SELF_SCREEN ? (s.screenSharers[0] ?? null) : s.watching,
@@ -343,7 +358,7 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
             screenSharers: [],
             watching: null,
           });
-          emitVoiceState({ channelId: null, muted: false, deafened: false });
+          emitVoiceState({ channelId: null, muted: false, deafened: false, sharing: false });
         }
       });
 
@@ -354,7 +369,7 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
       );
 
       set({ connecting: false, muted: false, deafened: false });
-      emitVoiceState({ channelId, muted: false, deafened: false });
+      emitVoiceState({ channelId, muted: false, deafened: false, sharing: false });
       playSelfJoin();
     } catch (error) {
       cleanupRoom();
@@ -398,7 +413,7 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
       screenSharers: [],
       watching: null,
     });
-    emitVoiceState({ channelId: null, muted: false, deafened: false });
+    emitVoiceState({ channelId: null, muted: false, deafened: false, sharing: false });
     playSelfLeave();
   },
 
@@ -408,7 +423,7 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
     if (!room || !channelId || muted) return;
     await room.localParticipant.setMicrophoneEnabled(false).catch(() => undefined);
     set({ muted: true });
-    emitVoiceState({ channelId, muted: true, deafened: get().deafened });
+    emitVoiceState({ channelId, muted: true, deafened: get().deafened, sharing: get().sharing });
   },
 
   toggleMute: async () => {
@@ -430,7 +445,7 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
       return;
     }
     set({ muted: nextMuted, deafened: nextDeafened });
-    emitVoiceState({ channelId, muted: nextMuted, deafened: nextDeafened });
+    emitVoiceState({ channelId, muted: nextMuted, deafened: nextDeafened, sharing: get().sharing });
     // Снятие мьюта вывело и из deafen — звучит возвращение звука, оно главнее
     if (deafened && !nextDeafened) playUndeafen();
     else if (nextMuted) playMicOff();
@@ -446,7 +461,7 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
     for (const element of audioElements.values()) element.muted = nextDeafened;
     await room.localParticipant.setMicrophoneEnabled(!nextMuted);
     set({ deafened: nextDeafened, muted: nextMuted });
-    emitVoiceState({ channelId, muted: nextMuted, deafened: nextDeafened });
+    emitVoiceState({ channelId, muted: nextMuted, deafened: nextDeafened, sharing: get().sharing });
     if (nextDeafened) playDeafen();
     else playUndeafen();
   },
@@ -480,23 +495,13 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
   /** Подавление шума меняется на лету: дорожка пересоздаётся с новой настройкой */
   toggleNoiseSuppression: async () => {
     const next = !noiseSuppression();
-    setNoiseSuppression(next);
-    /* Меняем настройку прямо на живой дорожке. Перезапуск через restartTrack
-       не годится: LiveKit заново запрашивает микрофон, пересоздаёт дорожку и
-       дёргает обработчик усиления — после этого микрофон замолкал и не
-       включался обратно. applyConstraints ничего не пересоздаёт. */
-    const track = room?.localParticipant.getTrackPublication(Track.Source.Microphone)?.audioTrack;
     try {
-      await track?.mediaStreamTrack.applyConstraints({
-        noiseSuppression: next,
-        echoCancellation: true,
-        autoGainControl: false,
-      });
+      await applyNoiseSuppression(next);
+      set({ noiseOn: next, error: null });
     } catch (error) {
       // Молча глотать нельзя: сломанный микрофон выглядел бы как загадка
       set({ error: error instanceof Error ? error.message : String(error) });
     }
-    set({ noiseOn: next });
   },
 
   /** Камера в канале — то же самое, что в звонке: устройство берём из настроек */
@@ -534,6 +539,7 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
       if (sharing) {
         localScreenTrack = null;
         playShareStop();
+        announceSharing(false);
         set((s) => ({
           sharing: false,
           watching: s.watching === SELF_SCREEN ? (s.screenSharers[0] ?? null) : s.watching,
@@ -542,6 +548,7 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
         localScreenTrack = (publication?.videoTrack as LocalVideoTrack | undefined) ?? null;
         // Звучит только если человек действительно выбрал экран, а не закрыл диалог
         if (publication) playShareStart();
+        announceSharing(Boolean(publication));
         // самопросмотр открываем сразу — видно, что именно стримишь
         set({
           sharing: Boolean(publication),
@@ -561,7 +568,8 @@ export function currentVoiceState(): {
   channelId: string | null;
   muted: boolean;
   deafened: boolean;
+  sharing: boolean;
 } {
-  const { channelId, muted, deafened } = useVoiceStore.getState();
-  return { channelId, muted, deafened };
+  const { channelId, muted, deafened, sharing } = useVoiceStore.getState();
+  return { channelId, muted, deafened, sharing };
 }

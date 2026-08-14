@@ -662,6 +662,47 @@ test.describe('Мелкие окна и поля', () => {
   });
 });
 
+test.describe('Эфир', () => {
+  /**
+   * Показ экрана должен быть виден остальным: без пометки непонятно, кого
+   * смотреть. Сам показ в тесте не запустить — систему выбора окна рисует
+   * браузер, — поэтому проверяем передачу состояния по сети напрямую.
+   */
+  test('пометка «в эфире» доходит до других участников', async ({ owner, friend }) => {
+    await owner.locator('.rail-icon.server').first().click();
+    await owner.waitForURL(/\/guilds\//);
+    await owner.locator('.channel-link.voice-link').first().click();
+    await expect(owner.locator('.voice-panel')).toBeVisible();
+
+    await friend.locator('.rail-icon.server').first().click();
+    await friend.waitForURL(/\/guilds\//);
+    const row = friend.locator('.voice-participant', { hasText: 'uitest_owner' });
+    await expect(row).toBeVisible();
+    await expect(row.locator('.live-badge')).toHaveCount(0);
+
+    // Объявляем эфир тем же событием, что и сам показ экрана
+    await owner.evaluate(() => {
+      const w = window as unknown as {
+        __voxaAnnounceSharing?: (value: boolean) => void;
+      };
+      w.__voxaAnnounceSharing?.(true);
+    });
+
+    await expect(row.locator('.live-badge')).toHaveText('В эфире');
+    await expect(
+      friend.locator('.member', { hasText: 'uitest_owner' }).locator('.member-status-text.sharing'),
+    ).toHaveText('Демонстрирует экран');
+
+    await owner.evaluate(() => {
+      const w = window as unknown as {
+        __voxaAnnounceSharing?: (value: boolean) => void;
+      };
+      w.__voxaAnnounceSharing?.(false);
+    });
+    await expect(row.locator('.live-badge')).toHaveCount(0);
+  });
+});
+
 test.describe('Панель владельца', () => {
   test('разделы переключаются, сводка и списки видны', async ({ owner }) => {
     await owner.locator('.rail-icon.owner').click();

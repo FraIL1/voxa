@@ -53,7 +53,12 @@ export class RedisIoAdapter extends IoAdapter {
   override async close(server: Server): Promise<void> {
     this.closing = true;
     await super.close(server);
-    await this.pubClient?.quit().catch(() => undefined);
-    await this.subClient?.quit().catch(() => undefined);
+    /* Пауза перед закрытием не для красоты: socket.io закрывает сервер, но
+       снятие подписок в адаптере доделывается асинхронно и не дожидается.
+       Если оборвать соединение прямо сейчас, ioredis отклонит эти незакрытые
+       команды с «Connection is closed», и никто их не поймает — прогон тестов
+       падал при полностью зелёных тестах. */
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await Promise.allSettled([this.pubClient?.quit(), this.subClient?.quit()]);
   }
 }

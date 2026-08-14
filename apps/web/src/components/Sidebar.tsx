@@ -1,6 +1,15 @@
 import { hasPermission, Permissions } from '@voxa/shared';
 import type { ChannelDto, ReadStateDto, VoiceParticipantDto } from '@voxa/shared';
-import { ChevronDown, Hash, HeadphoneOff, MicOff, Plus, Settings, Volume2 } from 'lucide-react';
+import {
+  ChevronDown,
+  Hash,
+  HeadphoneOff,
+  MicOff,
+  MonitorUp,
+  Plus,
+  Settings,
+  Volume2,
+} from 'lucide-react';
 import { useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink, useNavigate, useParams } from 'react-router';
@@ -26,6 +35,7 @@ function VoiceParticipants({
   participants: VoiceParticipantDto[];
   onContextMenu: (e: ReactMouseEvent, userId: string, username: string) => void;
 }) {
+  const { t } = useTranslation();
   const speaking = useVoiceStore((s) => s.speaking);
   if (participants.length === 0) return null;
 
@@ -39,6 +49,11 @@ function VoiceParticipants({
         >
           <Avatar name={p.username} className="voice-participant-avatar" />
           <span className="voice-participant-name">{p.username}</span>
+          {p.sharing && (
+            <span className="live-badge" title={t('voice.live')}>
+              <MonitorUp size={11} /> {t('voice.live')}
+            </span>
+          )}
           {p.muted && <MicOff size={12} />}
           {p.deafened && <HeadphoneOff size={12} />}
         </div>

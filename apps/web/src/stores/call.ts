@@ -21,7 +21,7 @@ import {
   micCaptureOptions,
   noiseSuppression,
   registerOutput,
-  setNoiseSuppression,
+  applyNoiseSuppression,
   unregisterOutput,
   watchLatency,
 } from '../lib/audio-io';
@@ -373,23 +373,13 @@ export const useCallStore = create<CallState>()((set, get) => ({
   /** Подавление шума общее с каналами: настройка одна на приложение */
   toggleNoiseSuppression: async () => {
     const next = !noiseSuppression();
-    setNoiseSuppression(next);
-    /* Меняем настройку прямо на живой дорожке. Перезапуск через restartTrack
-       не годится: LiveKit заново запрашивает микрофон, пересоздаёт дорожку и
-       дёргает обработчик усиления — после этого микрофон замолкал и не
-       включался обратно. applyConstraints ничего не пересоздаёт. */
-    const track = room?.localParticipant.getTrackPublication(Track.Source.Microphone)?.audioTrack;
     try {
-      await track?.mediaStreamTrack.applyConstraints({
-        noiseSuppression: next,
-        echoCancellation: true,
-        autoGainControl: false,
-      });
+      await applyNoiseSuppression(next);
+      set({ noiseOn: next, error: null });
     } catch (error) {
       // Молча глотать нельзя: сломанный микрофон выглядел бы как загадка
       set({ error: error instanceof Error ? error.message : String(error) });
     }
-    set({ noiseOn: next });
   },
 
   /** Демонстрация экрана в звонке — те же настройки качества, что и в канале */

@@ -6038,3 +6038,34 @@ h3 {
   background: #000;
   border: 1px solid var(--border);
 }
+
+/* Пометка «в эфире»: кто показывает экран прямо сейчас */
+.live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--danger-soft);
+  border: 1px solid rgba(251, 113, 133, 0.35);
+  color: var(--danger);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* В строке участника канала метка прижата к правому краю */
+.voice-participant .live-badge {
+  margin-left: auto;
+}
+
+/* Под ником в списке участников сервера */
+.member-status-text.sharing {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--danger);
+}

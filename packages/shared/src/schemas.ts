@@ -141,6 +141,8 @@ export const voiceStateSchema = z.object({
   channelId: z.string().uuid().nullable(),
   muted: z.boolean(),
   deafened: z.boolean(),
+  /** Показывает ли экран; старые клиенты поле не шлют */
+  sharing: z.boolean().default(false),
 });
 export type VoiceStateInput = z.infer<typeof voiceStateSchema>;
 

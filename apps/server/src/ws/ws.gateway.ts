@@ -238,7 +238,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     const parsed = voiceStateSchema.safeParse(body);
     if (!parsed.success) return;
-    const { channelId, deafened } = parsed.data;
+    const { channelId, deafened, sharing } = parsed.data;
     let { muted } = parsed.data;
 
     if (channelId !== null && !socket.rooms.has(channelRoom(channelId))) return;
@@ -260,6 +260,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       channelId,
       muted,
       deafened,
+      sharing,
     );
     for (const affectedChannelId of affected) {
       this.broadcastVoiceState(affectedChannelId);

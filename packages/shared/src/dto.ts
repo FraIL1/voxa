@@ -260,6 +260,8 @@ export interface VoiceParticipantDto {
   username: string;
   muted: boolean;
   deafened: boolean;
+  /** Показывает экран прямо сейчас */
+  sharing: boolean;
 }
 
 export interface VoiceChannelStateDto {

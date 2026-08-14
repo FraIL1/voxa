@@ -1,10 +1,12 @@
 import type { MemberDto } from '@voxa/shared';
+import { MonitorUp } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useParams } from 'react-router';
 
 import { useMembers } from '../hooks/useMembers';
+import { useVoiceStates } from '../hooks/useVoiceStates';
 import { openProfile } from '../stores/profileView';
 import Avatar from './Avatar';
 import MemberContextMenu, { type MenuState } from './MemberContextMenu';
@@ -35,6 +37,15 @@ export default function MemberList() {
   const { t } = useTranslation();
   const { guildId } = useParams<{ guildId: string }>();
   const { data: members } = useMembers(guildId);
+  const { data: voiceStates } = useVoiceStates();
+
+  /* Кто сейчас показывает экран. Берём из состояний голоса, а не из списка
+     участников: список приходит запросом и не знает про эфир. */
+  const sharingUsers = new Set(
+    (voiceStates ?? []).flatMap((state) =>
+      state.participants.filter((p) => p.sharing).map((p) => p.userId),
+    ),
+  );
   const [menu, setMenu] = useState<MenuState | null>(null);
 
   if (!members) {
@@ -78,8 +89,14 @@ export default function MemberList() {
                   <span className="member-name" style={color ? { color } : undefined}>
                     {member.nickname ?? member.displayName}
                   </span>
-                  {member.statusText && (
-                    <span className="member-status-text">{member.statusText}</span>
+                  {sharingUsers.has(member.id) ? (
+                    <span className="member-status-text sharing">
+                      <MonitorUp size={11} /> {t('voice.sharingNow')}
+                    </span>
+                  ) : (
+                    member.statusText && (
+                      <span className="member-status-text">{member.statusText}</span>
+                    )
                   )}
                 </span>
               </div>
