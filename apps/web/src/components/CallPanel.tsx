@@ -4,6 +4,7 @@ import {
   HeadphoneOff,
   Maximize2,
   Mic,
+  MonitorUp,
   MicOff,
   Minimize2,
   PhoneOff,
@@ -14,8 +15,33 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useAuthStore } from '../stores/auth';
-import { localVideoTrack, remoteVideoTrack, useCallStore } from '../stores/call';
+import {
+  localVideoTrack,
+  remoteVideoTrack,
+  screenTrackOf,
+  SELF_SCREEN_CALL,
+  useCallStore,
+} from '../stores/call';
+import { useVoiceStore } from '../stores/voice';
 import Avatar from './Avatar';
+import ShareOptionsModal from './ShareOptionsModal';
+
+/** Экран участника в звонке: трек живёт вне стора, привязываем вручную */
+function CallScreen({ owner, version }: { owner: string; version: number }) {
+  const ref = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const element = ref.current;
+    const track = screenTrackOf(owner);
+    if (!element || !track) return;
+    track.attach(element);
+    return () => {
+      track.detach(element);
+    };
+  }, [owner, version]);
+
+  return <video ref={ref} className="call-screen" autoPlay playsInline muted />;
+}
 
 /** Плитка участника: видео, если камера включена, иначе аватар */
 function CallTile({
@@ -103,6 +129,14 @@ export default function CallPanel({ conversationId }: { conversationId: string }
   const toggleDeafen = useCallStore((s) => s.toggleDeafen);
   const toggleCamera = useCallStore((s) => s.toggleCamera);
   const hangUp = useCallStore((s) => s.hangUp);
+  const toggleScreenShare = useCallStore((s) => s.toggleScreenShare);
+  const sharing = useCallStore((s) => s.sharing);
+  const screenSharers = useCallStore((s) => s.screenSharers);
+  const [shareOpen, setShareOpen] = useState(false);
+  const shareOptions = useVoiceStore((s) => s.shareOptions);
+
+  // Показываем один экран: свой, если показываешь сам, иначе первый чужой
+  const screenOwner = sharing ? SELF_SCREEN_CALL : (screenSharers[0] ?? null);
 
   const [collapsed, setCollapsed] = useState(false);
   const duration = useDuration(startedAt);
@@ -184,6 +218,8 @@ export default function CallPanel({ conversationId }: { conversationId: string }
         </div>
       )}
 
+      {screenOwner && <CallScreen owner={screenOwner} version={videoVersion} />}
+
       {error && <div className="call-error">{error}</div>}
 
       <div className="call-controls">
@@ -209,6 +245,13 @@ export default function CallPanel({ conversationId }: { conversationId: string }
           {cameraOn ? <Video size={19} /> : <VideoOff size={19} />}
         </button>
         <button
+          className={`call-control${sharing ? ' engaged' : ''}`}
+          title={sharing ? t('voice.stopShare') : t('voice.shareScreen')}
+          onClick={() => (sharing ? void toggleScreenShare() : setShareOpen(true))}
+        >
+          <MonitorUp size={19} />
+        </button>
+        <button
           className="call-control hangup"
           title={t('call.hangUp')}
           onClick={() => void hangUp()}
@@ -216,6 +259,14 @@ export default function CallPanel({ conversationId }: { conversationId: string }
           <PhoneOff size={19} />
         </button>
       </div>
+
+      {shareOpen && (
+        <ShareOptionsModal
+          initial={shareOptions}
+          onStart={(options) => void toggleScreenShare(options)}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
     </div>
   );
 }

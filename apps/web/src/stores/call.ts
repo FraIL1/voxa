@@ -17,12 +17,15 @@ import { create } from 'zustand';
 
 import { api } from '../api/client';
 import { applyMicGain, registerOutput, unregisterOutput } from '../lib/audio-io';
+import type { ShareOptions } from './voice';
 import {
   playCallConnected,
   playCallEnded,
   playDeafen,
   playMicOff,
   playMicOn,
+  playShareStart,
+  playShareStop,
   playUndeafen,
   startDialTone,
 } from '../lib/sounds';
@@ -47,6 +50,17 @@ let room: Room | null = null;
 let localVideo: LocalVideoTrack | null = null;
 /** Видео участников по их id — в беседе их может быть несколько */
 const remoteVideos = new Map<string, RemoteVideoTrack>();
+const remoteScreens = new Map<string, RemoteVideoTrack>();
+let localScreen: LocalVideoTrack | null = null;
+
+/** Ключ собственного экрана в списке показывающих */
+export const SELF_SCREEN_CALL = 'self-screen';
+
+/** Видеотрек демонстрации участника звонка */
+export function screenTrackOf(userId: string): RemoteVideoTrack | LocalVideoTrack | null {
+  if (userId === SELF_SCREEN_CALL) return localScreen;
+  return remoteScreens.get(userId) ?? null;
+}
 const audioElements = new Map<string, HTMLAudioElement>();
 
 export function remoteVideoTrack(userId: string): RemoteVideoTrack | null {
@@ -76,6 +90,8 @@ function cleanup(): void {
     element.remove();
   }
   audioElements.clear();
+  remoteScreens.clear();
+  localScreen = null;
   remoteVideos.clear();
   localVideo = null;
   room = null;
@@ -114,6 +130,10 @@ interface CallState {
   endedReason: DmCallEndReason | null;
   /** Кто говорит прямо сейчас: в групповом звонке иначе не разобрать */
   speaking: Record<string, boolean>;
+  /** Своя демонстрация экрана идёт */
+  sharing: boolean;
+  /** Кто показывает экран */
+  screenSharers: string[];
 
   startCall: (
     conversationId: string,
@@ -130,6 +150,7 @@ interface CallState {
   toggleMute: () => Promise<void>;
   toggleDeafen: () => Promise<void>;
   toggleCamera: () => Promise<void>;
+  toggleScreenShare: (options?: ShareOptions) => Promise<void>;
   /** Обработчики WS-событий */
   onIncoming: (payload: DmCallIncomingPayload) => void;
   onAccepted: () => void;
@@ -149,6 +170,8 @@ const IDLE_STATE = {
   deafened: false,
   startedAt: null,
   speaking: {} as Record<string, boolean>,
+  sharing: false,
+  screenSharers: [] as string[],
 };
 
 export const useCallStore = create<CallState>()((set, get) => ({
@@ -164,6 +187,8 @@ export const useCallStore = create<CallState>()((set, get) => ({
   deafened: false,
   cameraOn: false,
   speaking: {},
+  sharing: false,
+  screenSharers: [],
   videoUserIds: [],
   startedAt: null,
   videoVersion: 0,
@@ -314,6 +339,30 @@ export const useCallStore = create<CallState>()((set, get) => ({
     }
   },
 
+  /** Демонстрация экрана в звонке — те же настройки качества, что и в канале */
+  toggleScreenShare: async (options) => {
+    if (!room) return;
+    const sharing = get().sharing;
+    const next = options ?? useVoiceStore.getState().shareOptions;
+    try {
+      const publication = await room.localParticipant.setScreenShareEnabled(!sharing, {
+        audio: next.audio,
+        resolution: { width: next.width, height: next.height, frameRate: next.frameRate },
+      });
+      if (sharing) {
+        localScreen = null;
+        playShareStop();
+        set((s) => ({ sharing: false, videoVersion: s.videoVersion + 1 }));
+      } else {
+        localScreen = (publication?.videoTrack as LocalVideoTrack | undefined) ?? null;
+        if (publication) playShareStart();
+        set((s) => ({ sharing: Boolean(publication), videoVersion: s.videoVersion + 1 }));
+      }
+    } catch {
+      // человек закрыл диалог выбора экрана — не ошибка
+    }
+  },
+
   onIncoming: (payload) => {
     // Уже в звонке — новый вызов игнорируем (сервер сам ответит «занято»)
     if (get().status !== 'idle') return;
@@ -379,6 +428,13 @@ async function connect(
         videoVersion: s.videoVersion + 1,
       }));
     }
+    if (track.source === Track.Source.ScreenShare) {
+      remoteScreens.set(participant.identity, track as RemoteVideoTrack);
+      set((s) => ({
+        screenSharers: [...new Set([...s.screenSharers, participant.identity])],
+        videoVersion: s.videoVersion + 1,
+      }));
+    }
   });
 
   next.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack, _pub, participant) => {
@@ -389,12 +445,28 @@ async function connect(
       audioElements.delete(participant.identity);
       return;
     }
-    if (track.source === Track.Source.ScreenShare || track.source === Track.Source.Camera) {
+    if (track.source === Track.Source.ScreenShare) {
+      remoteScreens.delete(participant.identity);
+      set((s) => ({
+        screenSharers: s.screenSharers.filter((id) => id !== participant.identity),
+        videoVersion: s.videoVersion + 1,
+      }));
+      return;
+    }
+    if (track.source === Track.Source.Camera) {
       remoteVideos.delete(participant.identity);
       set((s) => ({
         videoUserIds: s.videoUserIds.filter((id) => id !== participant.identity),
         videoVersion: s.videoVersion + 1,
       }));
+    }
+  });
+
+  // «Остановить демонстрацию» из панели браузера
+  next.on(RoomEvent.LocalTrackUnpublished, (pub) => {
+    if (pub.source === Track.Source.ScreenShare) {
+      localScreen = null;
+      set((s) => ({ sharing: false, videoVersion: s.videoVersion + 1 }));
     }
   });
 

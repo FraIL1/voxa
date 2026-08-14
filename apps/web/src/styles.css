@@ -5880,3 +5880,24 @@ h3 {
     transform: none;
   }
 }
+
+/* Видео с камеры в плитке голосового канала */
+.voice-video {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: var(--radius);
+  background: #000;
+  /* Себя привычнее видеть зеркально */
+  transform: scaleX(-1);
+}
+
+/* Экран участника в панели звонка */
+.call-screen {
+  width: 100%;
+  max-height: 46vh;
+  object-fit: contain;
+  border-radius: var(--radius);
+  background: #000;
+  border: 1px solid var(--border);
+}

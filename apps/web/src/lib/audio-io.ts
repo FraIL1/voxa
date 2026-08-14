@@ -107,10 +107,15 @@ export async function applyMicGain(track: LocalAudioTrack | undefined): Promise<
 /**
  * Проверка микрофона: отдаёт уровень 0…1 примерно 30 раз в секунду.
  * Усиление учитывается, поэтому ползунок видно на глаз.
+ *
+ * `monitor` включает возврат звука в наушники: полоска показывает, что
+ * микрофон что-то слышит, но не что именно — шорох стула выглядит так же,
+ * как речь. Услышать себя — единственный способ убедиться, что пишется голос.
  */
 export function measureMicLevel(
   deviceId: string | null,
   onLevel: (level: number) => void,
+  monitor = false,
 ): () => void {
   let stopped = false;
   let stop = (): void => {
@@ -133,6 +138,14 @@ export function measureMicLevel(
       analyser.fftSize = 1024;
       source.connect(gain).connect(analyser);
 
+      // Возврат звука идёт через свой регулятор: без наушников иначе заводится
+      let monitorGain: GainNode | null = null;
+      if (monitor) {
+        monitorGain = context.createGain();
+        monitorGain.gain.value = levels.output;
+        analyser.connect(monitorGain).connect(context.destination);
+      }
+
       const buffer = new Float32Array(analyser.fftSize);
       let frame = 0;
 
@@ -154,6 +167,7 @@ export function measureMicLevel(
         source.disconnect();
         gain.disconnect();
         analyser.disconnect();
+        monitorGain?.disconnect();
         stream.getTracks().forEach((t) => t.stop());
         void context.close();
       };

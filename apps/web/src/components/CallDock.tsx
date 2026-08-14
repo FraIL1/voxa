@@ -1,4 +1,13 @@
-import { Headphones, HeadphoneOff, Maximize2, Mic, MicOff, PhoneOff } from 'lucide-react';
+import {
+  Headphones,
+  HeadphoneOff,
+  Maximize2,
+  Mic,
+  MicOff,
+  PhoneOff,
+  Video,
+  VideoOff,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router';
@@ -44,6 +53,8 @@ export default function CallDock() {
   const toggleMute = useCallStore((s) => s.toggleMute);
   const toggleDeafen = useCallStore((s) => s.toggleDeafen);
   const hangUp = useCallStore((s) => s.hangUp);
+  const toggleCamera = useCallStore((s) => s.toggleCamera);
+  const cameraOn = useCallStore((s) => s.cameraOn);
 
   const duration = useDuration(startedAt);
   const inCall = status === 'active' || status === 'outgoing';
@@ -83,6 +94,13 @@ export default function CallDock() {
           onClick={() => void toggleDeafen()}
         >
           {deafened ? <HeadphoneOff size={16} /> : <Headphones size={16} />}
+        </button>
+        <button
+          className={`call-dock-button${cameraOn ? ' engaged' : ''}`}
+          title={cameraOn ? t('call.cameraOff') : t('call.cameraOn')}
+          onClick={() => void toggleCamera()}
+        >
+          {cameraOn ? <Video size={16} /> : <VideoOff size={16} />}
         </button>
         <button
           className="call-dock-button hangup"

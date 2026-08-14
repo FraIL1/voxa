@@ -1,5 +1,5 @@
 import { createLocalVideoTrack, Room, type LocalVideoTrack } from 'livekit-client';
-import { Bell, BellOff, Mic, Play, Video, VideoOff, Volume2 } from 'lucide-react';
+import { Bell, BellOff, Mic, Play, Video, VideoOff, Volume2, VolumeX } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -31,6 +31,7 @@ export default function AudioDeviceSelects({ withCamera = false }: { withCamera?
   const [gain, setGain] = useState(micGain);
   const [output, setOutput] = useState(outputVolume);
   const [testing, setTesting] = useState(false);
+  const [monitor, setMonitor] = useState(false);
   const [level, setLevel] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -82,8 +83,8 @@ export default function AudioDeviceSelects({ withCamera = false }: { withCamera?
       setLevel(0);
       return;
     }
-    return measureMicLevel(voice.micDeviceId, setLevel);
-  }, [testing, voice.micDeviceId]);
+    return measureMicLevel(voice.micDeviceId, setLevel, monitor);
+  }, [testing, monitor, voice.micDeviceId]);
 
   const toOptions = (devices: DeviceOption[]): { value: string; label: string }[] =>
     devices.map((d) => ({ value: d.deviceId, label: d.label || t('voice.defaultDevice') }));
@@ -121,16 +122,37 @@ export default function AudioDeviceSelects({ withCamera = false }: { withCamera?
 
       <button
         className="btn-secondary"
-        onClick={() => setTesting((on) => !on)}
+        onClick={() => {
+          setTesting((on) => !on);
+          setMonitor(false);
+        }}
         title={t('voice.micTestHint')}
       >
         <Mic size={15} /> {testing ? t('voice.micTestStop') : t('voice.micTest')}
       </button>
 
       {testing && (
-        <div className="mic-meter" role="progressbar" aria-valuenow={Math.round(level * 100)}>
-          <span className="mic-meter-fill" style={{ transform: `scaleX(${level})` }} />
-        </div>
+        <>
+          <div className="mic-meter" role="progressbar" aria-valuenow={Math.round(level * 100)}>
+            <span className="mic-meter-fill" style={{ transform: `scaleX(${level})` }} />
+          </div>
+
+          <label className="sound-toggle">
+            {monitor ? <Volume2 size={16} /> : <VolumeX size={16} />}
+            <span className="sound-toggle-text">
+              <span className="owner-setting-name">{t('voice.micMonitor')}</span>
+              <span className="settings-hint">{t('voice.micMonitorHint')}</span>
+            </span>
+            <span className="owner-switch">
+              <input
+                type="checkbox"
+                checked={monitor}
+                onChange={(e) => setMonitor(e.target.checked)}
+              />
+              <span className="owner-switch-track" />
+            </span>
+          </label>
+        </>
       )}
       <label>
         {t('voice.output')}

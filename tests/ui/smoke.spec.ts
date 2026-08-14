@@ -520,6 +520,61 @@ test.describe('Плотность и движение', () => {
   });
 });
 
+test.describe('Управление звуком и видео', () => {
+  /**
+   * В канале не было камеры, в звонке — демонстрации экрана. Набор кнопок
+   * должен быть один и тот же, иначе человек не понимает, что где доступно.
+   */
+  test('в голосовом канале есть все пять кнопок', async ({ owner }) => {
+    await owner.locator('.rail-icon.server').first().click();
+    await owner.waitForURL(/\/guilds\//);
+    // Клик по голосовому каналу сразу и переводит, и подключает
+    await owner.locator('.channel-link.voice-link').first().click();
+
+    const controls = owner.locator('.voice-controls');
+    await expect(controls).toBeVisible();
+    await expect(controls.getByTitle('Выключить микрофон')).toBeVisible();
+    await expect(controls.getByTitle('Выключить звук')).toBeVisible();
+    await expect(controls.getByTitle('Включить камеру')).toBeVisible();
+    await expect(controls.getByTitle('Демонстрация экрана')).toBeVisible();
+    await expect(controls.getByTitle('Отключиться')).toBeVisible();
+
+    await controls.getByTitle('Отключиться').click();
+  });
+
+  test('в звонке есть все пять кнопок', async ({ owner }) => {
+    await owner.getByRole('button', { name: 'Все', exact: true }).click();
+    await owner.getByTitle('Написать').first().click();
+    await owner.waitForURL(/\/dm\//);
+    await owner.locator('.dm-header-actions').getByTitle('Голосовой звонок').click();
+
+    const controls = owner.locator('.call-controls');
+    await expect(controls.getByTitle('Выключить микрофон')).toBeVisible();
+    await expect(controls.getByTitle('Выключить звук')).toBeVisible();
+    await expect(controls.getByTitle('Включить камеру')).toBeVisible();
+    await expect(controls.getByTitle('Демонстрация экрана')).toBeVisible();
+    await expect(controls.getByTitle('Завершить звонок')).toBeVisible();
+
+    await controls.getByTitle('Завершить звонок').click();
+  });
+
+  test('проверка микрофона умеет возвращать звук в наушники', async ({ owner }) => {
+    await owner.locator('.user-card').getByTitle('Настройки').first().click();
+    await owner.getByRole('button', { name: 'Голос и видео' }).click();
+    await owner.getByRole('button', { name: 'Проверить микрофон' }).click();
+
+    const monitor = owner.locator('.sound-toggle', { hasText: 'Слышать себя' });
+    await expect(monitor).toBeVisible();
+    await monitor.locator('input').check();
+    await expect(monitor.locator('input')).toBeChecked();
+
+    // Выключение проверки гасит и возврат звука
+    await owner.getByRole('button', { name: 'Остановить проверку' }).click();
+    await expect(monitor).toBeHidden();
+    await owner.locator('.settings-panel').getByTitle('Закрыть').click();
+  });
+});
+
 test.describe('Панель владельца', () => {
   test('разделы переключаются, сводка и списки видны', async ({ owner }) => {
     await owner.locator('.rail-icon.owner').click();
@@ -724,7 +779,9 @@ test.describe('Звонок в личных сообщениях', () => {
     const stage = owner.locator('.call-stage');
     await expect(stage).toBeVisible();
     await expect(stage.locator('.call-avatar')).toBeVisible();
-    await expect(stage.locator('.call-control')).toHaveCount(4);
+    // Микрофон, наушники, камера, демонстрация, завершить — набор проверяет
+    // отдельный сценарий, здесь важно, что кнопки вообще есть
+    await expect(stage.locator('.call-control')).toHaveCount(5);
 
     // Круглые кнопки не должны сжиматься до размера обычной иконки:
     // общий .icon-button однажды уже зажал их и иконки полезли за края

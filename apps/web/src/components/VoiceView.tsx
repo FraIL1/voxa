@@ -1,13 +1,64 @@
 import type { ChannelDto } from '@voxa/shared';
-import { Headphones, HeadphoneOff, Mic, MicOff, MonitorUp, PhoneOff, Volume2 } from 'lucide-react';
+import {
+  Headphones,
+  HeadphoneOff,
+  Mic,
+  MicOff,
+  MonitorUp,
+  PhoneOff,
+  Video,
+  VideoOff,
+  Volume2,
+} from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { participantsOf, useVoiceStates } from '../hooks/useVoiceStates';
 import { useAuthStore } from '../stores/auth';
-import { screenVideoTrackOf, SELF_SCREEN, useVoiceStore } from '../stores/voice';
+import {
+  cameraTrackOf,
+  screenVideoTrackOf,
+  SELF_CAMERA,
+  SELF_SCREEN,
+  useVoiceStore,
+} from '../stores/voice';
 import Avatar from './Avatar';
 import ShareOptionsModal from './ShareOptionsModal';
+
+/**
+ * Плитка участника. Когда камера включена, вместо аватарки идёт видео —
+ * трек живёт вне стора, поэтому привязываем его вручную.
+ */
+function VoiceTile({
+  userId,
+  name,
+  withVideo,
+  self,
+  version,
+}: {
+  userId: string;
+  name: string;
+  withVideo: boolean;
+  self: boolean;
+  /** Меняется при появлении и пропаже треков — повод перепривязаться */
+  version: number;
+}) {
+  const ref = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const element = ref.current;
+    const track = cameraTrackOf(self ? SELF_CAMERA : userId);
+    if (!element || !track || !withVideo) return;
+    track.attach(element);
+    return () => {
+      track.detach(element);
+    };
+  }, [userId, self, withVideo, version]);
+
+  if (!withVideo) return <Avatar name={name} className="voice-avatar" />;
+  // Своё видео зеркалим и глушим: слышать себя не нужно
+  return <video ref={ref} className="voice-video" autoPlay playsInline muted />;
+}
 
 export default function VoiceView({ channel }: { channel: ChannelDto }) {
   const { t } = useTranslation();
@@ -80,7 +131,13 @@ export default function VoiceView({ channel }: { channel: ChannelDto }) {
             key={p.userId}
             className={`voice-tile${voice.speaking[p.userId] ? ' speaking' : ''}`}
           >
-            <Avatar name={p.username} className="voice-avatar" />
+            <VoiceTile
+              userId={p.userId}
+              name={p.username}
+              self={p.userId === myId}
+              withVideo={p.userId === myId ? voice.cameraOn : voice.cameraUsers.includes(p.userId)}
+              version={voice.videoVersion}
+            />
             <span className="voice-tile-name">{p.username}</span>
             <span className="voice-tile-icons">
               {p.muted && <MicOff size={14} />}
@@ -124,6 +181,13 @@ export default function VoiceView({ channel }: { channel: ChannelDto }) {
               onClick={() => void voice.toggleDeafen()}
             >
               {voice.deafened ? <HeadphoneOff size={20} /> : <Headphones size={20} />}
+            </button>
+            <button
+              className={`icon-button voice-control${voice.cameraOn ? ' engaged' : ''}`}
+              title={voice.cameraOn ? t('call.cameraOff') : t('call.cameraOn')}
+              onClick={() => void voice.toggleCamera()}
+            >
+              {voice.cameraOn ? <Video size={20} /> : <VideoOff size={20} />}
             </button>
             <button
               className={`icon-button voice-control${voice.sharing ? ' sharing' : ''}`}

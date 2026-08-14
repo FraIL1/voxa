@@ -82,6 +82,12 @@ interface VoiceState {
   participantVolumes: Record<string, number>;
   /** Я демонстрирую экран */
   sharing: boolean;
+  /** Своя камера включена */
+  cameraOn: boolean;
+  /** Кто из участников показывает камеру */
+  cameraUsers: string[];
+  /** Счётчик для перепривязки видео: треки живут вне стора */
+  videoVersion: number;
   /** Кто в канале демонстрирует экран (userId) */
   screenSharers: string[];
   /** Чей экран смотрим */
@@ -99,6 +105,7 @@ interface VoiceState {
   /** Что показывать и как — спрашиваем перед запуском, выбор запоминается */
   shareOptions: ShareOptions;
   toggleScreenShare: (options?: ShareOptions) => Promise<void>;
+  toggleCamera: () => Promise<void>;
   watch: (userId: string | null) => void;
 }
 
@@ -110,6 +117,17 @@ let room: Room | null = null;
 let localScreenTrack: LocalVideoTrack | null = null;
 const audioElements = new Map<string, HTMLMediaElement>();
 const screenVideoTracks = new Map<string, RemoteVideoTrack>();
+const cameraTracks = new Map<string, RemoteVideoTrack>();
+let localCameraTrack: LocalVideoTrack | null = null;
+
+/** Видеотрек камеры участника (для attach в компоненте) */
+export function cameraTrackOf(userId: string): RemoteVideoTrack | LocalVideoTrack | undefined {
+  if (userId === SELF_CAMERA) return localCameraTrack ?? undefined;
+  return cameraTracks.get(userId);
+}
+
+/** Ключ собственной камеры в списке участников с видео */
+export const SELF_CAMERA = 'self-camera';
 
 /** Видеотрек демонстрации экрана участника (для attach в компоненте) */
 export function screenVideoTrackOf(userId: string): RemoteVideoTrack | LocalVideoTrack | undefined {
@@ -142,7 +160,9 @@ function cleanupRoom(): void {
   }
   audioElements.clear();
   screenVideoTracks.clear();
+  cameraTracks.clear();
   localScreenTrack = null;
+  localCameraTrack = null;
   room = null;
 }
 
@@ -165,6 +185,9 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
   cameraDeviceId: savedDevices.cameraId,
   participantVolumes: loadJson<Record<string, number>>(VOLUMES_KEY, {}),
   sharing: false,
+  cameraOn: false,
+  cameraUsers: [],
+  videoVersion: 0,
   screenSharers: [],
   watching: null,
   shareOptions: loadJson<ShareOptions>(SHARE_KEY, DEFAULT_SHARE),
@@ -204,6 +227,13 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
               watching: s.watching ?? participant.identity,
             }));
           }
+          if (track.source === Track.Source.Camera) {
+            cameraTracks.set(participant.identity, track as RemoteVideoTrack);
+            set((s) => ({
+              cameraUsers: [...new Set([...s.cameraUsers, participant.identity])],
+              videoVersion: s.videoVersion + 1,
+            }));
+          }
         },
       );
 
@@ -212,6 +242,14 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
         (track: RemoteTrack, _pub, participant: RemoteParticipant) => {
           if (track.kind === Track.Kind.Audio) {
             detachTrack(track);
+            return;
+          }
+          if (track.source === Track.Source.Camera) {
+            cameraTracks.delete(participant.identity);
+            set((s) => ({
+              cameraUsers: s.cameraUsers.filter((id) => id !== participant.identity),
+              videoVersion: s.videoVersion + 1,
+            }));
             return;
           }
           if (track.source === Track.Source.ScreenShare) {
@@ -289,7 +327,9 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
     }
     audioElements.clear();
     screenVideoTracks.clear();
+    cameraTracks.clear();
     localScreenTrack = null;
+    localCameraTrack = null;
     set({
       channelId: null,
       channelName: null,
@@ -298,6 +338,8 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
       muted: false,
       deafened: false,
       sharing: false,
+      cameraOn: false,
+      cameraUsers: [],
       screenSharers: [],
       watching: null,
     });
@@ -372,6 +414,25 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
     saveJson(VOLUMES_KEY, volumes);
     set({ participantVolumes: volumes });
     room?.remoteParticipants.get(userId)?.setVolume(volume);
+  },
+
+  /** Камера в канале — то же самое, что в звонке: устройство берём из настроек */
+  toggleCamera: async () => {
+    const { cameraOn, cameraDeviceId } = get();
+    if (!room) return;
+    const next = !cameraOn;
+    try {
+      await room.localParticipant.setCameraEnabled(
+        next,
+        cameraDeviceId ? { deviceId: cameraDeviceId } : undefined,
+      );
+      localCameraTrack =
+        (room.localParticipant.getTrackPublication(Track.Source.Camera)?.track as
+          LocalVideoTrack | undefined) ?? null;
+      set((s) => ({ cameraOn: next, videoVersion: s.videoVersion + 1 }));
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : String(error) });
+    }
   },
 
   toggleScreenShare: async (options) => {
