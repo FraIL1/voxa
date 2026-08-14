@@ -2443,6 +2443,18 @@ h3 {
   color: var(--text-muted);
 }
 
+/* Галочка стоит слева от подписи, а не над ней. Селектор с родителем не
+   случаен: правило выше ставит колонку всем подписям формы и весит больше
+   одного класса — без этого галочка уезжала на отдельную строку по центру. */
+.add-server-form .settings-toggle {
+  flex-direction: row;
+  align-items: center;
+  gap: 9px;
+  margin: 4px 0 2px;
+  color: var(--text);
+  font-size: 14px;
+}
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;
@@ -2680,6 +2692,14 @@ h3 {
 .danger-text {
   color: var(--danger);
   margin-top: 16px;
+}
+
+/* В строке кнопок отступ сверху не нужен: он сдвигал «Удалить» вниз, и
+   рядом с «Сохранить» кнопки выглядели разными. Заодно опасное действие
+   уезжает влево, подальше от основного. */
+.modal-actions .danger-text {
+  margin-top: 0;
+  margin-right: auto;
 }
 
 /* ---------- Категории: сворачивание, «+», шестерёнка канала ---------- */

@@ -24,6 +24,7 @@ import {
 } from '../stores/call';
 import { useVoiceStore } from '../stores/voice';
 import Avatar from './Avatar';
+import LiveVideo from './LiveVideo';
 import ShareOptionsModal from './ShareOptionsModal';
 
 /** Экран участника в звонке: трек живёт вне стора, привязываем вручную */
@@ -40,7 +41,7 @@ function CallScreen({ owner, version }: { owner: string; version: number }) {
     };
   }, [owner, version]);
 
-  return <video ref={ref} className="call-screen" autoPlay playsInline muted />;
+  return <LiveVideo ref={ref} className="call-screen" />;
 }
 
 /** Плитка участника: видео, если камера включена, иначе аватар */
@@ -79,7 +80,7 @@ function CallTile({
       }`}
     >
       {withVideo ? (
-        <video ref={ref} className="call-video" autoPlay playsInline muted={self} />
+        <LiveVideo ref={ref} className="call-video" muted={self} />
       ) : (
         <Avatar name={name} url={avatarUrl} className="call-tile-avatar" />
       )}

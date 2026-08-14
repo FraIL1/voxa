@@ -422,7 +422,13 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
     if (!nextDeafened && deafened) {
       for (const element of audioElements.values()) element.muted = false;
     }
-    await room.localParticipant.setMicrophoneEnabled(!nextMuted);
+    try {
+      await room.localParticipant.setMicrophoneEnabled(!nextMuted);
+    } catch (error) {
+      // Без этого не включившийся микрофон выглядел как «кнопка не нажимается»
+      set({ error: error instanceof Error ? error.message : String(error) });
+      return;
+    }
     set({ muted: nextMuted, deafened: nextDeafened });
     emitVoiceState({ channelId, muted: nextMuted, deafened: nextDeafened });
     // Снятие мьюта вывело и из deafen — звучит возвращение звука, оно главнее
@@ -475,11 +481,21 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
   toggleNoiseSuppression: async () => {
     const next = !noiseSuppression();
     setNoiseSuppression(next);
+    /* Меняем настройку прямо на живой дорожке. Перезапуск через restartTrack
+       не годится: LiveKit заново запрашивает микрофон, пересоздаёт дорожку и
+       дёргает обработчик усиления — после этого микрофон замолкал и не
+       включался обратно. applyConstraints ничего не пересоздаёт. */
     const track = room?.localParticipant.getTrackPublication(Track.Source.Microphone)?.audioTrack;
-    /* Обработчик усиления заново не вешаем: LiveKit перезапускает его сам
-       вместе с дорожкой. Второй обработчик поверх живого рвал цепочку —
-       микрофон переставал передавать что-либо. */
-    await track?.restartTrack(micCaptureOptions(get().micDeviceId)).catch(() => undefined);
+    try {
+      await track?.mediaStreamTrack.applyConstraints({
+        noiseSuppression: next,
+        echoCancellation: true,
+        autoGainControl: false,
+      });
+    } catch (error) {
+      // Молча глотать нельзя: сломанный микрофон выглядел бы как загадка
+      set({ error: error instanceof Error ? error.message : String(error) });
+    }
     set({ noiseOn: next });
   },
 

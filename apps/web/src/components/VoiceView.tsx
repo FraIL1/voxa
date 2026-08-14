@@ -23,6 +23,7 @@ import {
   useVoiceStore,
 } from '../stores/voice';
 import Avatar from './Avatar';
+import LiveVideo from './LiveVideo';
 import ShareOptionsModal from './ShareOptionsModal';
 
 /**
@@ -57,7 +58,7 @@ function VoiceTile({
 
   if (!withVideo) return <Avatar name={name} className="voice-avatar" />;
   // Своё видео зеркалим и глушим: слышать себя не нужно
-  return <video ref={ref} className="voice-video" autoPlay playsInline muted />;
+  return <LiveVideo ref={ref} className="voice-video" />;
 }
 
 export default function VoiceView({ channel }: { channel: ChannelDto }) {
@@ -117,7 +118,7 @@ export default function VoiceView({ channel }: { channel: ChannelDto }) {
             )}
           </div>
           {voice.watching && watchingTrackReady ? (
-            <video ref={videoRef} className="screen-video" autoPlay playsInline muted />
+            <LiveVideo ref={videoRef} className="screen-video" />
           ) : (
             <div className="screen-placeholder">{t('voice.pickScreen')}</div>
           )}

@@ -633,6 +633,35 @@ test.describe('Панель связи', () => {
   });
 });
 
+test.describe('Мелкие окна и поля', () => {
+  test('настройки канала: галочка слева, кнопки на одной высоте', async ({ owner }) => {
+    await owner.locator('.rail-icon.server').first().click();
+    await owner.waitForURL(/\/guilds\//);
+    await owner.locator('.channel-row').first().hover();
+    await owner.locator('.channel-row').first().locator('button').last().click();
+
+    const modal = owner.locator('.add-server-modal');
+    await expect(modal).toBeVisible();
+
+    // Галочка стоит в строку с подписью, а не над ней
+    const toggle = modal.locator('.settings-toggle');
+    await expect(toggle).toHaveCSS('flex-direction', 'row');
+    const boxRect = await toggle.locator('input').boundingBox();
+    const labelRect = await toggle.boundingBox();
+    expect(boxRect!.x).toBeLessThan(labelRect!.x + 40);
+
+    // Кнопки одной высоты и на одной линии
+    const remove = await modal.getByRole('button', { name: 'Удалить канал' }).boundingBox();
+    const save = await modal.getByRole('button', { name: 'Сохранить' }).boundingBox();
+    expect(Math.abs(remove!.height - save!.height)).toBeLessThan(2);
+    expect(Math.abs(remove!.y - save!.y)).toBeLessThan(2);
+    // Опасное действие слева, основное справа
+    expect(remove!.x).toBeLessThan(save!.x);
+
+    await owner.keyboard.press('Escape');
+  });
+});
+
 test.describe('Панель владельца', () => {
   test('разделы переключаются, сводка и списки видны', async ({ owner }) => {
     await owner.locator('.rail-icon.owner').click();
