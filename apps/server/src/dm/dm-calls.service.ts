@@ -10,6 +10,7 @@ import { AccessToken } from 'livekit-server-sdk';
 
 import type { Env } from '../config/env';
 import { PrismaService } from '../prisma/prisma.service';
+import { VoiceStateService } from '../voice/voice-state.service';
 import { WsGateway } from '../ws/ws.gateway';
 
 /** Токен живёт долго: переподключения LiveKit не требуют нового */
@@ -49,7 +50,19 @@ export class DmCallsService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService<Env, true>,
     private readonly ws: WsGateway,
+    private readonly voiceStates: VoiceStateService,
   ) {}
+
+  /**
+   * Разговор может быть только один. Правило держит сервер, а не клиент:
+   * на клиенте выход из канала зависел от того, доживёт ли код до конца —
+   * упавший разрыв соединения оставлял человека в канале навсегда. Сервер
+   * же снимает его безусловно, чем бы ни занимался браузер.
+   */
+  private dropVoiceChannel(userId: string): void {
+    const channelId = this.voiceStates.drop(userId);
+    if (channelId) this.ws.broadcastVoiceState(channelId);
+  }
 
   activeCall(conversationId: string): ActiveCall | undefined {
     return this.calls.get(conversationId);
@@ -110,6 +123,8 @@ export class DmCallsService {
     conversationName: string | null,
     video: boolean,
   ): Promise<VoiceTokenDto> {
+    this.dropVoiceChannel(starterId);
+
     const existing = this.calls.get(conversationId);
     if (existing) {
       // Разговор уже идёт — это присоединение, а не новый звонок
@@ -160,6 +175,9 @@ export class DmCallsService {
   ): Promise<VoiceTokenDto> {
     const call = this.calls.get(conversationId);
     if (!call) throw new BadRequestException('Звонок уже завершён');
+
+    // Взял трубку или присоединился — из голосового канала выходим так же
+    this.dropVoiceChannel(userId);
 
     const first = call.participants.size <= 1;
     call.participants.add(userId);

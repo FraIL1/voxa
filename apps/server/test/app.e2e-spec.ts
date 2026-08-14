@@ -538,6 +538,63 @@ describe('Voxa: критический поток (e2e)', () => {
     expect((await left).participants).toHaveLength(0);
   });
 
+  it('звонок в личке снимает человека с голосового канала', async () => {
+    const structure = await request(httpServer)
+      .get(`/api/guilds/${guildId}/structure`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    const voiceChannel = (structure.body as CommunityStructureDto).categories
+      .flatMap((c) => c.channels)
+      .find((c) => c.type === 'VOICE') as { id: string };
+
+    const inChannel = new Promise<{ participants: unknown[] }>((resolve) => {
+      socket?.once(WsEvents.VoiceUpdate, resolve);
+    });
+    socket?.emit(WsClientEvents.VoiceState, {
+      channelId: voiceChannel.id,
+      muted: false,
+      deafened: false,
+    });
+    expect((await inChannel).participants).toHaveLength(1);
+
+    /* Звоним в личку, ничего не сообщая о выходе из канала. Правило держит
+       сервер: клиент мог не успеть или упасть по дороге, а состояния «и в
+       канале, и в звонке» быть не должно ни при каких условиях. */
+    const dropped = new Promise<{ participants: unknown[] }>((resolve) => {
+      socket?.once(WsEvents.VoiceUpdate, resolve);
+    });
+    const me = await request(httpServer)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(200);
+    const conversation = await request(httpServer)
+      .post('/api/dm/conversations')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ userId: (me.body as MeDto).id })
+      .expect(201);
+    await request(httpServer)
+      .post(`/api/dm/conversations/${conversation.body.id}/call`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ video: false })
+      .expect(201);
+
+    expect((await dropped).participants).toHaveLength(0);
+
+    const states = await request(httpServer)
+      .get('/api/voice/states')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    const still = (states.body as { channelId: string; participants: unknown[] }[]).find(
+      (s) => s.channelId === voiceChannel.id,
+    );
+    expect(still).toBeUndefined();
+
+    await request(httpServer)
+      .post(`/api/dm/conversations/${conversation.body.id}/call/end`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(204);
+  });
+
   it('GET /users: статусы присутствия и роли участников', async () => {
     const res = await request(httpServer)
       .get(`/api/guilds/${guildId}/members`)
