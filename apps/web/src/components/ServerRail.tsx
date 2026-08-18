@@ -6,6 +6,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router';
 import { useDmConversations } from '../hooks/useDm';
 import { useFriendRequests } from '../hooks/useFriends';
 import { useGuilds, useReorderGuilds } from '../hooks/useGuilds';
+import { useSupportNewCount } from '../hooks/useSupport';
 import { useAuthStore } from '../stores/auth';
 import AddServerModal from './AddServerModal';
 import InstancePanel from './InstancePanel';
@@ -24,6 +25,7 @@ export default function ServerRail() {
   const [addOpen, setAddOpen] = useState(false);
   const [instanceOpen, setInstanceOpen] = useState(false);
   const isInstanceOwner = useAuthStore((s) => s.user?.isInstanceOwner ?? false);
+  const { data: supportNew } = useSupportNewCount(isInstanceOwner);
 
   /** Перетащили один сервер на место другого — сохраняем новый порядок */
   const drop = (targetId: string): void => {
@@ -118,6 +120,10 @@ export default function ServerRail() {
           onClick={() => setInstanceOpen(true)}
         >
           <Shield size={22} />
+          {/* Точка на кнопке: новое обращение видно, не открывая панель */}
+          {(supportNew?.newCount ?? 0) > 0 && (
+            <span className="rail-badge">{supportNew?.newCount}</span>
+          )}
         </button>
       )}
 

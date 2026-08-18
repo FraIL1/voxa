@@ -6,17 +6,26 @@ import { useTranslation } from 'react-i18next';
 import { useCreateRole, useDeleteRole, useGuildRoles, useUpdateRole } from '../hooks/useGuildAdmin';
 
 /** Права, доступные для настройки роли (ADMINISTRATOR — только у владельца, отдельно) */
-const EDITABLE: PermissionKey[] = [
-  'MANAGE_CHANNELS',
-  'MANAGE_ROLES',
+/* Права собраны по смыслу: десять строк подряд не дают понять, что
+   именно ты выдаёшь человеку. */
+const PERM_GROUPS: { label: string; keys: PermissionKey[] }[] = [
+  { label: 'roles.groupText', keys: ['SEND_MESSAGES', 'UPLOAD_FILES', 'DELETE_MESSAGES'] },
+  { label: 'roles.groupVoice', keys: ['MUTE_MEMBERS'] },
+  {
+    label: 'roles.groupPeople',
+    keys: ['CREATE_INVITES', 'KICK_MEMBERS', 'BAN_MEMBERS', 'MANAGE_CHANNELS', 'MANAGE_ROLES'],
+  },
+  { label: 'roles.groupLook', keys: ['MENTION_EVERYONE'] },
+];
+
+/* Опасные права горят красным: видно, что даёшь, не вчитываясь */
+const DANGEROUS: PermissionKey[] = [
   'DELETE_MESSAGES',
+  'MUTE_MEMBERS',
   'KICK_MEMBERS',
   'BAN_MEMBERS',
-  'MUTE_MEMBERS',
-  'CREATE_INVITES',
-  'MENTION_EVERYONE',
-  'UPLOAD_FILES',
-  'SEND_MESSAGES',
+  'MANAGE_CHANNELS',
+  'MANAGE_ROLES',
 ];
 
 function RoleEditor({ guildId, role }: { guildId: string; role: RoleDto }) {
@@ -94,21 +103,39 @@ function RoleEditor({ guildId, role }: { guildId: string; role: RoleDto }) {
       {locked ? (
         <p className="settings-hint">{t('roles.ownerAll')}</p>
       ) : (
-        <div className="role-perms">
-          {EDITABLE.map((key) => (
-            <label key={key} className="role-perm">
-              <span className="role-perm-text">
-                <span className="role-perm-name">{t(`perm.${key}`)}</span>
-                <span className="role-perm-hint">{t(`permHint.${key}`, '')}</span>
-              </span>
-              <input
-                type="checkbox"
-                checked={hasPermission(draft, Permissions[key])}
-                onChange={() => toggle(Permissions[key])}
-              />
-            </label>
+        <>
+          {PERM_GROUPS.map((group) => (
+            <section key={group.label} className="perm-group">
+              <h4>{t(group.label)}</h4>
+              <div className="role-perms">
+                {group.keys.map((key) => {
+                  const on = hasPermission(draft, Permissions[key]);
+                  const danger = DANGEROUS.includes(key);
+                  return (
+                    <label key={key} className="role-perm">
+                      <span className="role-perm-text">
+                        <span className="role-perm-name">{t(`perm.${key}`)}</span>
+                        <span className="role-perm-hint">{t(`permHint.${key}`, '')}</span>
+                      </span>
+                      <span
+                        className={`owner-switch perm-switch${danger ? ' danger' : ''}${
+                          on ? ' on' : ''
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={on}
+                          onChange={() => toggle(Permissions[key])}
+                        />
+                        <span className="owner-switch-track" />
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </section>
           ))}
-        </div>
+        </>
       )}
 
       {!locked && (

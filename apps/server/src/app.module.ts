@@ -12,6 +12,7 @@ import { DmModule } from './dm/dm.module';
 import { FriendsModule } from './friends/friends.module';
 import { GuildsModule } from './guilds/guilds.module';
 import { InstanceModule } from './instance/instance.module';
+import { SupportModule } from './support/support.module';
 import { RegistrationModule } from './registration/registration.module';
 import { ModerationModule } from './moderation/moderation.module';
 import { FilesModule } from './files/files.module';
@@ -61,6 +62,7 @@ import { WsModule } from './ws/ws.module';
     FriendsModule,
     GuildsModule,
     InstanceModule,
+    SupportModule,
     RegistrationModule,
     WsModule,
     SeedModule,

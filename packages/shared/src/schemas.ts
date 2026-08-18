@@ -367,3 +367,21 @@ export type UpdateNotifyModeInput = z.infer<typeof updateNotifyModeSchema>;
 /** Заглушить/включить канал */
 export const muteChannelSchema = z.object({ muted: z.boolean() });
 export type MuteChannelInput = z.infer<typeof muteChannelSchema>;
+
+/** Обращение в поддержку */
+export const createSupportTicketSchema = z.object({
+  kind: z.enum(['PROBLEM', 'BUG', 'IDEA']),
+  message: z
+    .string()
+    .trim()
+    .min(20, 'Опишите подробнее — коротким сообщением проблему не решить')
+    .max(4000),
+  appVersion: z.string().max(32).nullish(),
+  platform: z.string().max(64).nullish(),
+});
+export type CreateSupportTicketInput = z.infer<typeof createSupportTicketSchema>;
+
+export const updateSupportTicketSchema = z.object({
+  status: z.enum(['NEW', 'IN_PROGRESS', 'DONE']),
+});
+export type UpdateSupportTicketInput = z.infer<typeof updateSupportTicketSchema>;

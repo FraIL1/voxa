@@ -7482,8 +7482,11 @@ h3 {
   min-width: 42px;
   min-height: 42px;
   border-radius: 14px;
-  display: grid;
-  place-items: center;
+  /* flex с явной высотой строки: при place-items буква уезжала за угол */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
   overflow: hidden;
   background: var(--panel-hover);
   border: 1px solid var(--border-strong);
@@ -7505,7 +7508,10 @@ h3 {
   letter-spacing: -0.02em;
 }
 
-.srv-head span {
+/* Строго подпись под названием. Прежнее правило било по всем span
+   внутри шапки и перебивало выравнивание самого значка: селектор с
+   тегом сильнее одиночного класса, и буква уезжала за угол. */
+.srv-head > div > span {
   display: block;
   font-size: 12px;
   color: var(--text-faint);
@@ -7658,4 +7664,128 @@ h3 {
   font-size: 11.5px;
   color: var(--text-faint);
   flex: none;
+}
+
+/* Права группами: заголовок над каждой парой колонок */
+.perm-group + .perm-group {
+  margin-top: 18px;
+}
+
+.perm-group h4 {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 4px;
+}
+
+/* Опасное право горит красным во включённом виде */
+.perm-switch.danger.on .owner-switch-track {
+  background: var(--danger);
+}
+
+/* ---------- Обращения в поддержку ---------- */
+.support-form .support-message {
+  min-height: 180px;
+  resize: vertical;
+}
+
+.support-send {
+  align-self: flex-start;
+}
+
+.support-row {
+  align-items: flex-start;
+}
+
+.support-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.support-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.support-meta i {
+  font-style: normal;
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+
+/* Вид обращения цветом: поломки видно раньше пожеланий */
+.support-kind {
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  border: 1px solid;
+}
+
+.support-kind.problem {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+  background: var(--danger-soft);
+}
+
+.support-kind.bug {
+  color: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 45%, transparent);
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+}
+
+.support-kind.idea {
+  color: var(--accent);
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+
+.support-text {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.support-status {
+  display: flex;
+  gap: 6px;
+  flex: none;
+}
+
+.support-status-btn {
+  padding: 5px 11px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.support-status-btn.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* Число новых рядом с разделом в списке настроек */
+.nav-badge {
+  margin-left: auto;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 11px;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
 }

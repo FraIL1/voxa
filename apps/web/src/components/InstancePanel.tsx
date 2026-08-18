@@ -1,7 +1,9 @@
 import type { InstanceUserDto } from '@voxa/shared';
+import type { SupportStatus } from '@voxa/shared';
 import {
   Activity,
   ArrowRight,
+  LifeBuoy,
   Ban,
   Check,
   Clock,
@@ -28,6 +30,7 @@ import {
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useSetSupportStatus, useSupportNewCount, useSupportTickets } from '../hooks/useSupport';
 import Avatar from './Avatar';
 import ConfirmModal from './ConfirmModal';
 import PromptModal from './PromptModal';
@@ -51,7 +54,8 @@ import {
   useRevokeRegistrationInvite,
 } from '../hooks/useInstance';
 
-type Tab = 'overview' | 'users' | 'regInvites' | 'bans' | 'guilds' | 'settings' | 'storage';
+type Tab =
+  'overview' | 'users' | 'support' | 'regInvites' | 'bans' | 'guilds' | 'settings' | 'storage';
 
 const dateFormat = new Intl.DateTimeFormat('ru', {
   day: '2-digit',
@@ -585,10 +589,66 @@ function Storage() {
   );
 }
 
+/** Обращения в поддержку: список и разбор */
+function Support() {
+  const { t } = useTranslation();
+  const { data: tickets } = useSupportTickets(true);
+  const setStatus = useSetSupportStatus();
+
+  const statuses: SupportStatus[] = ['NEW', 'IN_PROGRESS', 'DONE'];
+
+  return (
+    <>
+      <h2>{t('support.tickets')}</h2>
+      <p className="settings-hint">{t('support.ticketsHint')}</p>
+
+      {(tickets ?? []).length === 0 && <p className="empty-state">{t('support.noTickets')}</p>}
+
+      {(tickets ?? []).map((ticket) => (
+        <div key={ticket.id} className="admin-row support-row">
+          <Avatar
+            name={ticket.author?.displayName ?? '?'}
+            url={ticket.author?.avatarUrl}
+            className="admin-panel-avatar"
+          />
+
+          <div className="support-body">
+            <div className="support-meta">
+              <b>{ticket.author?.displayName ?? t('chat.deletedAuthor')}</b>
+              <span className={`support-kind ${ticket.kind.toLowerCase()}`}>
+                {t(`support.${ticket.kind}`)}
+              </span>
+              <i>{dateFormat.format(new Date(ticket.createdAt))}</i>
+              {(ticket.appVersion || ticket.platform) && (
+                <i>{[ticket.appVersion, ticket.platform].filter(Boolean).join(' \u00b7 ')}</i>
+              )}
+            </div>
+            <p className="support-text">{ticket.message}</p>
+          </div>
+
+          {/* Состояние меняется прямо в строке: заходить внутрь незачем */}
+          <div className="support-status">
+            {statuses.map((status) => (
+              <button
+                key={status}
+                className={`support-status-btn${ticket.status === status ? ' active' : ''}`}
+                onClick={() => setStatus.mutate({ id: ticket.id, status })}
+              >
+                {t(`support.${status}`)}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
 /** Панель владельца приложения: глобальные баны, серверы, лимиты, хранилище */
 export default function InstancePanel({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<Tab>('overview');
+  const { data: support } = useSupportNewCount(true);
 
   /* Разделы собраны по смыслу: сначала присмотр, потом кого пускать,
      в конце опасное. Семь одинаковых строк подряд читались плохо. */
@@ -598,6 +658,7 @@ export default function InstancePanel({ onClose }: { onClose: () => void }) {
       items: [
         ['overview', t('instance.tabOverview'), LayoutDashboard],
         ['users', t('instance.tabUsers'), UsersIcon],
+        ['support', t('support.tickets'), LifeBuoy],
         ['guilds', t('instance.tabGuilds'), Server],
         ['storage', t('instance.tabStorage'), HardDrive],
       ],
@@ -633,6 +694,9 @@ export default function InstancePanel({ onClose }: { onClose: () => void }) {
                   onClick={() => setTab(key)}
                 >
                   <Icon size={15} /> {label}
+                  {key === 'support' && (support?.newCount ?? 0) > 0 && (
+                    <span className="nav-badge">{support?.newCount}</span>
+                  )}
                 </button>
               ))}
             </div>
@@ -653,6 +717,7 @@ export default function InstancePanel({ onClose }: { onClose: () => void }) {
 
           {tab === 'overview' && <Overview goTo={setTab} />}
           {tab === 'users' && <Users />}
+          {tab === 'support' && <Support />}
           {tab === 'regInvites' && <RegistrationInvites />}
           {tab === 'bans' && <Bans />}
           {tab === 'guilds' && <Guilds />}

@@ -65,9 +65,13 @@ export class InvitesService {
     if (input.grantsRoleId) {
       const role = await this.prisma.role.findFirst({
         where: { id: input.grantsRoleId, guildId },
-        select: { id: true },
+        select: { id: true, isOwnerRole: true },
       });
       if (!role) throw new BadRequestException('Роль не найдена на этом сервере');
+      /* Владелец у сервера один, и его права нельзя раздавать по ссылке:
+         спрятать в списке мало, идентификатор можно подставить в запрос. */
+      if (role.isOwnerRole)
+        throw new BadRequestException('Роль «Владелец» нельзя выдать по приглашению');
       grantsRoleId = role.id;
     }
 

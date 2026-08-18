@@ -8,6 +8,7 @@ import {
   Command,
   Info,
   Music,
+  LifeBuoy,
   Search,
   Trash2,
   Upload,
@@ -29,9 +30,10 @@ import { useThemeStore, type ThemeMode } from '../stores/theme';
 import AudioDeviceSelects from './AudioDeviceSelects';
 import Avatar from './Avatar';
 import { AboutTab, HotkeysTab, SoundsTab } from './SettingsTabs';
+import SupportTab from './SupportTab';
 import VoiceLiveCheck from './VoiceLiveCheck';
 
-type Tab = 'profile' | 'appearance' | 'voice' | 'sounds' | 'hotkeys' | 'about' | 'app';
+type Tab = 'profile' | 'appearance' | 'voice' | 'sounds' | 'hotkeys' | 'about' | 'support' | 'app';
 
 /** Палитра акцента профиля: свои оттенки, не фирменные цвета чужих мессенджеров */
 const ACCENTS = [
@@ -139,6 +141,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
       id: 'other',
       label: t('settings.groupOther'),
       items: [
+        { key: 'support', label: t('support.title'), icon: LifeBuoy },
         { key: 'about', label: t('settings.about'), icon: Info },
         {
           key: 'logout',
@@ -520,6 +523,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
 
           {tab === 'sounds' && <SoundsTab />}
           {tab === 'hotkeys' && <HotkeysTab />}
+          {tab === 'support' && <SupportTab />}
           {tab === 'about' && <AboutTab />}
           {tab === 'app' && <AppTab />}
         </div>

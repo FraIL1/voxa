@@ -120,10 +120,13 @@ export class RolesService {
         name: input.name,
         color: input.color === undefined ? undefined : input.color,
         permissions: input.permissions,
+        // Старшинство: без этого поля перетаскивание в настройках молча ничего не меняло
+        position: input.position,
       },
     });
     this.emitChanged(guildId);
-    return toDto(updated);
+    const memberCount = await this.prisma.userRole.count({ where: { roleId } });
+    return toDto(updated, memberCount);
   }
 
   async remove(guildId: string, roleId: string): Promise<void> {

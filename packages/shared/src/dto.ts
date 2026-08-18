@@ -468,3 +468,21 @@ export interface RegistrationInviteDto {
 export interface RegistrationInviteCheckDto {
   valid: boolean;
 }
+
+/** О чём обращение: не работает, нашёл ошибку, есть пожелание */
+export type SupportKind = 'PROBLEM' | 'BUG' | 'IDEA';
+
+/** Разбор обращения владельцем */
+export type SupportStatus = 'NEW' | 'IN_PROGRESS' | 'DONE';
+
+export interface SupportTicketDto {
+  id: string;
+  kind: SupportKind;
+  status: SupportStatus;
+  message: string;
+  /** Версия и платформа приходят сами: без них половина сообщений неразбираема */
+  appVersion: string | null;
+  platform: string | null;
+  author: UserPublicDto | null;
+  createdAt: string;
+}

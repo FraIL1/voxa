@@ -54,6 +54,9 @@ export default function ServerSettingsModal({
   const isAdmin = hasPermission(mask, Permissions.ADMINISTRATOR);
   const myId = useAuthStore((state) => state.user?.id);
   const isOwner = guild?.ownerId === myId;
+  /* Заявки нужны одному режиму из трёх. В остальных раздел висел пустым и
+     непонятным — прячем его, пока сервер не пускает людей по заявке. */
+  const byRequest = guild?.joinMode === 'REQUEST';
 
   /* Разделы собраны по смыслу: сам сервер, люди, порядок, опасное.
      Семь одинаковых строк подряд не дают понять, где что искать. */
@@ -67,7 +70,7 @@ export default function ServerSettingsModal({
       items: [
         ['roles', t('roles.title'), canRoles, Shield],
         ['members', t('serverSettings.members'), canRoles, Users],
-        ['requests', t('serverSettings.requests'), canKick, UserPlus],
+        ['requests', t('serverSettings.requests'), canKick && byRequest, UserPlus],
         ['invites', t('community.invites'), canInvite, Link2],
       ],
     },
@@ -123,7 +126,7 @@ export default function ServerSettingsModal({
           {/* Удаление сервера — красным и в самом низу: промахнуться не должно быть куда */}
           {isOwner && (
             <div className="settings-nav-group">
-              <div className="settings-nav-group-name">{t('serverSettings.groupDanger')}</div>
+              {/* Без заголовка: красная строка внизу и так читается как опасная */}
               <button className="settings-tab danger" onClick={() => setTab('profile')}>
                 <Trash2 size={17} />
                 {t('serverSettings.delete')}

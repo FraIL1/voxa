@@ -133,7 +133,10 @@ export function Invites() {
               value={roleId}
               options={[
                 { value: '', label: t('community.inviteNoRole') },
-                ...(roles ?? []).map((role) => ({ value: role.id, label: role.name })),
+                // Владельца в списке нет: его права по ссылке не раздают
+                ...(roles ?? [])
+                  .filter((role) => !role.isOwnerRole)
+                  .map((role) => ({ value: role.id, label: role.name })),
               ]}
               onChange={setRoleId}
             />

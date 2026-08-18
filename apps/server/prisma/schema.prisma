@@ -57,6 +57,7 @@ model User {
   blocksReceived     UserBlock[]          @relation("Blocked")
   instanceBan        InstanceBan?         @relation("InstanceBanned")
   regInvitesCreated  RegistrationInvite[] @relation("RegInviteCreator")
+  supportTickets     SupportTicket[]
   notesWritten       UserNote[]           @relation("NoteOwner")
   notesAbout         UserNote[]           @relation("NoteTarget")
   instanceBansIssued InstanceBan[]        @relation("InstanceBanIssuer")
@@ -583,4 +584,35 @@ model AppMeta {
   value String
 
   @@map("app_meta")
+}
+
+/// Обращение в поддержку: человек описывает проблему, видит только владелец приложения
+model SupportTicket {
+  id        String              @id @default(uuid(7))
+  /// Автор. Удалили аккаунт — обращение остаётся, иначе теряется история багов
+  authorId  String?             @map("author_id")
+  author    User?               @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  kind      SupportKind
+  status    SupportStatus       @default(NEW)
+  message   String
+  /// Версия и платформа прикладываются сами: без них половина сообщений неразборчива
+  appVersion String?            @map("app_version")
+  platform  String?
+  createdAt DateTime            @default(now()) @map("created_at")
+  updatedAt DateTime            @updatedAt @map("updated_at")
+
+  @@index([status, createdAt])
+  @@map("support_tickets")
+}
+
+enum SupportKind {
+  PROBLEM
+  BUG
+  IDEA
+}
+
+enum SupportStatus {
+  NEW
+  IN_PROGRESS
+  DONE
 }
