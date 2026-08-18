@@ -26,6 +26,15 @@ function DmLink({
   const togglePin = useToggleConversationPin();
   const muted = Boolean(conversation.mutedUntil && new Date(conversation.mutedUntil) > new Date());
 
+  /* Под именем — присутствие собеседника, а не последнее сообщение:
+     в списке важнее «на месте ли он», чем «о чём говорили». */
+  const secondLine = (c: DmConversationDto): string => {
+    if (c.isGroup) return `${t('dm.groupMembers')}: ${c.members.length}`;
+    // Не друзья — присутствие неизвестно; писать «не в сети» было бы неправдой
+    if (!status) return '';
+    return t(`presence.${status}`);
+  };
+
   return (
     <NavLink
       to={`/dm/${conversation.id}`}
@@ -48,8 +57,14 @@ function DmLink({
           className="dm-avatar"
         />
       )}
-      <span className="channel-name">{dmTitle(conversation)}</span>
-      {muted && <BellOff size={13} className="dm-muted-mark" />}
+      {/* Две строки: имя и о чём был разговор — по списку видно, куда заходить */}
+      <span className="dm-lines">
+        <span className="dm-line-top">
+          <span className="channel-name">{dmTitle(conversation)}</span>
+          {muted && <BellOff size={13} className="dm-muted-mark" />}
+        </span>
+        <span className="dm-preview">{secondLine(conversation)}</span>
+      </span>
       {conversation.unreadCount > 0 && (
         <span className="mention-badge">{conversation.unreadCount}</span>
       )}

@@ -34,6 +34,8 @@ export const changePasswordSchema = z.object({
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 
 export const createInviteSchema = z.object({
+  /** Роль, которую выдадут при входе по ссылке; null — без роли */
+  grantsRoleId: z.string().uuid().nullish(),
   /** null/не задано — без лимита использований */
   maxUses: z.number().int().min(1).max(1000).nullish(),
   /** null/не задано — бессрочный */
@@ -288,6 +290,8 @@ export const updateRoleSchema = z.object({
   name: z.string().trim().min(1).max(32).optional(),
   color: roleColor,
   permissions: z.number().int().min(0).optional(),
+  /** Старшинство: больше — выше в списке. Выше 99 только у владельца */
+  position: z.number().int().min(0).max(99).optional(),
 });
 export type UpdateRoleInput = z.infer<typeof updateRoleSchema>;
 

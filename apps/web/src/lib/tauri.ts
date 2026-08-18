@@ -38,24 +38,29 @@ export async function notifyAppReady(): Promise<void> {
 }
 
 /** Глобальные хоткеи (работают даже когда окно свёрнуто): mute / deafen */
-export async function registerGlobalShortcuts(actions: {
-  toggleMute: () => void;
-  toggleDeafen: () => void;
-}): Promise<() => void> {
+/**
+ * Системные сочетания: работают, даже когда окно не в фокусе.
+ * Список приходит из настроек — что человек назначил, то и регистрируем.
+ */
+export async function registerGlobalShortcuts(
+  binds: { accelerator: string; run: () => void }[],
+): Promise<() => void> {
   if (!isTauri()) return () => undefined;
 
   const { register, unregister } = await import('@tauri-apps/plugin-global-shortcut');
-  // PRD 7.4: mute Ctrl+Shift+M, deafen Ctrl+Shift+D
-  await register('CommandOrControl+Shift+M', (event) => {
-    if (event.state === 'Pressed') actions.toggleMute();
-  }).catch(() => undefined);
-  await register('CommandOrControl+Shift+D', (event) => {
-    if (event.state === 'Pressed') actions.toggleDeafen();
-  }).catch(() => undefined);
+  const registered: string[] = [];
+
+  for (const { accelerator, run } of binds) {
+    await register(accelerator, (event) => {
+      if (event.state === 'Pressed') run();
+    })
+      .then(() => registered.push(accelerator))
+      // Сочетание может быть занято другой программой — молча пропускаем
+      .catch(() => undefined);
+  }
 
   return () => {
-    void unregister('CommandOrControl+Shift+M').catch(() => undefined);
-    void unregister('CommandOrControl+Shift+D').catch(() => undefined);
+    registered.forEach((accelerator) => void unregister(accelerator).catch(() => undefined));
   };
 }
 

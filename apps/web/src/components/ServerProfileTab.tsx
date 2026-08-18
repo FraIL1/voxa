@@ -1,4 +1,5 @@
 import { hasPermission, Permissions } from '@voxa/shared';
+import { Check, Crown, DoorOpen, ImageUp, Trash2, XCircle } from 'lucide-react';
 import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
@@ -85,6 +86,7 @@ export default function ServerProfileTab({
         {canManage && (
           <div className="server-icon-actions">
             <label className="btn-secondary icon-upload">
+              <ImageUp size={16} />
               {t('serverSettings.changeIcon')}
               <input type="file" accept="image/*" hidden onChange={pickIcon} />
             </label>
@@ -94,6 +96,7 @@ export default function ServerProfileTab({
                 className="btn-secondary danger-text"
                 onClick={() => updateGuild.mutate({ iconUrl: null })}
               >
+                <XCircle size={16} />
                 {t('serverSettings.removeIcon')}
               </button>
             )}
@@ -120,6 +123,7 @@ export default function ServerProfileTab({
         {saved && <p className="settings-ok">{t('settings.saved')}</p>}
         {canManage && (
           <button className="btn-primary" type="submit" disabled={updateGuild.isPending}>
+            <Check size={16} />
             {t('settings.save')}
           </button>
         )}
@@ -152,6 +156,7 @@ export default function ServerProfileTab({
             onClose();
           }}
         >
+          <DoorOpen size={16} />
           {t('serverSettings.leave')}
         </button>
       )}
@@ -177,11 +182,13 @@ export default function ServerProfileTab({
               disabled={!heir || transferGuild.isPending}
               onClick={() => setAsking('transfer')}
             >
+              <Crown size={16} />
               {t('serverSettings.transfer')}
             </button>
           </div>
 
           <button className="btn-secondary danger-text" onClick={() => setAsking('delete')}>
+            <Trash2 size={16} />
             {t('serverSettings.delete')}
           </button>
         </>

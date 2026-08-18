@@ -1,5 +1,21 @@
 import { changePasswordSchema, updateProfileSchema, type MeDto } from '@voxa/shared';
-import { Check, LogOut, Trash2, Upload, X } from 'lucide-react';
+import {
+  Check,
+  Eye,
+  LogOut,
+  Monitor,
+  Palette,
+  Command,
+  Info,
+  Music,
+  Search,
+  Trash2,
+  Upload,
+  UserRound,
+  Video,
+  X,
+  type LucideIcon,
+} from 'lucide-react';
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -12,8 +28,10 @@ import { useSkinStore, type Skin } from '../stores/skin';
 import { useThemeStore, type ThemeMode } from '../stores/theme';
 import AudioDeviceSelects from './AudioDeviceSelects';
 import Avatar from './Avatar';
+import { AboutTab, HotkeysTab, SoundsTab } from './SettingsTabs';
+import VoiceLiveCheck from './VoiceLiveCheck';
 
-type Tab = 'profile' | 'appearance' | 'voice' | 'app';
+type Tab = 'profile' | 'appearance' | 'voice' | 'sounds' | 'hotkeys' | 'about' | 'app';
 
 /** Палитра акцента профиля: свои оттенки, не фирменные цвета чужих мессенджеров */
 const ACCENTS = [
@@ -84,6 +102,57 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const [passwordMessage, setPasswordMessage] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [query, setQuery] = useState('');
+
+  /* Разделы сгруппированы так же, как на эскизе: сначала про себя,
+     потом про приложение, в конце редкое и опасное. */
+  const groups: {
+    id: string;
+    label: string;
+    items: {
+      key: string;
+      label: string;
+      icon: LucideIcon;
+      danger?: boolean;
+      action?: () => void;
+    }[];
+  }[] = [
+    {
+      id: 'account',
+      label: t('settings.groupAccount'),
+      items: [{ key: 'profile', label: t('settings.profile'), icon: UserRound }],
+    },
+    {
+      id: 'app',
+      label: t('settings.groupApp'),
+      items: [
+        { key: 'voice', label: t('settings.voiceTab'), icon: Video },
+        { key: 'appearance', label: t('settings.appearanceTab'), icon: Palette },
+        { key: 'sounds', label: t('settings.soundsTab'), icon: Music },
+        { key: 'hotkeys', label: t('settings.hotkeysTab'), icon: Command },
+        ...(isTauri()
+          ? [{ key: 'app', label: t('settings.appTab'), icon: Monitor as LucideIcon }]
+          : []),
+      ],
+    },
+    {
+      id: 'other',
+      label: t('settings.groupOther'),
+      items: [
+        { key: 'about', label: t('settings.about'), icon: Info },
+        {
+          key: 'logout',
+          label: t('settings.logout'),
+          icon: LogOut,
+          danger: true,
+          action: () => void logout(),
+        },
+      ],
+    },
+  ];
+
+  const matches = (name: string): boolean =>
+    !query.trim() || name.toLowerCase().includes(query.trim().toLowerCase());
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
@@ -199,41 +268,39 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
     <div className="settings-overlay" onClick={onClose}>
       <div className="settings-panel" onClick={(e) => e.stopPropagation()}>
         <nav className="settings-nav">
-          <button
-            className={`settings-tab${tab === 'profile' ? ' active' : ''}`}
-            onClick={() => setTab('profile')}
-          >
-            {t('settings.profile')}
-          </button>
-          <button
-            className={`settings-tab${tab === 'appearance' ? ' active' : ''}`}
-            onClick={() => setTab('appearance')}
-          >
-            {t('settings.appearanceTab')}
-          </button>
-          <button
-            className={`settings-tab${tab === 'voice' ? ' active' : ''}`}
-            onClick={() => setTab('voice')}
-          >
-            {t('settings.voiceTab')}
-          </button>
-          {isTauri() && (
-            <button
-              className={`settings-tab${tab === 'app' ? ' active' : ''}`}
-              onClick={() => setTab('app')}
-            >
-              {t('settings.appTab')}
-            </button>
-          )}
+          <div className="settings-nav-title">{t('settings.title')}</div>
+
+          <label className="settings-search">
+            <Search size={15} />
+            <input
+              type="text"
+              value={query}
+              placeholder={t('settings.search')}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </label>
+
+          {groups.map(({ id, label, items }) => {
+            const visible = items.filter(({ label: name }) => matches(name));
+            if (visible.length === 0) return null;
+            return (
+              <div key={id} className="settings-nav-group">
+                <div className="settings-nav-group-name">{label}</div>
+                {visible.map(({ key, label: name, icon: Icon, danger, action }) => (
+                  <button
+                    key={key}
+                    className={`settings-tab${tab === key ? ' active' : ''}${danger ? ' danger' : ''}`}
+                    onClick={action ?? (() => setTab(key as Tab))}
+                  >
+                    <Icon size={17} />
+                    {name}
+                  </button>
+                ))}
+              </div>
+            );
+          })}
+
           <div className="settings-nav-spacer" />
-          <button className="settings-tab danger" onClick={() => void logout()}>
-            <LogOut size={15} /> {t('settings.logout')}
-          </button>
-          <p className="settings-copyright">
-            Voxa © {new Date().getFullYear()}
-            <br />
-            {t('settings.rights')}
-          </p>
         </nav>
 
         <div className="settings-content">
@@ -446,13 +513,111 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
             <>
               <h2>{t('settings.voiceTab')}</h2>
               <div className="settings-form voice-form">
-                <AudioDeviceSelects withCamera />
+                <AudioDeviceSelects />
               </div>
             </>
           )}
 
+          {tab === 'sounds' && <SoundsTab />}
+          {tab === 'hotkeys' && <HotkeysTab />}
+          {tab === 'about' && <AboutTab />}
           {tab === 'app' && <AppTab />}
         </div>
+
+        {/* Третья колонка: результат виден сразу, не надо закрывать настройки ради проверки */}
+        {tab === 'profile' && (
+          <aside className="settings-aside">
+            <div className="settings-aside-head">
+              <Eye size={16} />
+              <div>
+                <b>{t('settings.previewProfileTitle')}</b>
+                <span>{t('settings.previewProfileHint')}</span>
+              </div>
+            </div>
+
+            <div
+              className="preview-profile"
+              style={
+                user?.accentColor
+                  ? ({ '--preview-accent': user.accentColor } as React.CSSProperties)
+                  : undefined
+              }
+            >
+              <div className="preview-profile-top" />
+              <Avatar
+                name={displayName || (user?.displayName ?? 'Я')}
+                url={user?.avatarUrl}
+                className="preview-profile-avatar"
+              />
+              <div className="preview-profile-body">
+                <div className="preview-profile-name">
+                  {displayName || (user?.displayName ?? 'Я')}
+                </div>
+                <div className="preview-profile-login">@{user?.username}</div>
+                {statusText.trim() && (
+                  <div className="preview-profile-status">{statusText.trim()}</div>
+                )}
+                <p className={`preview-profile-bio${bio.trim() ? '' : ' empty'}`}>
+                  {bio.trim() || t('settings.previewNoBio')}
+                </p>
+              </div>
+            </div>
+          </aside>
+        )}
+
+        {tab === 'voice' && (
+          <aside className="settings-aside">
+            <div className="settings-aside-head">
+              <Eye size={16} />
+              <div>
+                <b>{t('settings.previewVoiceTitle')}</b>
+                <span>{t('settings.previewVoiceHint')}</span>
+              </div>
+            </div>
+            <VoiceLiveCheck />
+          </aside>
+        )}
+
+        {tab === 'appearance' && (
+          <aside className="settings-aside">
+            <div className="settings-aside-head">
+              <Eye size={16} />
+              <div>
+                <b>{t('settings.previewTitle')}</b>
+                <span>{t('settings.previewHint')}</span>
+              </div>
+            </div>
+
+            <div className="preview-chat">
+              <div className="preview-msg">
+                <Avatar name="Кирилл" className="preview-avatar" />
+                <div>
+                  <div className="preview-msg-meta">
+                    <b>Кирилл</b>
+                    <i>14:02</i>
+                  </div>
+                  <p>{t('settings.previewMsgOne')}</p>
+                </div>
+              </div>
+              <div className="preview-msg">
+                <Avatar
+                  name={user?.displayName ?? 'Я'}
+                  url={user?.avatarUrl}
+                  className="preview-avatar"
+                />
+                <div>
+                  <div className="preview-msg-meta">
+                    <b style={user?.accentColor ? { color: user.accentColor } : undefined}>
+                      {user?.displayName ?? 'Я'}
+                    </b>
+                    <i>14:03</i>
+                  </div>
+                  <p>{t('settings.previewMsgTwo')}</p>
+                </div>
+              </div>
+            </div>
+          </aside>
+        )}
       </div>
     </div>
   );

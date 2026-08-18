@@ -1,9 +1,21 @@
 import { hasPermission, Permissions } from '@voxa/shared';
-import { X } from 'lucide-react';
+import {
+  Ban,
+  Link2,
+  ScrollText,
+  Settings2,
+  Shield,
+  Trash2,
+  UserPlus,
+  Users,
+  X,
+  type LucideIcon,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useGuild } from '../hooks/useGuilds';
+import { useAuthStore } from '../stores/auth';
 import { Audit, Bans, Invites } from './CommunityTab';
 import JoinRequestsTab from './JoinRequestsTab';
 import MembersTab from './MembersTab';
@@ -40,33 +52,84 @@ export default function ServerSettingsModal({
   const canBan = hasPermission(mask, Permissions.BAN_MEMBERS);
   const canKick = hasPermission(mask, Permissions.KICK_MEMBERS);
   const isAdmin = hasPermission(mask, Permissions.ADMINISTRATOR);
+  const myId = useAuthStore((state) => state.user?.id);
+  const isOwner = guild?.ownerId === myId;
 
-  const tabs: [Tab, string, boolean][] = [
-    ['profile', t('serverSettings.profile'), true],
-    ['roles', t('roles.title'), canRoles],
-    ['members', t('serverSettings.members'), canRoles],
-    ['requests', t('serverSettings.requests'), canKick],
-    ['invites', t('community.invites'), canInvite],
-    ['bans', t('community.bans'), canBan],
-    ['audit', t('community.audit'), isAdmin],
+  /* Разделы собраны по смыслу: сам сервер, люди, порядок, опасное.
+     Семь одинаковых строк подряд не дают понять, где что искать. */
+  const groups: { label: string; items: [Tab, string, boolean, LucideIcon][] }[] = [
+    {
+      label: t('serverSettings.groupServer'),
+      items: [['profile', t('serverSettings.profile'), true, Settings2]],
+    },
+    {
+      label: t('serverSettings.groupPeople'),
+      items: [
+        ['roles', t('roles.title'), canRoles, Shield],
+        ['members', t('serverSettings.members'), canRoles, Users],
+        ['requests', t('serverSettings.requests'), canKick, UserPlus],
+        ['invites', t('community.invites'), canInvite, Link2],
+      ],
+    },
+    {
+      label: t('serverSettings.groupOrder'),
+      items: [
+        ['bans', t('community.bans'), canBan, Ban],
+        ['audit', t('community.audit'), isAdmin, ScrollText],
+      ],
+    },
   ];
 
   return (
     <div className="settings-overlay" onClick={onClose}>
-      <div className="settings-panel" onClick={(e) => e.stopPropagation()}>
+      <div className="settings-panel server" onClick={(e) => e.stopPropagation()}>
         <nav className="settings-nav">
-          <div className="settings-nav-title">{guild?.name ?? t('serverSettings.title')}</div>
-          {tabs
-            .filter(([, , show]) => show)
-            .map(([id, label]) => (
-              <button
-                key={id}
-                className={`settings-tab${tab === id ? ' active' : ''}`}
-                onClick={() => setTab(id)}
-              >
-                {label}
+          {/* Шапка отвечает на вопрос «чей это сервер» до чтения разделов */}
+          <div className="srv-head">
+            <span className="srv-head-icon" aria-hidden>
+              {guild?.iconUrl ? (
+                <img src={guild.iconUrl} alt="" />
+              ) : (
+                (guild?.name ?? '?').slice(0, 1).toUpperCase()
+              )}
+            </span>
+            <div>
+              <b>{guild?.name ?? t('serverSettings.title')}</b>
+            </div>
+          </div>
+
+          {groups.map((group) => {
+            const visible = group.items.filter(([, , show]) => show);
+            if (visible.length === 0) return null;
+            return (
+              <div key={group.label} className="settings-nav-group">
+                <div className="settings-nav-group-name">{group.label}</div>
+                {visible.map(([id, label, , Icon]) => (
+                  <button
+                    key={id}
+                    className={`settings-tab${tab === id ? ' active' : ''}`}
+                    onClick={() => setTab(id)}
+                  >
+                    <Icon size={17} />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            );
+          })}
+
+          <div className="settings-nav-spacer" />
+
+          {/* Удаление сервера — красным и в самом низу: промахнуться не должно быть куда */}
+          {isOwner && (
+            <div className="settings-nav-group">
+              <div className="settings-nav-group-name">{t('serverSettings.groupDanger')}</div>
+              <button className="settings-tab danger" onClick={() => setTab('profile')}>
+                <Trash2 size={17} />
+                {t('serverSettings.delete')}
               </button>
-            ))}
+            </div>
+          )}
         </nav>
 
         <div className="settings-content">

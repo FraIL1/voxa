@@ -52,6 +52,48 @@ export function setSoundsEnabled(value: boolean): void {
   }
 }
 
+/** Ключи отдельных звуков: каждый включается сам по себе */
+export type SoundKey = 'channel' | 'peers' | 'mic' | 'deafen' | 'share' | 'call' | 'mention';
+
+export const SOUND_KEYS: SoundKey[] = [
+  'channel',
+  'peers',
+  'mic',
+  'deafen',
+  'share',
+  'call',
+  'mention',
+];
+
+const OFF_KEY = 'voxa.sounds.off';
+
+function readOff(): Set<SoundKey> {
+  try {
+    const raw = localStorage.getItem(OFF_KEY);
+    return new Set(raw ? (JSON.parse(raw) as SoundKey[]) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+let off = readOff();
+
+/** Включён ли отдельный звук. Общий выключатель главнее любого частного. */
+export function soundOn(key: SoundKey): boolean {
+  return enabled && !off.has(key);
+}
+
+export function setSoundOn(key: SoundKey, value: boolean): void {
+  off = new Set(off);
+  if (value) off.delete(key);
+  else off.add(key);
+  try {
+    localStorage.setItem(OFF_KEY, JSON.stringify([...off]));
+  } catch {
+    // без сохранения переживём: в этой сессии выбор всё равно действует
+  }
+}
+
 function audio(): { ctx: AudioContext; master: GainNode } | null {
   if (!enabled) return null;
   try {
@@ -176,6 +218,7 @@ function play(notes: Note[]): void {
 
 /** Сам вошёл в канал: три ноты вверх, уверенно */
 export function playSelfJoin(): void {
+  if (!soundOn('channel')) return;
   play([
     { hz: A4, dur: 0.16 },
     { hz: CS5, at: 0.07, dur: 0.18 },
@@ -185,6 +228,7 @@ export function playSelfJoin(): void {
 
 /** Сам вышел: те же ноты вниз и короче */
 export function playSelfLeave(): void {
+  if (!soundOn('channel')) return;
   play([
     { hz: E5, dur: 0.14 },
     { hz: CS5, at: 0.07, dur: 0.16 },
@@ -194,6 +238,7 @@ export function playSelfLeave(): void {
 
 /** Кто-то другой зашёл: тише и выше — не спорит с твоими действиями */
 export function playPeerJoin(): void {
+  if (!soundOn('peers')) return;
   play([
     { hz: E5, dur: 0.1, gain: 0.07, voice: 'soft' },
     { hz: A5, at: 0.06, dur: 0.16, gain: 0.07, voice: 'soft' },
@@ -202,6 +247,7 @@ export function playPeerJoin(): void {
 
 /** Кто-то другой вышел */
 export function playPeerLeave(): void {
+  if (!soundOn('peers')) return;
   play([
     { hz: A5, dur: 0.1, gain: 0.06, voice: 'soft' },
     { hz: E5, at: 0.06, dur: 0.16, gain: 0.06, voice: 'soft' },
@@ -212,16 +258,19 @@ export function playPeerLeave(): void {
 
 /** Микрофон выключен: короткий глухой удар вниз */
 export function playMicOff(): void {
+  if (!soundOn('mic')) return;
   play([{ hz: 200, to: 130, dur: 0.11, gain: 0.16, voice: 'thud' }]);
 }
 
 /** Микрофон включён: тот же удар вверх */
 export function playMicOn(): void {
+  if (!soundOn('mic')) return;
   play([{ hz: 150, to: 240, dur: 0.11, gain: 0.16, voice: 'thud' }]);
 }
 
 /** Звук выключен целиком: удар и следом «накрыло» — глухо и ниже */
 export function playDeafen(): void {
+  if (!soundOn('deafen')) return;
   play([
     { hz: 220, to: 140, dur: 0.1, gain: 0.15, voice: 'thud' },
     { hz: 150, to: 90, at: 0.08, dur: 0.2, gain: 0.13, voice: 'thud' },
@@ -230,6 +279,7 @@ export function playDeafen(): void {
 
 /** Звук вернулся: открывается снизу вверх */
 export function playUndeafen(): void {
+  if (!soundOn('deafen')) return;
   play([
     { hz: 110, to: 170, dur: 0.1, gain: 0.13, voice: 'thud' },
     { hz: 180, to: 280, at: 0.08, dur: 0.16, gain: 0.14, voice: 'thud' },
@@ -241,6 +291,7 @@ export function playUndeafen(): void {
 
 /** Экран пошёл в эфир: шелест вверх и искра сверху — «включился монитор» */
 export function playShareStart(): void {
+  if (!soundOn('share')) return;
   play([
     { hz: 700, to: 2600, dur: 0.26, gain: 0.06, voice: 'air' },
     { hz: A4, dur: 0.12, gain: 0.08 },
@@ -252,6 +303,7 @@ export function playShareStart(): void {
 
 /** Демонстрация закончилась: шелест вниз, гаснет */
 export function playShareStop(): void {
+  if (!soundOn('share')) return;
   play([
     { hz: 2400, to: 600, dur: 0.22, gain: 0.05, voice: 'air' },
     { hz: E5, dur: 0.12, gain: 0.08 },
@@ -296,6 +348,7 @@ export function startRingtone(): () => void {
 
 /** Собеседник ответил: тёплый аккорд с искрой сверху */
 export function playCallConnected(): void {
+  if (!soundOn('call')) return;
   play([
     { hz: A3, dur: 0.3, gain: 0.07, voice: 'soft' },
     { hz: E4, dur: 0.3, gain: 0.07, voice: 'soft' },
@@ -306,6 +359,7 @@ export function playCallConnected(): void {
 
 /** Разговор окончен: две ноты вниз, спокойно */
 export function playCallEnded(): void {
+  if (!soundOn('call')) return;
   play([
     { hz: B4, dur: 0.16, gain: 0.1, voice: 'soft' },
     { hz: E4, at: 0.13, dur: 0.34, gain: 0.09, voice: 'soft' },
@@ -316,6 +370,7 @@ export function playCallEnded(): void {
 
 /** Тебя упомянули: короткая яркая искра, ни с чем не спутать */
 export function playMention(): void {
+  if (!soundOn('mention')) return;
   play([
     { hz: CS6, dur: 0.1, gain: 0.08 },
     { hz: E6, at: 0.07, dur: 0.2, gain: 0.09 },

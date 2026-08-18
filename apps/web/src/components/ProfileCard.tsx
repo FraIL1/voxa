@@ -2,6 +2,7 @@ import type { UserProfileDto } from '@voxa/shared';
 import {
   Ban,
   Crown,
+  Info,
   MessageSquare,
   Phone,
   ShieldCheck,
@@ -9,7 +10,7 @@ import {
   UserPlus,
   X,
 } from 'lucide-react';
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 
@@ -20,7 +21,7 @@ import {
   useSendFriendRequest,
   useUnblockUser,
 } from '../hooks/useFriends';
-import { useProfile, useRefreshProfile } from '../hooks/useProfile';
+import { useProfile, useRefreshProfile, useSetUserNote } from '../hooks/useProfile';
 import { useCallStore } from '../stores/call';
 import { useProfileViewStore } from '../stores/profileView';
 import Avatar from './Avatar';
@@ -36,6 +37,18 @@ function initials(name: string): string {
   return name.slice(0, 1).toUpperCase();
 }
 
+/** Сколько человек здесь: «4 месяца», «второй год» — понятнее точной даты */
+function sinceLabel(iso: string): string {
+  const months = Math.max(
+    0,
+    Math.round((Date.now() - new Date(iso).getTime()) / (30 * 24 * 3600 * 1000)),
+  );
+  if (months < 1) return 'меньше месяца';
+  if (months < 12) return `${months} мес.`;
+  const years = Math.floor(months / 12);
+  return `${years} г.`;
+}
+
 /** Акцент профиля: свой цвет пользователя либо фирменный цвет приложения */
 function accentStyle(profile: UserProfileDto): React.CSSProperties {
   return profile.accentColor
@@ -43,8 +56,23 @@ function accentStyle(profile: UserProfileDto): React.CSSProperties {
     : {};
 }
 
-/** Наполнение карточки профиля: обложка, опознавательные знаки, действия */
-export function ProfileBody({ userId, onNavigate }: { userId: string; onNavigate?: () => void }) {
+type ProfileTab = 'about' | 'guilds' | 'note';
+
+/**
+ * Карточка профиля из двух половин: слева кто это и что с ним можно сделать,
+ * справа подробности по вкладкам. Одной колонкой карточка росла вниз и
+ * кнопки действий уезжали под сгиб — до них надо было прокручивать.
+ */
+export function ProfileBody({
+  userId,
+  onNavigate,
+  compact = false,
+}: {
+  userId: string;
+  onNavigate?: () => void;
+  /** Боковая панель: только кнопки, подробности открываются отдельным окном */
+  compact?: boolean;
+}) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { data: profile, isLoading } = useProfile(userId);
@@ -55,8 +83,11 @@ export function ProfileBody({ userId, onNavigate }: { userId: string; onNavigate
   const removeFriend = useRemoveFriend();
   const block = useBlockUser();
   const unblock = useUnblockUser();
+  const setNote = useSetUserNote();
   const startCall = useCallStore((s) => s.startCall);
   const callStatus = useCallStore((s) => s.status);
+  const [tab, setTab] = useState<ProfileTab>('about');
+  const openProfile = useProfileViewStore((state) => state.open);
 
   if (isLoading || !profile) {
     return (
@@ -94,92 +125,45 @@ export function ProfileBody({ userId, onNavigate }: { userId: string; onNavigate
   };
 
   return (
-    <div className="profile-card" style={accentStyle(profile)}>
+    <div className={`profile-card${compact ? ' compact' : ''}`} style={accentStyle(profile)}>
       <div className="profile-cover" />
 
-      <div className="profile-head">
+      <div className="profile-left">
         <Avatar
           name={profile.displayName}
           url={profile.avatarUrl}
           status={profile.status}
           className="profile-avatar"
         />
-        <div className="profile-titles">
-          <div className="profile-name">
-            {profile.myAlias ?? profile.displayName}
-            {profile.isInstanceOwner && (
-              <span className="profile-badge owner" title={t('profile.ownerBadge')}>
-                <Crown size={12} /> {t('profile.ownerBadge')}
-              </span>
-            )}
-            {profile.relation === 'friends' && (
-              <span className="profile-badge friend" title={t('profile.friendBadge')}>
-                <ShieldCheck size={12} /> {t('profile.friendBadge')}
-              </span>
-            )}
-          </div>
-          <div className="profile-username">
-            @{profile.username}
-            {profile.myAlias && ` · ${profile.displayName}`}
-          </div>
-          {profile.statusText && <p className="profile-status-text">{profile.statusText}</p>}
+
+        <div className="profile-name">
+          {profile.myAlias ?? profile.displayName}
+          {profile.isInstanceOwner && (
+            <span className="profile-badge owner" title={t('profile.ownerBadge')}>
+              <Crown size={12} /> {t('profile.ownerBadge')}
+            </span>
+          )}
+          {profile.relation === 'friends' && (
+            <span className="profile-badge friend" title={t('profile.friendBadge')}>
+              <ShieldCheck size={12} /> {t('profile.friendBadge')}
+            </span>
+          )}
         </div>
-      </div>
 
-      <div className="profile-body">
-        {profile.bio && (
-          <section className="profile-section">
-            <h4>{t('profile.about')}</h4>
-            <p className="profile-bio">{profile.bio}</p>
-          </section>
-        )}
+        <div className="profile-username">
+          @{profile.username}
+          {profile.myAlias ? ' · ' + profile.displayName : ''}
+        </div>
 
-        {profile.myNote && (
-          <section className="profile-section">
-            <h4>{t('profile.note')}</h4>
-            <p className="profile-bio profile-note">{profile.myNote}</p>
-          </section>
-        )}
-
-        <section className="profile-section">
-          <h4>{t('profile.joined')}</h4>
-          <p className="profile-fact">{joinedFormat.format(new Date(profile.createdAt))}</p>
-        </section>
-
-        {profile.mutualGuilds.length > 0 && (
-          <section className="profile-section">
-            <h4>
-              {t('profile.mutualServers')} — {profile.mutualGuilds.length}
-            </h4>
-            <div className="profile-guilds">
-              {profile.mutualGuilds.map((guild) => (
-                <button
-                  key={guild.id}
-                  className="profile-guild"
-                  onClick={() => {
-                    onNavigate?.();
-                    navigate(`/guilds/${guild.id}`);
-                  }}
-                >
-                  <span className="profile-guild-icon" aria-hidden>
-                    {guild.iconUrl ? <img src={guild.iconUrl} alt="" /> : initials(guild.name)}
-                  </span>
-                  <span className="profile-guild-name">{guild.name}</span>
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {profile.mutualFriends > 0 && (
-          <section className="profile-section">
-            <h4>{t('profile.mutualFriends')}</h4>
-            <p className="profile-fact">{profile.mutualFriends}</p>
-          </section>
-        )}
+        {profile.statusText && <p className="profile-status-text">{profile.statusText}</p>}
 
         {!isSelf && (
           <div className="profile-actions">
+            {compact && (
+              <button className="btn-secondary" onClick={() => openProfile(profile.id)}>
+                <Info size={15} /> {t('profile.openFull')}
+              </button>
+            )}
             <button className="btn-primary" onClick={message} disabled={openDm.isPending}>
               <MessageSquare size={15} /> {t('profile.message')}
             </button>
@@ -202,7 +186,7 @@ export function ProfileBody({ userId, onNavigate }: { userId: string; onNavigate
             )}
             {profile.relation === 'outgoing' && (
               <button className="btn-secondary" disabled>
-                {t('profile.requestSent')}
+                <UserPlus size={15} /> {t('profile.requestSent')}
               </button>
             )}
             {profile.relation === 'incoming' && (
@@ -242,6 +226,135 @@ export function ProfileBody({ userId, onNavigate }: { userId: string; onNavigate
           </div>
         )}
       </div>
+
+      {!compact && (
+        <div className="profile-right">
+          <nav className="profile-tabs">
+            <button
+              className={`profile-tab${tab === 'about' ? ' active' : ''}`}
+              onClick={() => setTab('about')}
+            >
+              {t('profile.tabAbout')}
+            </button>
+            <button
+              className={`profile-tab${tab === 'guilds' ? ' active' : ''}`}
+              onClick={() => setTab('guilds')}
+            >
+              {t('profile.tabGuilds')}
+              {profile.mutualGuilds.length > 0 && (
+                <span className="profile-tab-count">{profile.mutualGuilds.length}</span>
+              )}
+            </button>
+            {!isSelf && (
+              <button
+                className={`profile-tab${tab === 'note' ? ' active' : ''}`}
+                onClick={() => setTab('note')}
+              >
+                {t('profile.tabNote')}
+              </button>
+            )}
+          </nav>
+
+          <div className="profile-panel">
+            {tab === 'about' && (
+              <>
+                {/* Две плитки сверху: сколько человек здесь и насколько вы пересекаетесь */}
+                <div className="profile-stats">
+                  <div className="profile-stat">
+                    <b>{sinceLabel(profile.createdAt)}</b>
+                    <span>{joinedFormat.format(new Date(profile.createdAt))}</span>
+                  </div>
+                  <div className="profile-stat">
+                    <b>{profile.mutualGuilds.length}</b>
+                    <span>{t('profile.mutualCount')}</span>
+                  </div>
+                </div>
+
+                {profile.bio && (
+                  <section className="profile-section">
+                    <h4>{t('profile.about')}</h4>
+                    <p className="profile-bio">{profile.bio}</p>
+                  </section>
+                )}
+
+                {profile.mutualGuilds.length > 0 && (
+                  <section className="profile-section">
+                    <h4>{t('profile.tabGuilds')}</h4>
+                    <div className="profile-chips">
+                      {profile.mutualGuilds.map((guild) => (
+                        <button
+                          key={guild.id}
+                          className="profile-chip"
+                          onClick={() => {
+                            onNavigate?.();
+                            navigate(`/guilds/${guild.id}`);
+                          }}
+                        >
+                          <span className="profile-chip-icon" aria-hidden>
+                            {guild.iconUrl ? (
+                              <img src={guild.iconUrl} alt="" />
+                            ) : (
+                              initials(guild.name)
+                            )}
+                          </span>
+                          {guild.name}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {profile.mutualFriends > 0 && (
+                  <section className="profile-section">
+                    <h4>{t('profile.mutualFriends')}</h4>
+                    <p className="profile-fact">{profile.mutualFriends}</p>
+                  </section>
+                )}
+              </>
+            )}
+
+            {tab === 'guilds' &&
+              (profile.mutualGuilds.length === 0 ? (
+                <p className="empty-state">{t('profile.noGuilds')}</p>
+              ) : (
+                <div className="profile-guilds">
+                  {profile.mutualGuilds.map((guild) => (
+                    <button
+                      key={guild.id}
+                      className="profile-guild"
+                      onClick={() => {
+                        onNavigate?.();
+                        navigate(`/guilds/${guild.id}`);
+                      }}
+                    >
+                      <span className="profile-guild-icon" aria-hidden>
+                        {guild.iconUrl ? <img src={guild.iconUrl} alt="" /> : initials(guild.name)}
+                      </span>
+                      <span className="profile-guild-name">{guild.name}</span>
+                    </button>
+                  ))}
+                </div>
+              ))}
+
+            {tab === 'note' && !isSelf && (
+              <section className="profile-section">
+                <h4>{t('profile.personalNote')}</h4>
+                {/* Заметку видит только тот, кто её написал */}
+                <textarea
+                  className="profile-note-input"
+                  defaultValue={profile.myNote ?? ''}
+                  placeholder={t('profile.notePlaceholder')}
+                  rows={7}
+                  onBlur={(e) =>
+                    setNote.mutate({ userId: profile.id, note: e.target.value.trim() })
+                  }
+                />
+                <p className="settings-hint">{t('profile.noteOnlyYou')}</p>
+              </section>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

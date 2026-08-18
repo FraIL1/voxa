@@ -1,15 +1,17 @@
-import { createLocalVideoTrack, Room, type LocalVideoTrack } from 'livekit-client';
-import { Bell, BellOff, Mic, Play, Video, VideoOff, Volume2, VolumeX } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { Room } from 'livekit-client';
+import { Bell, BellOff, Play } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
-  measureMicLevel,
+  echoCancellation,
   micGain,
   outputVolume,
+  setEchoCancellation,
   setMicGain,
   setOutputVolume,
 } from '../lib/audio-io';
+import { applyNoiseSuppression, noiseSuppression } from '../lib/audio-io';
 import { playPreview, setSoundsEnabled, soundsEnabled } from '../lib/sounds';
 import { useVoiceStore } from '../stores/voice';
 import Select from './Select';
@@ -19,228 +21,186 @@ interface DeviceOption {
   label: string;
 }
 
-/** Устройства голоса и видео — попап голоса и раздел настроек */
-export default function AudioDeviceSelects({ withCamera = false }: { withCamera?: boolean }) {
+/** Строка настройки: слева название и пояснение, справа сам переключатель */
+function Row({ name, hint, children }: { name: string; hint?: string; children: ReactNode }) {
+  return (
+    <div className="setting-row">
+      <div className="setting-row-text">
+        <span className="setting-row-name">{name}</span>
+        {hint && <span className="setting-row-hint">{hint}</span>}
+      </div>
+      <div className="setting-row-control">{children}</div>
+    </div>
+  );
+}
+
+/** Переключатель-тумблер: свой, чтобы выглядел одинаково во всех браузерах */
+function Toggle({ on, onChange }: { on: boolean; onChange: (value: boolean) => void }) {
+  return (
+    <span className="owner-switch">
+      <input type="checkbox" checked={on} onChange={(e) => onChange(e.target.checked)} />
+      <span className="owner-switch-track" />
+    </span>
+  );
+}
+
+/** Ползунок со значением справа: без числа непонятно, куда его тянуть */
+function Slider({
+  value,
+  max,
+  label,
+  onChange,
+}: {
+  value: number;
+  max: number;
+  label: string;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div className="setting-slider">
+      <input
+        className="volume-slider level-slider"
+        type="range"
+        min={0}
+        max={max}
+        step={5}
+        value={value}
+        aria-label={label}
+        onChange={(e) => onChange(Number(e.target.value))}
+      />
+      <span className="level-value">{value}%</span>
+    </div>
+  );
+}
+
+/** Устройства голоса и видео. Проверка живёт отдельно — в правой колонке */
+export default function AudioDeviceSelects() {
   const { t } = useTranslation();
   const voice = useVoiceStore();
   const [mics, setMics] = useState<DeviceOption[]>([]);
   const [outputs, setOutputs] = useState<DeviceOption[]>([]);
   const [cameras, setCameras] = useState<DeviceOption[]>([]);
-  const [preview, setPreview] = useState(false);
   const [sounds, setSounds] = useState(soundsEnabled);
   const [gain, setGain] = useState(micGain);
   const [output, setOutput] = useState(outputVolume);
-  const [testing, setTesting] = useState(false);
-  const [monitor, setMonitor] = useState(false);
-  const [level, setLevel] = useState(0);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const [noise, setNoise] = useState(noiseSuppression);
+  const [echo, setEcho] = useState(echoCancellation);
 
   useEffect(() => {
-    // true — запросить доступ к микрофону, если его ещё нет (иначе ярлыки пустые)
+    // true — запросить доступ, если его ещё нет: иначе ярлыки устройств пустые
     void Room.getLocalDevices('audioinput', true).then((devices) =>
       setMics(devices.map((d) => ({ deviceId: d.deviceId, label: d.label }))),
     );
     void Room.getLocalDevices('audiooutput', true).then((devices) =>
       setOutputs(devices.map((d) => ({ deviceId: d.deviceId, label: d.label }))),
     );
-  }, []);
-
-  // Список камер спрашиваем только там, где он нужен: иначе браузер зря
-  // просит доступ к камере при открытии попапа голоса
-  useEffect(() => {
-    if (!withCamera) return;
     void Room.getLocalDevices('videoinput', true).then((devices) =>
       setCameras(devices.map((d) => ({ deviceId: d.deviceId, label: d.label }))),
     );
-  }, [withCamera]);
-
-  /* Предпросмотр — отдельный временный трек: комнату он не трогает и
-     гаснет вместе с закрытием раздела */
-  useEffect(() => {
-    if (!preview) return;
-    let track: LocalVideoTrack | null = null;
-    let cancelled = false;
-
-    void createLocalVideoTrack(voice.cameraDeviceId ? { deviceId: voice.cameraDeviceId } : {})
-      .then((created) => {
-        if (cancelled) {
-          created.stop();
-          return;
-        }
-        track = created;
-        if (videoRef.current) created.attach(videoRef.current);
-      })
-      .catch(() => setPreview(false));
-
-    return () => {
-      cancelled = true;
-      track?.stop();
-    };
-  }, [preview, voice.cameraDeviceId]);
-
-  useEffect(() => {
-    if (!testing) {
-      setLevel(0);
-      return;
-    }
-    return measureMicLevel(voice.micDeviceId, setLevel, monitor);
-  }, [testing, monitor, voice.micDeviceId]);
+  }, []);
 
   const toOptions = (devices: DeviceOption[]): { value: string; label: string }[] =>
     devices.map((d) => ({ value: d.deviceId, label: d.label || t('voice.defaultDevice') }));
 
   return (
     <>
-      <label>
-        {t('voice.mic')}
+      <div className="setting-group-name">{t('voice.grpMic')}</div>
+
+      <Row name={t('voice.device')} hint={t('voice.micDeviceHint')}>
         <Select
           value={voice.micDeviceId ?? 'default'}
           options={toOptions(mics)}
           placeholder={t('voice.defaultDevice')}
           onChange={(value) => void voice.setAudioDevice('audioinput', value)}
         />
-      </label>
+      </Row>
 
-      <div className="level-row">
-        <Mic size={15} />
-        <input
-          className="volume-slider level-slider"
-          type="range"
-          min={0}
-          max={200}
-          step={5}
+      <Row name={t('voice.micVolume')} hint={t('voice.micVolumeHint')}>
+        <Slider
           value={Math.round(gain * 100)}
-          aria-label={t('voice.micVolume')}
-          onChange={(e) => {
-            const next = Number(e.target.value) / 100;
-            setGain(next);
-            setMicGain(next);
+          max={200}
+          label={t('voice.micVolume')}
+          onChange={(next) => {
+            setGain(next / 100);
+            setMicGain(next / 100);
           }}
         />
-        <span className="level-value">{Math.round(gain * 100)}%</span>
-      </div>
+      </Row>
 
-      <button
-        className="btn-secondary"
-        onClick={() => {
-          setTesting((on) => !on);
-          setMonitor(false);
-        }}
-        title={t('voice.micTestHint')}
-      >
-        <Mic size={15} /> {testing ? t('voice.micTestStop') : t('voice.micTest')}
-      </button>
+      <Row name={t('voice.noise')} hint={t('voice.noiseHint')}>
+        <Toggle
+          on={noise}
+          onChange={(next) => {
+            setNoise(next);
+            void applyNoiseSuppression(next);
+          }}
+        />
+      </Row>
 
-      {testing && (
-        <>
-          <div className="mic-meter" role="progressbar" aria-valuenow={Math.round(level * 100)}>
-            <span className="mic-meter-fill" style={{ transform: `scaleX(${level})` }} />
-          </div>
+      <Row name={t('voice.echo')} hint={t('voice.echoHint')}>
+        <Toggle
+          on={echo}
+          onChange={(next) => {
+            setEcho(next);
+            setEchoCancellation(next);
+          }}
+        />
+      </Row>
 
-          <label className="sound-toggle">
-            {monitor ? <Volume2 size={16} /> : <VolumeX size={16} />}
-            <span className="sound-toggle-text">
-              <span className="owner-setting-name">{t('voice.micMonitor')}</span>
-              <span className="settings-hint">{t('voice.micMonitorHint')}</span>
-            </span>
-            <span className="owner-switch">
-              <input
-                type="checkbox"
-                checked={monitor}
-                onChange={(e) => setMonitor(e.target.checked)}
-              />
-              <span className="owner-switch-track" />
-            </span>
-          </label>
-        </>
-      )}
-      <label>
-        {t('voice.output')}
+      <div className="setting-group-name">{t('voice.grpSound')}</div>
+
+      <Row name={t('voice.output')} hint={t('voice.outputDeviceHint')}>
         <Select
           value={voice.outputDeviceId ?? 'default'}
           options={toOptions(outputs)}
           placeholder={t('voice.defaultDevice')}
           onChange={(value) => void voice.setAudioDevice('audiooutput', value)}
         />
-      </label>
+      </Row>
 
-      <div className="level-row">
-        <Volume2 size={15} />
-        <input
-          className="volume-slider level-slider"
-          type="range"
-          min={0}
-          max={100}
-          step={5}
+      <Row name={t('voice.outputVolume')} hint={t('voice.outputVolumeHint')}>
+        <Slider
           value={Math.round(output * 100)}
-          aria-label={t('voice.outputVolume')}
-          onChange={(e) => {
-            const next = Number(e.target.value) / 100;
-            setOutput(next);
-            setOutputVolume(next);
+          max={100}
+          label={t('voice.outputVolume')}
+          onChange={(next) => {
+            setOutput(next / 100);
+            setOutputVolume(next / 100);
           }}
         />
-        <span className="level-value">{Math.round(output * 100)}%</span>
-      </div>
+      </Row>
 
-      {withCamera && (
-        <>
-          <label className="sound-toggle">
-            {sounds ? <Bell size={16} /> : <BellOff size={16} />}
-            <span className="sound-toggle-text">
-              <span className="owner-setting-name">{t('voice.sounds')}</span>
-              <span className="settings-hint">{t('voice.soundsHint')}</span>
-            </span>
-            <button
-              type="button"
-              className="btn-secondary"
-              title={t('voice.soundsPreview')}
-              disabled={!sounds}
-              onClick={() => playPreview()}
-            >
-              <Play size={15} />
-            </button>
-            <span className="owner-switch">
-              <input
-                type="checkbox"
-                checked={sounds}
-                onChange={(e) => {
-                  setSounds(e.target.checked);
-                  setSoundsEnabled(e.target.checked);
-                  if (e.target.checked) playPreview();
-                }}
-              />
-              <span className="owner-switch-track" />
-            </span>
-          </label>
+      <Row name={t('voice.sounds')} hint={t('voice.soundsHint')}>
+        <button
+          type="button"
+          className="btn-secondary"
+          title={t('voice.soundsPreview')}
+          disabled={!sounds}
+          onClick={() => playPreview()}
+        >
+          <Play size={15} />
+        </button>
+        {sounds ? <Bell size={16} /> : <BellOff size={16} />}
+        <Toggle
+          on={sounds}
+          onChange={(next) => {
+            setSounds(next);
+            setSoundsEnabled(next);
+            if (next) playPreview();
+          }}
+        />
+      </Row>
 
-          <label>
-            {t('voice.camera')}
-            <Select
-              value={voice.cameraDeviceId ?? 'default'}
-              options={toOptions(cameras)}
-              placeholder={t('voice.defaultDevice')}
-              onChange={(value) => void voice.setCameraDevice(value)}
-            />
-          </label>
+      <div className="setting-group-name">{t('voice.grpCamera')}</div>
 
-          <div className="camera-preview">
-            {preview ? (
-              <video ref={videoRef} autoPlay playsInline muted />
-            ) : (
-              <div className="camera-preview-off">
-                <VideoOff size={22} />
-                {t('voice.cameraOffHint')}
-              </div>
-            )}
-          </div>
-
-          <button className="btn-secondary" onClick={() => setPreview((on) => !on)}>
-            {preview ? <VideoOff size={15} /> : <Video size={15} />}
-            {preview ? t('voice.cameraStop') : t('voice.cameraTest')}
-          </button>
-        </>
-      )}
+      <Row name={t('voice.device')} hint={t('voice.cameraDeviceHint')}>
+        <Select
+          value={voice.cameraDeviceId ?? 'default'}
+          options={toOptions(cameras)}
+          placeholder={t('voice.defaultDevice')}
+          onChange={(value) => void voice.setCameraDevice(value)}
+        />
+      </Row>
     </>
   );
 }

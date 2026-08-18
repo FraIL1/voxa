@@ -2,11 +2,20 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, Outlet } from 'react-router';
 
-import { toggleActiveDeafen, toggleActiveMute } from '../hooks/useAudioSession';
+import {
+  answerIncoming,
+  declineIncoming,
+  leaveActive,
+  toggleActiveCamera,
+  toggleActiveDeafen,
+  toggleActiveMute,
+  toggleActiveShare,
+} from '../hooks/useAudioSession';
 import { useIdleWatch } from '../hooks/useIdleWatch';
 import { useRealtime } from '../hooks/useRealtime';
 import { registerGlobalShortcuts } from '../lib/tauri';
 import { useAuthStore } from '../stores/auth';
+import { comboAccelerator, matchesCombo, useHotkeysStore } from '../stores/hotkeys';
 import { useProfileViewStore } from '../stores/profileView';
 import CallDock from './CallDock';
 import IncomingCallModal from './IncomingCallModal';
@@ -31,28 +40,50 @@ export default function AppShell() {
   // Управляют активной сессией: голосовым каналом или звонком в личке.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
-      // Ctrl+K — быстрый переход; работает и без Shift
-      if (e.ctrlKey && !e.shiftKey && e.code === 'KeyK') {
+      const { binds } = useHotkeysStore.getState();
+      if (matchesCombo(binds.switcher, e)) {
         e.preventDefault();
         setSwitcherOpen((v) => !v);
-        return;
-      }
-      if (!e.ctrlKey || !e.shiftKey) return;
-      if (e.code === 'KeyM') {
+      } else if (matchesCombo(binds.mute, e)) {
         e.preventDefault();
         toggleActiveMute();
-      } else if (e.code === 'KeyD') {
+      } else if (matchesCombo(binds.deafen, e)) {
         e.preventDefault();
         toggleActiveDeafen();
+      } else if (matchesCombo(binds.leaveVoice, e)) {
+        e.preventDefault();
+        leaveActive();
+      } else if (matchesCombo(binds.camera, e)) {
+        e.preventDefault();
+        toggleActiveCamera();
+      } else if (matchesCombo(binds.share, e)) {
+        e.preventDefault();
+        toggleActiveShare();
+      } else if (matchesCombo(binds.answer, e)) {
+        e.preventDefault();
+        answerIncoming();
+      } else if (matchesCombo(binds.decline, e)) {
+        e.preventDefault();
+        declineIncoming();
       }
     };
     window.addEventListener('keydown', onKeyDown);
 
     let cleanupGlobal: (() => void) | undefined;
-    void registerGlobalShortcuts({
-      toggleMute: toggleActiveMute,
-      toggleDeafen: toggleActiveDeafen,
-    }).then((cleanup) => {
+    const { binds } = useHotkeysStore.getState();
+    const global = [
+      { combo: binds.mute, run: toggleActiveMute },
+      { combo: binds.deafen, run: toggleActiveDeafen },
+      { combo: binds.leaveVoice, run: leaveActive },
+      { combo: binds.camera, run: toggleActiveCamera },
+      { combo: binds.share, run: toggleActiveShare },
+      { combo: binds.answer, run: answerIncoming },
+      { combo: binds.decline, run: declineIncoming },
+    ]
+      .map(({ combo, run }) => ({ accelerator: comboAccelerator(combo), run }))
+      .filter((b): b is { accelerator: string; run: () => void } => b.accelerator !== null);
+
+    void registerGlobalShortcuts(global).then((cleanup) => {
       cleanupGlobal = cleanup;
     });
 

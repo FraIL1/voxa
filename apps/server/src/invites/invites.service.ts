@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { CreateInviteInput, InviteCheckDto, InviteDto } from '@voxa/shared';
 import type { Invite, Role, User } from '@prisma/client';
@@ -42,6 +42,7 @@ export class InvitesService {
             avatarUrl: invite.createdBy.avatarUrl,
           }
         : null,
+      grantsRoleId: invite.grantsRoleId,
       grantsRoleName: invite.grantsRole?.name ?? null,
       uses: invite.uses,
       maxUses: invite.maxUses,
@@ -58,11 +59,24 @@ export class InvitesService {
   } as const;
 
   async create(guildId: string, creatorId: string, input: CreateInviteInput): Promise<InviteDto> {
+    /* Роль сверяем с сервером: иначе по ссылке можно было бы выдать
+       чужую роль, подставив её идентификатор в запрос. */
+    let grantsRoleId: string | null = null;
+    if (input.grantsRoleId) {
+      const role = await this.prisma.role.findFirst({
+        where: { id: input.grantsRoleId, guildId },
+        select: { id: true },
+      });
+      if (!role) throw new BadRequestException('Роль не найдена на этом сервере');
+      grantsRoleId = role.id;
+    }
+
     const invite = await this.prisma.invite.create({
       data: {
         guildId,
         code: generateInviteCode(),
         createdById: creatorId,
+        grantsRoleId,
         maxUses: input.maxUses ?? null,
         expiresAt: input.expiresInHours
           ? new Date(Date.now() + input.expiresInHours * 60 * 60 * 1000)

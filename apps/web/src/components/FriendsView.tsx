@@ -1,5 +1,16 @@
 import type { FriendDto } from '@voxa/shared';
-import { Ban, Check, MessageSquare, UserMinus, UserPlus, Users, X } from 'lucide-react';
+import {
+  Ban,
+  Check,
+  Circle,
+  Inbox,
+  MessageSquare,
+  UserMinus,
+  UserPlus,
+  Users,
+  X,
+  type LucideIcon,
+} from 'lucide-react';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
@@ -296,11 +307,11 @@ export default function FriendsView() {
 
   const incomingCount = (requests ?? []).filter((r) => r.direction === 'incoming').length;
 
-  const tabs: { key: Tab; label: string; badge?: number }[] = [
-    { key: 'online', label: t('friends.online') },
-    { key: 'all', label: t('friends.all') },
-    { key: 'requests', label: t('friends.requests'), badge: incomingCount },
-    { key: 'blocked', label: t('friends.blocked') },
+  const tabs: { key: Tab; label: string; icon: LucideIcon; badge?: number }[] = [
+    { key: 'online', label: t('friends.online'), icon: Circle },
+    { key: 'all', label: t('friends.all'), icon: Users },
+    { key: 'requests', label: t('friends.requests'), icon: Inbox, badge: incomingCount },
+    { key: 'blocked', label: t('friends.blocked'), icon: Ban },
   ];
 
   return (
@@ -310,12 +321,13 @@ export default function FriendsView() {
           <Users size={18} /> {t('nav.friends')}
         </span>
         <div className="friends-tabs">
-          {tabs.map(({ key, label, badge }) => (
+          {tabs.map(({ key, label, icon: Icon, badge }) => (
             <button
               key={key}
               className={`friends-tab${tab === key ? ' active' : ''}`}
               onClick={() => setTab(key)}
             >
+              <Icon size={15} />
               {label}
               {badge ? <span className="mention-badge">{badge}</span> : null}
             </button>

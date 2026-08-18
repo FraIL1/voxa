@@ -21,6 +21,7 @@ interface Saved {
   output: number;
   /** Подавление шума на микрофоне */
   noise: boolean;
+  echo: boolean;
 }
 
 function load(): Saved {
@@ -31,9 +32,10 @@ function load(): Saved {
       micGain: clamp(saved.micGain ?? 1, 0, 3),
       output: clamp(saved.output ?? 1, 0, 1),
       noise: saved.noise ?? true,
+      echo: saved.echo ?? true,
     };
   } catch {
-    return { micGain: 1, output: 1, noise: true };
+    return { micGain: 1, output: 1, noise: true, echo: true };
   }
 }
 
@@ -217,6 +219,21 @@ export async function applyNoiseSuppression(value: boolean): Promise<void> {
   await deviceMicTrack.applyConstraints({ noiseSuppression: value });
 }
 
+/**
+ * Подавление эха. В отличие от шумоподавления менять его на живой дорожке
+ * нельзя: браузер задаёт его в момент захвата и на applyConstraints отвечает
+ * «Cannot satisfy constraints». Поэтому только сохраняем — новое значение
+ * возьмёт следующий захват, то есть следующее подключение.
+ */
+export function echoCancellation(): boolean {
+  return levels.echo;
+}
+
+export function setEchoCancellation(value: boolean): void {
+  levels = { ...levels, echo: value };
+  save(levels);
+}
+
 /** Настройки захвата микрофона — одинаковые в каналах и в звонках */
 export function micCaptureOptions(deviceId: string | null): {
   deviceId?: string;
@@ -227,7 +244,7 @@ export function micCaptureOptions(deviceId: string | null): {
   return {
     ...(deviceId ? { deviceId } : {}),
     noiseSuppression: levels.noise,
-    echoCancellation: true,
+    echoCancellation: levels.echo,
     // Своё усиление ниже по цепочке, автоматика с ним боролась бы
     autoGainControl: false,
   };

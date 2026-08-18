@@ -1,5 +1,5 @@
 import type { MeDto, PresenceMode } from '@voxa/shared';
-import { Check, ChevronRight, Copy, LogOut, Pencil, Sparkles } from 'lucide-react';
+import { Check, ChevronRight, Copy, LogOut, Pencil, Sparkles, UserRound } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -8,6 +8,7 @@ import { logout } from '../api/auth';
 import { api } from '../api/client';
 import { useAuthStore } from '../stores/auth';
 import { usePresenceStore } from '../stores/presence';
+import { useProfileViewStore } from '../stores/profileView';
 import Avatar from './Avatar';
 
 /** Порядок в подменю: от «я тут» к «меня нет» */
@@ -73,6 +74,7 @@ export default function ProfileMenu({
   };
 
   const mode = user?.presenceMode ?? 'ONLINE';
+  const openProfile = useProfileViewStore((state) => state.open);
 
   return (
     <div className="profile-menu" ref={ref}>
@@ -91,6 +93,17 @@ export default function ProfileMenu({
       </div>
 
       <div className="profile-menu-group">
+        {/* Сначала посмотреть, потом менять: смотрят чаще, чем правят */}
+        <button
+          className="menu-item"
+          onClick={() => {
+            onClose();
+            if (user) openProfile(user.id);
+          }}
+        >
+          <UserRound size={15} /> {t('profile.viewProfile')}
+        </button>
+
         <button
           className="menu-item"
           onClick={() => {

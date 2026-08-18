@@ -49,8 +49,14 @@
   --nav-bg: linear-gradient(180deg, var(--panel), #0c1119);
 
   --transition: 160ms cubic-bezier(0.2, 0.8, 0.3, 1);
-  --sidebar-width: 264px;
-  --members-width: 216px;
+  --sidebar-width: 268px;
+  --members-width: 250px;
+  --rail-width: 78px;
+
+  /* Панели стоят отдельными карточками. Зазор маленький нарочно: карточки
+     должны читаться раздельно, но столбцы не должны разъезжаться. */
+  --shell-gap: 7px;
+  --card-radius: 20px;
 
   /* Высоты управляющих элементов: кнопки и поля стоят в один рост */
   --control-h: 36px;
@@ -443,9 +449,16 @@ h3 {
 
 /* ---------- Оболочка: рейл серверов + контекстный макет ---------- */
 
+/* Панели лежат карточками на общем фоне. Фон живой, но без единой линии:
+   только рассеянное сияние по углам — линии в фоне режут текст в переписке. */
 .app-root {
   display: flex;
   height: 100%;
+  gap: var(--shell-gap);
+  padding: var(--shell-gap);
+  background:
+    radial-gradient(55% 40% at 10% 0%, rgba(34, 211, 238, 0.08), transparent 62%),
+    radial-gradient(40% 35% at 100% 100%, rgba(45, 212, 191, 0.06), transparent 62%), var(--bg);
 }
 
 .app-root > .app-shell {
@@ -453,12 +466,29 @@ h3 {
   min-width: 0;
 }
 
-/* Левый столбец иконок (Дом + серверы) */
+/* Общий вид карточки: границы вместо разделительных линий между колоннами */
+.server-rail,
+.sidebar,
+.main-column,
+.members {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  overflow: hidden;
+}
+
+/* Колонка каналов не режет вылетающее наружу: меню профиля и его
+   подменю статусов выходят за край и обрезались скруглением карточки.
+   Прокрутка живёт внутри списка каналов, поэтому углы остаются чистыми. */
+.sidebar {
+  overflow: visible;
+}
+
+/* Левый столбец иконок (Личные + серверы) */
 .server-rail {
-  width: 76px;
+  width: var(--rail-width);
   flex-shrink: 0;
   background: var(--rail-bg);
-  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -521,6 +551,32 @@ h3 {
   box-shadow: 0 6px 20px rgba(34, 211, 238, 0.28);
 }
 
+/* Личные сообщения — первая кнопка столбца, выделена цветом и подписана.
+   Раньше она стояла внизу и её просто не находили. */
+.rail-icon.home {
+  background: linear-gradient(140deg, rgba(34, 211, 238, 0.13), var(--panel-raised));
+  border-color: var(--accent-line);
+  color: var(--accent);
+  margin-bottom: 16px;
+}
+
+.rail-caption {
+  position: absolute;
+  top: calc(100% + 3px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  color: var(--text-muted);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.rail-icon.home.active .rail-caption {
+  color: var(--accent);
+}
+
 .rail-icon.add {
   background: transparent;
   border-style: dashed;
@@ -566,11 +622,25 @@ h3 {
 .app-shell {
   display: grid;
   grid-template-columns: var(--sidebar-width) 1fr var(--members-width);
+  gap: var(--shell-gap);
   height: 100%;
 }
 
 .app-shell.home {
   grid-template-columns: var(--sidebar-width) 1fr;
+}
+
+/* Список участников убран — его ширина уходит переписке */
+.app-shell.no-members {
+  grid-template-columns: var(--sidebar-width) 1fr;
+}
+
+.header-toggle {
+  margin-left: auto;
+}
+
+.header-toggle.active {
+  color: var(--accent);
 }
 
 @media (max-width: 900px) {
@@ -724,8 +794,6 @@ h3 {
 
 .sidebar {
   position: relative;
-  background: var(--panel);
-  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -736,8 +804,9 @@ h3 {
 }
 
 .sidebar-header {
-  padding: 14px 16px;
-  font-weight: 700;
+  padding: 18px 18px 14px;
+  font-size: 19px;
+  font-weight: 750;
   border-bottom: 1px solid var(--border);
 }
 
@@ -748,21 +817,23 @@ h3 {
 }
 
 .category-name {
-  font-size: 11px;
-  font-weight: 700;
+  font-size: 10px;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.12em;
   color: var(--text-faint);
-  padding: 10px 8px 4px;
+  padding: 14px 10px 5px;
 }
 
 .channel-link {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 7px 10px;
-  border-radius: var(--radius);
+  gap: 11px;
+  padding: 9px 11px;
+  margin: 2px 0;
+  font-size: 14.5px;
+  border-radius: 12px;
   color: var(--text-muted);
   text-decoration: none;
   transition:
@@ -852,13 +923,22 @@ h3 {
 
 /* Панель текущего голосового подключения */
 /* Панель связи над карточкой: состояние, где сидишь и что можно включить */
+/* Карточка голоса — отдельный светящийся островок внизу столбца,
+   а не полоса через всю ширину: сразу видно, что разговор идёт. */
 .voice-panel {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  border-top: 1px solid var(--border);
-  padding: 10px 12px;
-  background: color-mix(in srgb, var(--success) 8%, transparent);
+  margin: 0 10px 10px;
+  padding: 12px 13px;
+  border: 1px solid color-mix(in srgb, var(--success) 42%, transparent);
+  border-radius: 15px;
+  background: linear-gradient(
+    140deg,
+    color-mix(in srgb, var(--success) 16%, transparent),
+    color-mix(in srgb, var(--success) 5%, transparent)
+  );
+  box-shadow: 0 0 26px color-mix(in srgb, var(--success) 14%, transparent);
   font-size: 13px;
 }
 
@@ -1154,16 +1234,19 @@ h3 {
   color: var(--text);
 }
 
+/* Сообщение при наведении поднимается карточкой, а не подкрашивается полоской */
 .message {
   position: relative;
   display: flex;
-  gap: 12px;
-  padding: 6px 8px;
-  border-radius: var(--radius);
+  gap: 14px;
+  padding: 10px 12px;
+  margin: 0 -12px;
+  border-radius: 16px;
+  transition: background var(--transition);
 }
 
 .message:hover {
-  background: var(--tint);
+  background: var(--panel-raised);
 }
 
 .message.pending {
@@ -1328,20 +1411,22 @@ h3 {
 }
 
 .message-author {
-  font-weight: 650;
-  font-size: 14px;
+  font-weight: 700;
+  font-size: 15px;
   letter-spacing: -0.01em;
 }
 
 .message-time {
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
 }
 
 .message-content {
   overflow-wrap: anywhere;
-  line-height: 1.55;
+  font-size: 15px;
+  line-height: 1.6;
+  margin-top: 3px;
 }
 
 .message-content a {
@@ -1797,7 +1882,6 @@ h3 {
 
 .voice-control.icon-button.danger:hover {
   filter: brightness(1.08);
-  background: var(--danger);
 }
 
 .voice-control.icon-button.sharing {
@@ -1807,13 +1891,109 @@ h3 {
 }
 
 /* Область просмотра демонстрации экрана */
+/* Когда кто-то показывает экран, главное на сцене — он, а не аватарки.
+   Поэтому плитка забирает всю высоту, а участники уходят в полосу под ней. */
 .screen-area {
-  flex: 2;
+  flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: #000;
-  border-bottom: 1px solid var(--border);
+  margin: 10px 10px 0;
+  background: #05070b;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.screen-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.screen-stage .screen-video {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Полоса появляется поверх картинки и не отнимает у неё высоту */
+.screen-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: linear-gradient(0deg, rgba(4, 7, 12, 0.82), transparent);
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+
+.screen-stage:hover .screen-overlay,
+.screen-stage:focus-within .screen-overlay {
+  opacity: 1;
+}
+
+.screen-what {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  font-weight: 650;
+  color: #eaf0f9;
+}
+
+.screen-air {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+  color: var(--danger);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.screen-air i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--danger);
+}
+
+.screen-tools {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+.screen-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(10, 14, 21, 0.72);
+  color: #eaf0f9;
+  font-size: 12.5px;
+}
+
+.screen-tool:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.screen-tool.on {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  color: var(--accent);
 }
 
 .screen-tabs {
@@ -1861,19 +2041,45 @@ h3 {
 
 .voice-grid.compact {
   flex: 0 0 auto;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  align-content: stretch;
+  height: 104px;
   padding: 10px;
-  gap: 8px;
+  gap: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
+/* Все плитки одного размера: разнокалиберные читаются как ошибка */
 .voice-grid.compact .voice-tile {
-  padding: 10px 16px;
-  min-width: 110px;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 10px;
+  min-width: 128px;
+  border-radius: 14px;
+  box-shadow: none;
 }
 
 .voice-grid.compact .voice-avatar {
-  width: 36px;
-  height: 36px;
-  font-size: 16px;
+  width: 34px;
+  height: 34px;
+  font-size: 15px;
+}
+
+.voice-grid.compact .voice-video {
+  height: 100%;
+  border-radius: 10px;
+}
+
+.voice-grid.compact .voice-tile-name {
+  font-size: 12px;
+}
+
+/* В полосе тесно — громкость настраивается в полном виде */
+.voice-grid.compact .volume-slider {
+  display: none;
 }
 
 /* Слайдер громкости участника: свои стили — одинаково во всех браузерах,
@@ -1963,9 +2169,11 @@ h3 {
 }
 
 /* Плитки со сводкой: вкладка «Сообщество» и панель владельца */
+/* Ровно четыре колонки: при трёх четвёртая плитка уезжала на вторую
+   строку и ряд выглядел обломанным. */
 .admin-tiles {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
   margin: 0 0 8px;
 }
@@ -2053,12 +2261,32 @@ h3 {
 }
 
 /* Рамку сверху ставит слой полировки ниже — второй линии здесь быть не должно */
+/* Строка списка в панели владельца — карточка, а не строка в таблице:
+   плоский список из сотни строк читать нечем — глазу не за что зацепиться. */
 .admin-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 10px;
-  font-size: 13px;
+  gap: 12px;
+  margin-bottom: 8px;
+  padding: 12px 14px;
+  font-size: 13.5px;
+  border-radius: var(--radius-lg);
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  transition:
+    border-color var(--transition),
+    transform var(--transition);
+}
+
+.admin-row:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+
+.admin-row .avatar {
+  width: 34px;
+  height: 34px;
+  font-size: 14px;
 }
 
 .invite-code {
@@ -2177,8 +2405,8 @@ h3 {
 .settings-panel {
   position: relative;
   display: flex;
-  width: min(820px, 94vw);
-  height: min(600px, 90vh);
+  width: min(1320px, 96vw);
+  height: min(760px, 94vh);
   background: var(--bg);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
@@ -2188,7 +2416,7 @@ h3 {
 }
 
 .settings-nav {
-  width: 208px;
+  width: 252px;
   background: var(--nav-bg);
   border-right: 1px solid var(--border);
   display: flex;
@@ -2196,6 +2424,164 @@ h3 {
   gap: 2px;
   padding: 16px 10px;
   overflow-y: auto;
+}
+
+/* Строка настройки по эскизу: слева название и пояснение, справа сам переключатель */
+/* Форма настроек зажата в 360px — для полей это верно, но строки
+   со значением справа должны тянуться на всю ширину колонки. */
+.settings-content .settings-form {
+  max-width: none;
+}
+
+.settings-form.voice-form {
+  gap: 0;
+}
+
+/* Поля ввода шире чем надо читаются хуже, поэтому ограничиваем их сами,
+   а не всю колонку: заголовки и строки должны идти на всю ширину. */
+.settings-content .settings-form input[type='text'],
+.settings-content .settings-form input[type='password'],
+.settings-content .settings-form textarea,
+.settings-content .settings-form .select {
+  max-width: 460px;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.setting-row-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.setting-row-name {
+  display: block;
+  font-size: 14.5px;
+}
+
+.setting-row-hint {
+  display: block;
+  margin-top: 3px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-faint);
+}
+
+/* Ширина колонки с контролами фиксирована: иначе длинное имя
+   устройства растягивает список и зажимает пояснение в узкий столбик. */
+.setting-row-control {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  width: 320px;
+  flex: none;
+}
+
+.setting-row-control .select {
+  width: 100%;
+  min-width: 0;
+}
+
+/* Длинное имя устройства обрезаем многоточием, целиком видно в списке */
+.setting-row-control .select-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.setting-slider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.setting-slider .volume-slider {
+  flex: 1;
+}
+
+.owner-switch.faded {
+  opacity: 0.45;
+}
+
+.hotkey {
+  padding: 5px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--border-strong);
+  background: var(--panel-raised);
+  font-family: inherit;
+  font-size: 12.5px;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.hotkey.listening {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.setting-row-value {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.setting-group-name {
+  padding: 22px 0 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.settings-nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-nav-group + .settings-nav-group {
+  margin-top: 14px;
+}
+
+.settings-nav-group-name {
+  padding: 6px 10px 5px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.settings-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  margin: 4px 0 12px;
+  padding: 0 11px;
+  border-radius: 12px;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  color: var(--text-faint);
+}
+
+.settings-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 13.5px;
+  outline: none;
 }
 
 .settings-tab {
@@ -2231,7 +2617,8 @@ h3 {
 
 .settings-content {
   flex: 1;
-  padding: 22px 26px;
+  min-width: 0;
+  padding: 26px 32px;
   overflow-y: auto;
 }
 
@@ -2242,6 +2629,239 @@ h3 {
 
 .settings-content h2:first-child {
   margin-top: 0;
+}
+
+/* Третья колонка — живая проверка. Смысл в том, чтобы результат был
+   виден сразу и не приходилось закрывать настройки ради проверки. */
+.settings-aside {
+  width: 340px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  background: var(--nav-bg);
+  padding: 20px 18px;
+  overflow-y: auto;
+}
+
+.settings-aside-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--accent);
+  margin-bottom: 16px;
+}
+
+.settings-aside-head b {
+  display: block;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.settings-aside-head span {
+  display: block;
+  font-size: 12px;
+  color: var(--text-faint);
+  margin-top: 2px;
+  line-height: 1.45;
+}
+
+.preview-chat {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.preview-msg {
+  display: flex;
+  gap: 11px;
+}
+
+.preview-avatar {
+  width: 32px;
+  height: 32px;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.preview-msg-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.preview-msg-meta b {
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.preview-msg-meta i {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.preview-msg p {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+/* Карточка профиля в предпросмотре: то же, что увидят другие */
+.preview-profile {
+  --preview-accent: var(--accent);
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.preview-profile-top {
+  height: 62px;
+  background: linear-gradient(135deg, var(--preview-accent), transparent 140%);
+  opacity: 0.85;
+}
+
+.preview-profile-avatar {
+  position: absolute;
+  top: 32px;
+  left: 16px;
+  width: 60px;
+  height: 60px;
+  font-size: 24px;
+  border: 3px solid var(--panel);
+}
+
+.preview-profile-body {
+  padding: 30px 16px 16px;
+}
+
+.preview-profile-name {
+  font-size: 17px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  color: var(--preview-accent);
+}
+
+.preview-profile-login {
+  font-size: 12.5px;
+  color: var(--text-faint);
+  margin-top: 2px;
+}
+
+.preview-profile-status {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.preview-profile-bio {
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.preview-profile-bio.empty {
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+.live-check {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.check-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.check-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 13.5px;
+  font-weight: 650;
+}
+
+.check-head i {
+  margin-left: auto;
+  font-style: normal;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--accent);
+}
+
+/* Полоска из отрезков: видно, докуда добивает голос, а не просто «есть звук» */
+.check-bars {
+  display: flex;
+  gap: 3px;
+  height: 10px;
+}
+
+.check-bar {
+  flex: 1;
+  border-radius: 2px;
+  background: var(--panel-hover);
+  transition: background 90ms linear;
+}
+
+.check-bar.on {
+  background: var(--accent);
+}
+
+.check-bar.hot.on {
+  background: var(--warning);
+}
+
+.check-wide {
+  width: 100%;
+  justify-content: center;
+}
+
+.camera-note {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  background: rgba(5, 8, 14, 0.78);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.check-hint {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-faint);
+}
+
+.live-check > label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* На узком экране проверка вытеснила бы сами настройки */
+@media (max-width: 900px) {
+  .settings-aside {
+    display: none;
+  }
 }
 
 .settings-close {
@@ -2284,8 +2904,6 @@ h3 {
 /* Правая колонка */
 
 .members {
-  background: var(--panel);
-  border-left: 1px solid var(--border);
   padding: 10px;
   overflow-y: auto;
   min-height: 0;
@@ -2850,8 +3468,12 @@ h3 {
   padding: 8px 0;
 }
 
+/* Подсветка только у рамки целиком: у поля внутри её гасим,
+   иначе два кольца накладываются одно на другое. */
 .dm-panel-search input:focus {
   border: none;
+  outline: none;
+  box-shadow: none;
 }
 
 .dm-panel-row {
@@ -3014,6 +3636,47 @@ h3 {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.dm-header-login {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-faint);
+}
+
+/* Строка диалога в две строки: имя и о чём был разговор */
+.dm-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.dm-line-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.dm-when {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.dm-preview {
+  font-size: 12.5px;
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dm-link.unread .dm-preview {
+  color: var(--text-muted);
 }
 
 .dm-header-count {
@@ -3666,6 +4329,206 @@ h3 {
   margin-top: -30px;
 }
 
+/* Две половины: кто это и что с ним делать — слева, подробности — справа */
+.profile-card {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  grid-template-rows: auto 1fr;
+  gap: 0;
+  /* Высота на самой карточке, а не на окне: иначе под карточкой
+     оставалась пустая полоса фона. */
+  min-height: 540px;
+}
+
+.profile-card.compact {
+  min-height: 0;
+  grid-template-rows: auto auto;
+}
+
+.profile-card > .profile-cover {
+  grid-column: 1 / -1;
+}
+
+.profile-left {
+  display: flex;
+  flex-direction: column;
+  padding: 0 18px 18px;
+  border-right: 1px solid var(--border);
+}
+
+.profile-left .profile-avatar {
+  margin-top: -34px;
+}
+
+.profile-left .profile-name {
+  margin-top: 12px;
+  font-size: 19px;
+  font-weight: 780;
+  letter-spacing: -0.02em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.profile-left .profile-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 18px;
+}
+
+/* Без flex: none кнопки тянулись ввысоту: у них есть рост по главной оси,
+   а ось теперь вертикальная */
+.profile-left .profile-actions button {
+  flex: none;
+  width: 100%;
+  justify-content: center;
+}
+
+.profile-right {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.profile-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 12px 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.profile-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px;
+  border-radius: 11px 11px 0 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13.5px;
+  border-bottom: 2px solid transparent;
+}
+
+.profile-tab:hover {
+  color: var(--text);
+}
+
+.profile-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.profile-tab-count {
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--panel-hover);
+  font-size: 11px;
+}
+
+.profile-panel {
+  flex: 1;
+  min-height: 190px;
+  padding: 16px 18px 18px;
+  overflow-y: auto;
+}
+
+/* Вкладки пилюлями, как на эскизе */
+.profile-tabs {
+  border-bottom: none;
+  padding: 14px 16px 4px;
+}
+
+.profile-tab {
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  border-bottom: 1px solid transparent;
+}
+
+.profile-tab.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* Две плитки с главными числами */
+.profile-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.profile-stat {
+  padding: 14px 16px;
+  border-radius: var(--radius-lg);
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+}
+
+.profile-stat b {
+  display: block;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.profile-stat span {
+  display: block;
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+/* Серверы фишками в строку, а не списком в столбик */
+.profile-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.profile-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 6px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--panel-raised);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.profile-chip:hover {
+  border-color: var(--accent);
+}
+
+.profile-chip-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: var(--panel-hover);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.profile-chip-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-note-input {
+  width: 100%;
+  resize: vertical;
+  min-height: 110px;
+  border-style: dashed;
+}
+
 .profile-avatar {
   width: 74px;
   height: 74px;
@@ -3783,10 +4646,11 @@ h3 {
   background: var(--panel-hover);
 }
 
+/* Значки общих серверов читались как квадраты рядом с круглыми аватарами */
 .profile-guild-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-sm);
+  width: 30px;
+  height: 30px;
+  border-radius: 11px;
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -3825,7 +4689,9 @@ h3 {
 /* Профиль поверх интерфейса */
 .profile-modal {
   position: relative;
-  width: min(420px, 100%);
+  /* Две колонки в 420px не помещаются: кнопки и вкладки наезжали друг на друга */
+  /* Окно ближе к квадрату: широкая и низкая карточка выглядела приплюснутой */
+  width: min(820px, 94vw);
   max-height: 86vh;
   overflow-y: auto;
   border-radius: var(--radius-lg);
@@ -3878,6 +4744,34 @@ h3 {
   }
 }
 
+/* В боковой панели две колонки не помещаются — там карточка идёт в один столбец */
+.dm-profile-aside .profile-card,
+.profile-card.narrow {
+  grid-template-columns: 1fr;
+}
+
+.dm-profile-aside .profile-left,
+.profile-card.narrow .profile-left {
+  border-right: none;
+  padding-bottom: 12px;
+}
+
+.dm-profile-aside .profile-left .profile-actions,
+.profile-card.narrow .profile-left .profile-actions {
+  margin-top: 14px;
+  padding-top: 0;
+}
+
+.dm-profile-aside .profile-tabs,
+.profile-card.narrow .profile-tabs {
+  padding-top: 0;
+}
+
+.dm-profile-aside .profile-panel,
+.profile-card.narrow .profile-panel {
+  min-height: 0;
+}
+
 .dm-profile-aside .profile-card {
   border: none;
   border-radius: 0;
@@ -3889,8 +4783,76 @@ h3 {
   height: 96px;
 }
 
-.dm-profile-aside .profile-actions button {
-  flex: 1 1 100%;
+/* Узкая карточка: только кнопки, и всё на тон мельче */
+.profile-card.compact {
+  grid-template-columns: 1fr;
+}
+
+.profile-card.compact .profile-left {
+  border-right: none;
+  padding: 0 14px 14px;
+}
+
+.profile-card.compact .profile-avatar {
+  width: 54px;
+  height: 54px;
+  font-size: 21px;
+  border-width: 3px;
+  margin-top: -24px;
+}
+
+.profile-card.compact .profile-name {
+  margin-top: 8px;
+  font-size: 15.5px;
+}
+
+.profile-card.compact .profile-username {
+  font-size: 12px;
+}
+
+.profile-card.compact .profile-status-text {
+  font-size: 12.5px;
+}
+
+.profile-card.compact .profile-actions {
+  gap: 6px;
+  margin-top: 14px;
+  padding-top: 12px;
+}
+
+.profile-card.compact .profile-actions button {
+  min-height: var(--control-h-sm);
+  padding: 0 12px;
+  font-size: 12.5px;
+}
+
+/* В боковой панели всё мельче: места там вчетверо меньше */
+.dm-profile-aside .profile-avatar {
+  width: 56px;
+  height: 56px;
+  font-size: 22px;
+  border-width: 3px;
+  margin-top: -26px;
+}
+
+.dm-profile-aside .profile-left .profile-name {
+  margin-top: 8px;
+  font-size: 16px;
+}
+
+.dm-profile-aside .profile-left .profile-actions button {
+  min-height: var(--control-h-sm);
+  font-size: 13px;
+}
+
+.dm-profile-aside .profile-tab {
+  padding: 6px 9px;
+  font-size: 12.5px;
+  gap: 5px;
+}
+
+.dm-profile-aside .profile-panel {
+  padding: 12px 14px 14px;
 }
 
 /* Имя автора и аватар в чате открывают карточку */
@@ -4772,10 +5734,10 @@ h3 {
 }
 
 /* Права на приложение — внизу колонки настроек */
+/* Подпись только в «О программе»: в остальных разделах она ни при чём */
 .settings-copyright {
-  margin: 14px 10px 0;
-  font-size: 11px;
-  line-height: 1.5;
+  margin-top: 22px;
+  font-size: 12.5px;
   color: var(--text-faint);
 }
 
@@ -5353,8 +6315,8 @@ h3 {
   background: var(--gradient-surface), var(--panel);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
-  padding: 24px;
-  width: min(400px, 92vw);
+  padding: 26px 28px;
+  width: min(480px, 92vw);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -5406,6 +6368,7 @@ h3 {
 
 /* Предпросмотр камеры в настройках */
 .camera-preview {
+  position: relative;
   position: relative;
   aspect-ratio: 16 / 9;
   border: 1px solid var(--border);
@@ -6080,11 +7043,619 @@ h3 {
   color: var(--danger);
 }
 
-/* Подсказка про звук демонстрации: предупреждение, а не ошибка */
-.share-hint {
-  color: var(--warning);
-  font-size: 13px;
-  text-align: center;
-  margin: 8px 16px 0;
+/* ============================================================
+   Узкая карточка профиля в боковой панели.
+
+   Правила стоят в конце файла нарочно: прежние правила боковой панели
+   имели ту же силу и, стоя ниже, растягивали кнопки в строку во всю
+   ширину. Спор решает порядок, поэтому последнее слово здесь.
+   ============================================================ */
+.profile-card.compact .profile-actions {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.profile-card.compact .profile-actions button {
+  flex: 0 0 auto;
+  width: 100%;
+  min-height: var(--control-h-sm);
+  padding: 0 12px;
+  font-size: 12.5px;
+  justify-content: center;
+}
+
+/* ---------- Маленькие окна: подтверждения и создание ---------- */
+
+/* Значок наверху отвечает на вопрос «что сейчас произойдёт» до чтения текста */
+.confirm-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  color: var(--accent);
+  margin-bottom: 14px;
+}
+
+.confirm-icon.danger {
+  background: var(--danger-soft);
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+  color: var(--danger);
+}
+
+/* Что именно исчезнет — показываем целиком, а не описываем словами */
+.confirm-preview {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  font-size: 13.5px;
   line-height: 1.5;
+}
+
+.modal-escape {
+  margin-top: 12px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.confirm-preview-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.confirm-preview-meta b {
+  font-size: 13.5px;
+}
+
+.confirm-preview-meta i {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+/* ---------- Окно приглашения на сервер ---------- */
+.invite-modal {
+  width: min(520px, 94vw);
+}
+
+.invite-link-label,
+.invite-params label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.invite-link-row {
+  display: flex;
+  gap: 8px;
+}
+
+.invite-link-row input {
+  flex: 1;
+  min-width: 0;
+  font-family: inherit;
+}
+
+.invite-link-row .btn-primary {
+  flex: none;
+}
+
+.invite-params {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.invite-role {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+/* Кнопка одна и во всю ширину: закрыть окно можно Esc или щелчком мимо */
+.invite-renew {
+  width: 100%;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+/* В настройках сервера колонка широкая, и поля приглашения растягивались
+   на всю её ширину — читать такую строку неудобно, глаз теряет начало. */
+/* Настройки сервера — две колонны, а не три: ширина от личных настроек там лишняя */
+/* Настройки сервера — карточки с зазорами, как на главном экране,
+   а не одно сплошное окно с разделительной линией. */
+.settings-panel.server {
+  width: min(1240px, 96vw);
+  height: min(800px, 94vh);
+  gap: var(--shell-gap);
+  padding: var(--shell-gap);
+  background:
+    radial-gradient(55% 40% at 8% 0%, rgba(34, 211, 238, 0.07), transparent 62%), var(--bg);
+}
+
+.settings-panel.server > .settings-nav,
+.settings-panel.server > .settings-content {
+  border-radius: var(--card-radius);
+  border: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.settings-panel.server > .settings-nav {
+  border-right: 1px solid var(--border);
+}
+
+/* Панель владельца шире остальных: там ряды плиток и две панели рядом */
+.settings-panel.owner-panel {
+  width: min(1420px, 96vw);
+  height: min(860px, 94vh);
+}
+
+/* Создание ссылки — одной карточкой, чтобы поля не висели в воздухе */
+.invite-card {
+  max-width: 640px;
+  margin-bottom: 18px;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+}
+
+.invite-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.invite-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  min-width: 0;
+}
+
+.invite-card-foot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.invite-card-foot .btn-primary {
+  padding: 0 22px;
+}
+
+.invite-params label,
+.invite-role {
+  gap: 6px;
+}
+
+/* ---------- Панель владельца ---------- */
+
+/* Мелкий ряд под крупными плитками: справочные числа не спорят с главными */
+.admin-tiles.small {
+  grid-template-columns: repeat(5, 1fr);
+  margin-top: 12px;
+}
+
+.admin-tiles.small .admin-tile {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 12px 14px;
+}
+
+.admin-tiles.small .admin-tile-icon {
+  margin-bottom: 0;
+  flex: none;
+}
+
+.admin-tiles.small .admin-tile-value {
+  font-size: 17px;
+}
+
+.admin-tiles.small .admin-tile-label {
+  margin-top: 1px;
+  font-size: 11.5px;
+}
+
+.owner-nav-foot {
+  padding: 12px 12px 0;
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+
+/* Две панели под плитками: чем занято место и кто пришёл недавно */
+.admin-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.admin-panel {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-lg);
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  padding: 16px 16px 14px;
+}
+
+.admin-panel header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.admin-panel header b {
+  font-size: 15px;
+}
+
+.link-button {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  color: var(--accent);
+  font-size: 12.5px;
+}
+
+.admin-panel-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 7px 0;
+}
+
+.admin-panel-avatar {
+  width: 32px;
+  height: 32px;
+  font-size: 13px;
+}
+
+.admin-panel-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.admin-panel-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 14px;
+}
+
+.admin-panel-sub {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  margin-top: 2px;
+}
+
+.admin-panel-when {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  flex: none;
+}
+
+/* Отступ снаружи, а не внутри: внутренний сдвигал текст кнопки вниз */
+.admin-panel-foot {
+  margin-top: auto;
+  justify-content: center;
+}
+
+.admin-panel-row + .admin-panel-foot {
+  margin-top: 14px;
+}
+
+.invite-grid.two {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+/* ---------- Роли: список слева, права справа ---------- */
+.roles-layout {
+  display: grid;
+  grid-template-columns: 268px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.roles-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px;
+  border-radius: var(--radius-lg);
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+}
+
+.roles-list header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.roles-list header b {
+  font-size: 15px;
+}
+
+.roles-new {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.roles-new input {
+  flex: 1;
+  min-width: 0;
+}
+
+.roles-new .btn-primary {
+  flex: none;
+  padding: 0 12px;
+}
+
+.roles-hint {
+  margin-bottom: 8px;
+}
+
+.roles-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  text-align: left;
+}
+
+.roles-item:hover {
+  background: var(--panel-hover);
+  color: var(--text);
+}
+
+.roles-item.active {
+  background: var(--accent-soft);
+  color: var(--text);
+  font-weight: 650;
+}
+
+.roles-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.roles-item-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.roles-item-tag {
+  font-size: 10.5px;
+  color: var(--text-faint);
+}
+
+.roles-editor-pane {
+  min-width: 0;
+}
+
+/* Шапка сервера в настройках: значок, имя, дальше разделы */
+/* Шапка не должна сжиматься и вылезать за край: в колонке-flex без
+   flex: none её давило списком разделов. */
+.srv-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+  min-height: 42px;
+  padding: 6px 8px 14px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.srv-head-icon {
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  min-height: 42px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: var(--panel-hover);
+  border: 1px solid var(--border-strong);
+  color: var(--accent);
+  font-weight: 800;
+  font-size: 17px;
+  flex: none;
+}
+
+.srv-head-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.srv-head b {
+  display: block;
+  font-size: 16px;
+  letter-spacing: -0.02em;
+}
+
+.srv-head span {
+  display: block;
+  font-size: 12px;
+  color: var(--text-faint);
+  margin-top: 2px;
+}
+
+/* ---------- Правая карточка: права выбранной роли ---------- */
+.role-editor-top {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding-bottom: 14px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.role-editor-top h3 {
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.role-editor-del {
+  margin-left: auto;
+}
+
+.roles-dot.big {
+  width: 14px;
+  height: 14px;
+}
+
+.role-editor-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+
+.role-editor-fields label,
+.role-colors {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.role-swatches {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Кружки вместо системного выбора цвета: тот выглядит чужим в тёмной теме */
+.role-swatch {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  padding: 0;
+}
+
+.role-swatch.active {
+  box-shadow:
+    0 0 0 2px var(--panel),
+    0 0 0 4px var(--text);
+}
+
+/* Права в две колонки: одним столбцом список уходил далеко вниз */
+.role-perms {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 28px;
+}
+
+.role-perm {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.role-perm-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.role-perm-name {
+  display: block;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.role-perm-hint {
+  display: block;
+  font-size: 11.5px;
+  color: var(--text-faint);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+/* Полоса сохранения: пока ничего не меняли — спокойная, при правках оживает */
+.role-savebar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--text-faint);
+}
+
+.role-savebar > span {
+  flex: 1;
+}
+
+.role-savebar.on > span {
+  color: var(--warning);
+}
+
+/* Перетаскивание ролей: ручка появляется при наведении, цель подсвечивается */
+.roles-item {
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.roles-grip {
+  color: var(--text-faint);
+  opacity: 0;
+  flex: none;
+  cursor: grab;
+  transition: opacity var(--transition);
+}
+
+.roles-item:hover .roles-grip {
+  opacity: 1;
+}
+
+.roles-item.dragging {
+  opacity: 0.45;
+}
+
+.roles-item.over {
+  border-color: var(--accent);
+}
+
+.roles-item-count {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  flex: none;
 }

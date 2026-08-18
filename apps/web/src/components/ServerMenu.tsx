@@ -19,12 +19,14 @@ import { useAuthStore } from '../stores/auth';
 import CreateChannelModal from './CreateChannelModal';
 import NotifySettingsModal from './NotifySettingsModal';
 import PromptModal from './PromptModal';
+import InviteModal from './InviteModal';
 import ServerSettingsModal from './ServerSettingsModal';
 
 /** Меню сервера (клик по названию): приглашения, настройки, создание, ник, выход */
 export default function ServerMenu({ guildId }: { guildId: string }) {
   const { t } = useTranslation();
   const guild = useGuild(guildId);
+  const [inviteOpen, setInviteOpen] = useState(false);
   const myId = useAuthStore((s) => s.user?.id);
   const { data: members } = useMembers(guildId);
   const createCategory = useCreateCategory(guildId);
@@ -73,7 +75,7 @@ export default function ServerMenu({ guildId }: { guildId: string }) {
                 className="menu-item"
                 onClick={() => {
                   close();
-                  setSettings('invites');
+                  setInviteOpen(true);
                 }}
               >
                 <UserPlus size={16} /> {t('guild.menuInvite')}
@@ -150,6 +152,13 @@ export default function ServerMenu({ guildId }: { guildId: string }) {
           guildId={guildId}
           initialTab={settings}
           onClose={() => setSettings(null)}
+        />
+      )}
+      {inviteOpen && (
+        <InviteModal
+          guildId={guildId}
+          guildName={guild?.name ?? ''}
+          onClose={() => setInviteOpen(false)}
         />
       )}
       {createChannel && (

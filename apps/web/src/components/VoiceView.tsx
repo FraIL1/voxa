@@ -4,11 +4,13 @@ import {
   HeadphoneOff,
   Mic,
   MicOff,
+  Maximize2,
   MonitorUp,
   PhoneOff,
   Video,
   VideoOff,
   Volume2,
+  VolumeX,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -68,6 +70,8 @@ export default function VoiceView({ channel }: { channel: ChannelDto }) {
   const [shareOpen, setShareOpen] = useState(false);
   const myId = useAuthStore((s) => s.user?.id);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const [shareSound, setShareSound] = useState(true);
 
   const participants = participantsOf(voiceStates, channel.id);
   const isHere = voice.channelId === channel.id;
@@ -118,7 +122,52 @@ export default function VoiceView({ channel }: { channel: ChannelDto }) {
             )}
           </div>
           {voice.watching && watchingTrackReady ? (
-            <LiveVideo ref={videoRef} className="screen-video" />
+            <div className="screen-stage" ref={stageRef}>
+              <LiveVideo ref={videoRef} className="screen-video" />
+
+              {/* Подпись и управление поверх картинки: под ней места нет,
+                  а знать «что это и чей» нужно всегда */}
+              <div className="screen-overlay">
+                <span className="screen-what">
+                  <MonitorUp size={13} />
+                  {t('voice.shareLabel')}
+                  <span className="screen-air">
+                    <i />
+                    {voice.watching === SELF_SCREEN
+                      ? t('voice.yourScreen')
+                      : nameOf(voice.watching)}
+                    {' · '}
+                    {t('voice.onAir')}
+                  </span>
+                </span>
+
+                <span className="screen-tools">
+                  <button
+                    className={`screen-tool${shareSound ? ' on' : ''}`}
+                    title={shareSound ? t('voice.shareSoundOn') : t('voice.shareSoundOff')}
+                    onClick={() => {
+                      const next = !shareSound;
+                      setShareSound(next);
+                      if (videoRef.current) videoRef.current.muted = !next;
+                    }}
+                  >
+                    {shareSound ? <Volume2 size={15} /> : <VolumeX size={15} />}
+                    {shareSound ? t('voice.shareSoundOn') : t('voice.shareSoundOff')}
+                  </button>
+                  <button
+                    className="screen-tool"
+                    title={t('voice.shareFull')}
+                    onClick={() => {
+                      if (document.fullscreenElement) void document.exitFullscreen();
+                      else void stageRef.current?.requestFullscreen();
+                    }}
+                  >
+                    <Maximize2 size={15} />
+                    {t('voice.shareFull')}
+                  </button>
+                </span>
+              </div>
+            </div>
           ) : (
             <div className="screen-placeholder">{t('voice.pickScreen')}</div>
           )}
@@ -164,10 +213,6 @@ export default function VoiceView({ channel }: { channel: ChannelDto }) {
           </div>
         ))}
       </div>
-
-      {voice.shareAudioMissing && (
-        <p className="voice-error share-hint">{t('voice.shareNoAudio')}</p>
-      )}
 
       {voice.error && (
         <p className="auth-error voice-error">

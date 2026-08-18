@@ -258,6 +258,15 @@ export default function Message({ message }: { message: ChatMessage }) {
           message={t('chat.deleteConfirm')}
           confirmLabel={t('chat.delete')}
           danger
+          preview={
+            <>
+              <div className="confirm-preview-meta">
+                <b>{message.author?.displayName ?? t('chat.deletedAuthor')}</b>
+                <i>{timeFormat.format(new Date(message.createdAt))}</i>
+              </div>
+              {message.content}
+            </>
+          }
           onConfirm={() => deleteMessage.mutate(message.id)}
           onClose={() => setConfirmDelete(false)}
         />

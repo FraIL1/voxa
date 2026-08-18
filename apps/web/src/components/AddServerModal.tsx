@@ -1,4 +1,4 @@
-import { Search, UsersRound } from 'lucide-react';
+import { Compass, LogIn, Search, Sparkles, UsersRound } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
@@ -135,24 +135,33 @@ export default function AddServerModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="settings-overlay" onClick={onClose}>
       <div className="add-server-modal" onClick={(e) => e.stopPropagation()}>
+        <span className="confirm-icon" aria-hidden>
+          <Sparkles size={18} />
+        </span>
+
         <h2>{t('guild.addTitle')}</h2>
+        <p className="confirm-message">{t('guild.addHint')}</p>
+
         <div className="friends-tabs">
           <button
             className={`friends-tab${mode === 'create' ? ' active' : ''}`}
             onClick={() => setMode('create')}
           >
+            <Sparkles size={15} />
             {t('guild.createTab')}
           </button>
           <button
             className={`friends-tab${mode === 'join' ? ' active' : ''}`}
             onClick={() => setMode('join')}
           >
+            <LogIn size={15} />
             {t('guild.joinTab')}
           </button>
           <button
             className={`friends-tab${mode === 'discover' ? ' active' : ''}`}
             onClick={() => setMode('discover')}
           >
+            <Compass size={15} />
             {t('guild.discoverTab')}
           </button>
         </div>
@@ -197,6 +206,8 @@ export default function AddServerModal({ onClose }: { onClose: () => void }) {
             </div>
           </form>
         )}
+
+        <p className="modal-escape">{t('common.escapeCloses')}</p>
       </div>
     </div>
   );

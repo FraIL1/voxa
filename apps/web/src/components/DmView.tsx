@@ -298,6 +298,8 @@ export default function DmView() {
         >
           {isGroup ? <UsersRound size={18} /> : <AtSign size={18} />}
           {title}
+          {/* Логин и присутствие рядом с именем: с кем говоришь и здесь ли он */}
+          {!isGroup && peer && <span className="dm-header-login">@{peer.username}</span>}
           {isGroup && conversation && (
             <span className="dm-header-count">{conversation.members.length}</span>
           )}

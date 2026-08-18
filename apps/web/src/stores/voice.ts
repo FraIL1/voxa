@@ -101,8 +101,6 @@ interface VoiceState {
   cameraOn: boolean;
   /** Подавление шума включено */
   noiseOn: boolean;
-  /** Звук просили, но браузер его не дал — галочку не поставили */
-  shareAudioMissing: boolean;
   /** Кто из участников показывает камеру */
   cameraUsers: string[];
   /** Счётчик для перепривязки видео: треки живут вне стора */
@@ -229,7 +227,6 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
   cameraUsers: [],
   videoVersion: 0,
   noiseOn: noiseSuppression(),
-  shareAudioMissing: false,
   screenSharers: [],
   watching: null,
   shareOptions: loadJson<ShareOptions>(SHARE_KEY, DEFAULT_SHARE),
@@ -423,10 +420,7 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
       cameraUsers: [],
       screenSharers: [],
       watching: null,
-      /* Предупреждение и ошибка привязаны к прошлому сеансу. Без сброса при
-         возврате в канал висело «экран идёт без звука», хотя показ давно
-         кончился и никто ничего не включал. */
-      shareAudioMissing: false,
+      /* Ошибка привязана к прошлому сеансу — без сброса она висела после возврата в канал */
       error: null,
     });
     emitVoiceState({ channelId: null, muted: false, deafened: false, sharing: false });
@@ -562,7 +556,6 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
         localScreenTrack = null;
         playShareStop();
         announceSharing(false);
-        set({ shareAudioMissing: false });
         set((s) => ({
           sharing: false,
           watching: s.watching === SELF_SCREEN ? (s.screenSharers[0] ?? null) : s.watching,
@@ -572,10 +565,6 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
         // Звучит только если человек действительно выбрал экран, а не закрыл диалог
         if (publication) playShareStart();
         announceSharing(Boolean(publication));
-        /* Просили звук, а его нет — значит галочку в окне браузера не
-           поставили. Молчать нельзя: человек будет думать, что звук идёт. */
-        const withAudio = room.localParticipant.getTrackPublication(Track.Source.ScreenShareAudio);
-        set({ shareAudioMissing: Boolean(publication) && next.audio && !withAudio });
         // самопросмотр открываем сразу — видно, что именно стримишь
         set({
           sharing: Boolean(publication),

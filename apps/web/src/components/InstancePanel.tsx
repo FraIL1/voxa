@@ -1,6 +1,7 @@
 import type { InstanceUserDto } from '@voxa/shared';
 import {
   Activity,
+  ArrowRight,
   Ban,
   Check,
   Clock,
@@ -58,21 +59,33 @@ const dateFormat = new Intl.DateTimeFormat('ru', {
   year: 'numeric',
 });
 
-function Overview() {
+function Overview({ goTo }: { goTo: (tab: Tab) => void }) {
   const { t } = useTranslation();
   const { data } = useInstanceOverview(true);
+  const { data: storage } = useInstanceStorage(true);
+  const { data: users } = useInstanceUsers('', true);
   if (!data) return null;
 
-  const tiles: [string, string | number, LucideIcon, boolean?][] = [
-    [t('instance.users'), data.usersTotal, UsersIcon],
+  // Кто пришёл последним — сверху: панель отвечает на вопрос «что нового»
+  const fresh = [...(users ?? [])]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 6);
+
+  /* Четыре главных числа крупно, остальное — мелкой строкой. Раньше все
+     девять шли одинаковыми плитками, и «сейчас онлайн» терялось среди них. */
+  const big: [string, string | number, LucideIcon, boolean?][] = [
     [t('instance.online'), data.onlineNow, Activity, true],
+    [t('instance.users'), data.usersTotal, UsersIcon],
     [t('instance.guilds'), data.guildsTotal, Server],
     [t('instance.messages'), data.messagesTotal + data.dmMessagesTotal, MessageSquare],
+  ];
+
+  const small: [string, string | number, LucideIcon][] = [
     [t('instance.sessions'), data.activeSessions, KeyRound],
     [t('instance.banned'), data.bannedTotal, ShieldBan],
     [t('instance.storage'), `${data.storageMb} МБ`, HardDrive],
-    [t('community.version'), data.serverVersion, Tag],
     [t('community.uptime'), `${Math.floor(data.uptimeSeconds / 3600)} ч`, Clock],
+    [t('community.version'), data.serverVersion, Tag],
   ];
 
   return (
@@ -81,15 +94,111 @@ function Overview() {
       <p className="settings-hint">{t('instance.overviewHint')}</p>
 
       <div className="admin-tiles">
-        {tiles.map(([label, value, Icon, accent]) => (
+        {big.map(([label, value, Icon, accent]) => (
           <div key={label} className={`admin-tile${accent ? ' accent' : ''}`}>
             <span className="admin-tile-icon">
-              <Icon size={15} />
+              <Icon size={16} />
             </span>
             <div className="admin-tile-value">{value}</div>
             <div className="admin-tile-label">{label}</div>
           </div>
         ))}
+      </div>
+
+      <div className="admin-tiles small">
+        {small.map(([label, value, Icon]) => (
+          <div key={label} className="admin-tile">
+            <span className="admin-tile-icon">
+              <Icon size={14} />
+            </span>
+            <div>
+              <div className="admin-tile-value">{value}</div>
+              <div className="admin-tile-label">{label}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="admin-pair">
+        <section className="admin-panel">
+          <header>
+            <b>{t('instance.topUploaders')}</b>
+            <button className="link-button" onClick={() => goTo('storage')}>
+              {t('instance.tabStorage')} <ArrowRight size={13} />
+            </button>
+          </header>
+
+          {(storage?.top ?? []).length === 0 && (
+            <p className="settings-hint">{t('instance.noFiles')}</p>
+          )}
+          {(storage?.top ?? []).slice(0, 5).map((row) => (
+            <div key={row.username} className="admin-panel-row">
+              <Avatar name={row.username} className="admin-panel-avatar" />
+              <div className="admin-panel-text">
+                <div className="admin-panel-name">{row.username}</div>
+                <div className="admin-panel-sub">
+                  {t('instance.filesCount', { count: row.files })}
+                </div>
+              </div>
+              <b>{row.mb} МБ</b>
+            </div>
+          ))}
+
+          {storage && storage.orphanMb > 0 && (
+            <button className="btn-secondary admin-panel-foot" onClick={() => goTo('storage')}>
+              <Trash2 size={15} />
+              {t('instance.cleanup', { mb: storage.orphanMb })}
+            </button>
+          )}
+        </section>
+
+        <section className="admin-panel">
+          <header>
+            <b>{t('instance.recent')}</b>
+            <button className="link-button" onClick={() => goTo('users')}>
+              {t('instance.tabUsers')} <ArrowRight size={13} />
+            </button>
+          </header>
+
+          {fresh.map((user) => (
+            <div key={user.id} className="admin-panel-row">
+              <Avatar
+                name={user.displayName}
+                url={user.avatarUrl}
+                status={user.status}
+                className="admin-panel-avatar"
+              />
+              <div className="admin-panel-text">
+                <div className="admin-panel-name">
+                  {user.displayName}
+                  {user.isInstanceOwner && (
+                    <span className="owner-chip">
+                      <Crown size={11} /> {t('instance.owner')}
+                    </span>
+                  )}
+                  {user.bannedReason !== null && (
+                    <span className="owner-chip danger">{t('instance.isBanned')}</span>
+                  )}
+                </div>
+                <div className="admin-panel-sub">
+                  {t('instance.userStats', {
+                    owned: user.guildsOwned,
+                    joined: user.guildsJoined,
+                    sessions: user.activeSessions,
+                  })}
+                </div>
+              </div>
+              <span className="admin-panel-when">
+                {dateFormat.format(new Date(user.createdAt))}
+              </span>
+            </div>
+          ))}
+
+          <button className="btn-secondary admin-panel-foot" onClick={() => goTo('regInvites')}>
+            <Ticket size={15} />
+            {t('instance.regCreate')}
+          </button>
+        </section>
       </div>
     </>
   );
@@ -353,27 +462,44 @@ function RegistrationInvites() {
       <h2>{t('instance.tabReg')}</h2>
       <p className="settings-hint">{t('instance.regHint')}</p>
 
-      <div className="invite-form">
-        <input
-          type="number"
-          min={1}
-          placeholder={t('community.maxUsesPlaceholder')}
-          value={maxUses}
-          onChange={(e) => setMaxUses(e.target.value)}
-        />
-        <Select
-          value={expires}
-          options={[
-            { value: '', label: t('community.expiresNever') },
-            { value: '24', label: `24 ${t('community.hour')}` },
-            { value: '168', label: `7 ${t('community.days')}` },
-            { value: '720', label: `30 ${t('community.days')}` },
-          ]}
-          onChange={setExpires}
-        />
-        <button className="btn-primary" disabled={create.isPending} onClick={doCreate}>
-          {t('instance.regCreate')}
-        </button>
+      {/* Та же карточка, что и у приглашений на сервер: одно действие — один вид */}
+      <div className="invite-card">
+        <div className="invite-grid two">
+          <label>
+            {t('community.inviteLives')}
+            <Select
+              value={expires}
+              options={[
+                { value: '', label: t('community.expiresNever') },
+                { value: '24', label: `24 ${t('community.hour')}` },
+                { value: '168', label: `7 ${t('community.days')}` },
+                { value: '720', label: `30 ${t('community.days')}` },
+              ]}
+              onChange={setExpires}
+            />
+          </label>
+          <label>
+            {t('community.inviteUses')}
+            <Select
+              value={maxUses}
+              options={[
+                { value: '', label: t('community.usesUnlimited') },
+                { value: '1', label: '1' },
+                { value: '5', label: '5' },
+                { value: '25', label: '25' },
+                { value: '100', label: '100' },
+              ]}
+              onChange={setMaxUses}
+            />
+          </label>
+        </div>
+
+        <div className="invite-card-foot">
+          <button className="btn-primary" disabled={create.isPending} onClick={doCreate}>
+            <Ticket size={15} />
+            {t('instance.regCreate')}
+          </button>
+        </div>
       </div>
 
       {active.length === 0 && <p className="empty-state">{t('instance.noRegInvites')}</p>}
@@ -464,15 +590,29 @@ export default function InstancePanel({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<Tab>('overview');
 
-  // Иконка у каждого раздела: список из семи одинаковых строк читается плохо
-  const tabs: [Tab, string, LucideIcon][] = [
-    ['overview', t('instance.tabOverview'), LayoutDashboard],
-    ['users', t('instance.tabUsers'), UsersIcon],
-    ['regInvites', t('instance.tabReg'), Ticket],
-    ['bans', t('instance.tabBans'), ShieldBan],
-    ['guilds', t('instance.tabGuilds'), Server],
-    ['settings', t('instance.tabSettings'), SlidersHorizontal],
-    ['storage', t('instance.tabStorage'), HardDrive],
+  /* Разделы собраны по смыслу: сначала присмотр, потом кого пускать,
+     в конце опасное. Семь одинаковых строк подряд читались плохо. */
+  const groups: { label: string; items: [Tab, string, LucideIcon, boolean?][] }[] = [
+    {
+      label: t('instance.groupWatch'),
+      items: [
+        ['overview', t('instance.tabOverview'), LayoutDashboard],
+        ['users', t('instance.tabUsers'), UsersIcon],
+        ['guilds', t('instance.tabGuilds'), Server],
+        ['storage', t('instance.tabStorage'), HardDrive],
+      ],
+    },
+    {
+      label: t('instance.groupAccess'),
+      items: [
+        ['regInvites', t('instance.tabReg'), Ticket],
+        ['settings', t('instance.tabSettings'), SlidersHorizontal],
+      ],
+    },
+    {
+      label: t('instance.groupLimits'),
+      items: [['bans', t('instance.tabBans'), ShieldBan, true]],
+    },
   ];
 
   return (
@@ -483,15 +623,23 @@ export default function InstancePanel({ onClose }: { onClose: () => void }) {
             <Crown size={15} />
             {t('instance.title')}
           </div>
-          {tabs.map(([key, label, Icon]) => (
-            <button
-              key={key}
-              className={`settings-tab${tab === key ? ' active' : ''}`}
-              onClick={() => setTab(key)}
-            >
-              <Icon size={15} /> {label}
-            </button>
+          {groups.map((group) => (
+            <div key={group.label} className="settings-nav-group">
+              <div className="settings-nav-group-name">{group.label}</div>
+              {group.items.map(([key, label, Icon, danger]) => (
+                <button
+                  key={key}
+                  className={`settings-tab${tab === key ? ' active' : ''}${danger ? ' danger' : ''}`}
+                  onClick={() => setTab(key)}
+                >
+                  <Icon size={15} /> {label}
+                </button>
+              ))}
+            </div>
           ))}
+
+          <div className="settings-nav-spacer" />
+          <p className="owner-nav-foot">Voxa 0.1.0</p>
         </nav>
 
         <div className="settings-content">
@@ -503,7 +651,7 @@ export default function InstancePanel({ onClose }: { onClose: () => void }) {
             <X size={18} />
           </button>
 
-          {tab === 'overview' && <Overview />}
+          {tab === 'overview' && <Overview goTo={setTab} />}
           {tab === 'users' && <Users />}
           {tab === 'regInvites' && <RegistrationInvites />}
           {tab === 'bans' && <Bans />}

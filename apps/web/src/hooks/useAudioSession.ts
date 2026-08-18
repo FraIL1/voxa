@@ -50,6 +50,38 @@ export function toggleActiveDeafen(): void {
   else void useVoiceStore.getState().toggleDeafen();
 }
 
+/** Выход из активной сессии: из канала или из звонка — смотря где ты */
+export function leaveActive(): void {
+  if (inCallNow()) void useCallStore.getState().hangUp();
+  else void useVoiceStore.getState().leave();
+}
+
+/** Камера активной сессии */
+export function toggleActiveCamera(): void {
+  if (inCallNow()) void useCallStore.getState().toggleCamera();
+  else void useVoiceStore.getState().toggleCamera();
+}
+
+/** Показ экрана активной сессии. Настройки берём прошлые — клавише некогда спрашивать. */
+export function toggleActiveShare(): void {
+  if (inCallNow()) void useCallStore.getState().toggleScreenShare();
+  else void useVoiceStore.getState().toggleScreenShare();
+}
+
+/** Ответить на входящий звонок. Вне звонка клавиша молчит. */
+export function answerIncoming(): void {
+  const call = useCallStore.getState();
+  if (call.status !== 'incoming' || !call.incoming) return;
+  void call.acceptIncoming(call.incoming.from.displayName);
+}
+
+/** Отклонить входящий звонок */
+export function declineIncoming(): void {
+  const call = useCallStore.getState();
+  if (call.status !== 'incoming') return;
+  void call.declineIncoming();
+}
+
 /**
  * Единая точка управления звуком. Раньше кнопки в карточке пользователя
  * знали только про голосовые каналы, поэтому во время звонка 1-на-1 они

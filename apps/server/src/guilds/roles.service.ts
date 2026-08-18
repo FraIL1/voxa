@@ -16,7 +16,7 @@ import type { Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { WsGateway } from '../ws/ws.gateway';
 
-function toDto(role: Role): RoleDto {
+function toDto(role: Role, memberCount = 0): RoleDto {
   return {
     id: role.id,
     name: role.name,
@@ -25,6 +25,7 @@ function toDto(role: Role): RoleDto {
     position: role.position,
     isDefault: role.isDefault,
     isOwnerRole: role.isOwnerRole,
+    memberCount,
   };
 }
 
@@ -40,7 +41,17 @@ export class RolesService {
       where: { guildId },
       orderBy: { position: 'desc' },
     });
-    return roles.map(toDto);
+
+    /* Считаем одним запросом, а не по роли: список ролей открывают часто,
+       и десяток отдельных подсчётов заметно нагружал бы базу. */
+    const counts = await this.prisma.userRole.groupBy({
+      by: ['roleId'],
+      where: { role: { guildId } },
+      _count: { roleId: true },
+    });
+    const byRole = new Map<string, number>(counts.map((row) => [row.roleId, row._count.roleId]));
+
+    return roles.map((role) => toDto(role, byRole.get(role.id) ?? 0));
   }
 
   private async assertRoleOfGuild(guildId: string, roleId: string): Promise<Role> {

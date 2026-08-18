@@ -17,6 +17,8 @@ export interface RoleDto {
   position: number;
   isDefault: boolean;
   isOwnerRole: boolean;
+  /** Скольким людям выдана роль */
+  memberCount: number;
 }
 
 export interface MeDto extends UserPublicDto {
@@ -245,6 +247,7 @@ export interface InviteDto {
   code: string;
   url: string;
   createdBy: UserPublicDto | null;
+  grantsRoleId: string | null;
   grantsRoleName: string | null;
   uses: number;
   maxUses: number | null;

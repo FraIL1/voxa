@@ -126,7 +126,7 @@ export function PeerProfileAside({
       <button className="icon-button profile-close" onClick={onClose} title={t('settings.close')}>
         <X size={16} />
       </button>
-      <ProfileBody userId={peer.id} onNavigate={onClose} />
+      <ProfileBody userId={peer.id} onNavigate={onClose} compact />
     </aside>
   );
 }

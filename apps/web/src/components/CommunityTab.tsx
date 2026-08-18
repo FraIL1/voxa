@@ -6,6 +6,7 @@ import {
   Copy,
   HardDrive,
   KeyRound,
+  Plus,
   Tag,
   Trash2,
   Users,
@@ -24,6 +25,7 @@ import {
   useRevokeInvite,
   useUnban,
 } from '../hooks/useAdmin';
+import { useGuildRoles } from '../hooks/useGuildAdmin';
 import { useMyGuildPermissions } from '../hooks/useGuilds';
 import Select from './Select';
 
@@ -68,13 +70,16 @@ export function Invites() {
   const { guildId } = useParams<{ guildId: string }>();
   const { data: invites } = useInvites(guildId, true);
   const createInvite = useCreateInvite(guildId);
+  const { data: roles } = useGuildRoles(guildId);
   const revokeInvite = useRevokeInvite(guildId);
   const [maxUses, setMaxUses] = useState('');
-  const [expires, setExpires] = useState('');
+  const [expires, setExpires] = useState('168');
+  const [roleId, setRoleId] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const create = (): void => {
     createInvite.mutate({
+      grantsRoleId: roleId || null,
       maxUses: maxUses ? Number(maxUses) : null,
       expiresInHours: expires ? Number(expires) : null,
     });
@@ -91,28 +96,56 @@ export function Invites() {
 
   return (
     <>
-      <div className="invite-form">
-        <input
-          type="number"
-          min={1}
-          placeholder={t('community.maxUsesPlaceholder')}
-          value={maxUses}
-          onChange={(e) => setMaxUses(e.target.value)}
-        />
-        <Select
-          value={expires}
-          options={[
-            { value: '', label: t('community.expiresNever') },
-            { value: '1', label: `1 ${t('community.hour')}` },
-            { value: '24', label: `24 ${t('community.hour')}` },
-            { value: '168', label: `7 ${t('community.days')}` },
-            { value: '720', label: `30 ${t('community.days')}` },
-          ]}
-          onChange={setExpires}
-        />
-        <button className="btn-primary" disabled={createInvite.isPending} onClick={create}>
-          {t('community.createInvite')}
-        </button>
+      {/* Всё для новой ссылки — в одной карточке: поля в ряд, кнопка справа */}
+      <div className="invite-card">
+        <div className="invite-grid">
+          <label>
+            {t('community.inviteLives')}
+            <Select
+              value={expires}
+              options={[
+                { value: '', label: t('community.expiresNever') },
+                { value: '1', label: `1 ${t('community.hour')}` },
+                { value: '24', label: `24 ${t('community.hour')}` },
+                { value: '168', label: `7 ${t('community.days')}` },
+                { value: '720', label: `30 ${t('community.days')}` },
+              ]}
+              onChange={setExpires}
+            />
+          </label>
+          <label>
+            {t('community.inviteUses')}
+            <Select
+              value={maxUses}
+              options={[
+                { value: '', label: t('community.usesUnlimited') },
+                { value: '1', label: '1' },
+                { value: '5', label: '5' },
+                { value: '25', label: '25' },
+                { value: '100', label: '100' },
+              ]}
+              onChange={setMaxUses}
+            />
+          </label>
+          <label>
+            {t('community.inviteRole')}
+            <Select
+              value={roleId}
+              options={[
+                { value: '', label: t('community.inviteNoRole') },
+                ...(roles ?? []).map((role) => ({ value: role.id, label: role.name })),
+              ]}
+              onChange={setRoleId}
+            />
+          </label>
+        </div>
+
+        <div className="invite-card-foot">
+          <button className="btn-primary" disabled={createInvite.isPending} onClick={create}>
+            <Plus size={15} />
+            {t('community.createInvite')}
+          </button>
+        </div>
       </div>
 
       {active.length === 0 && <p className="settings-hint">{t('community.noInvites')}</p>}

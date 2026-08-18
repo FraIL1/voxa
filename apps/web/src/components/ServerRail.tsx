@@ -60,6 +60,8 @@ export default function ServerRail() {
       >
         <MessageCircle size={24} />
         {totalUnread > 0 && <span className="rail-badge">{totalUnread}</span>}
+        {/* Без подписи кнопку не находят: её искали внизу столбца */}
+        <span className="rail-caption">{t('nav.homeShort')}</span>
       </button>
 
       <div className="rail-divider" />

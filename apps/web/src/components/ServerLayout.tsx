@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Outlet, useNavigate, useParams } from 'react-router';
 
 import { useGuilds } from '../hooks/useGuilds';
+import { useLayoutStore } from '../stores/layout';
 import MemberList from './MemberList';
 import Sidebar from './Sidebar';
 
@@ -18,15 +19,17 @@ export default function ServerLayout() {
     }
   }, [guilds, guildId, navigate]);
 
+  const membersOpen = useLayoutStore((state) => state.membersOpen);
+
   return (
-    <div className="app-shell">
+    <div className={`app-shell${membersOpen ? '' : ' no-members'}`}>
       {/* Ключ по серверу: колонка пересоздаётся и заново разворачивается от
           иконки — иначе переход между серверами проходит незаметно */}
       <Sidebar key={guildId} />
       <main className="main-column">
         <Outlet />
       </main>
-      <MemberList />
+      {membersOpen && <MemberList />}
     </div>
   );
 }
