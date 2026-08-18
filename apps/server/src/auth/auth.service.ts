@@ -50,6 +50,17 @@ export class AuthService {
     private readonly instance: InstanceService,
   ) {}
 
+  /** Свободен ли логин. Сравниваем в нижнем регистре: Artem и artem — один и тот же. */
+  async usernameAvailable(username: string): Promise<{ available: boolean }> {
+    const value = username.trim().toLowerCase();
+    if (value.length < 3) return { available: false };
+    const taken = await this.prisma.user.findUnique({
+      where: { usernameLower: value },
+      select: { id: true },
+    });
+    return { available: taken === null };
+  }
+
   async register(input: RegisterInput, meta: ClientMeta): Promise<AuthResult> {
     // Первый аккаунт создаётся всегда — он и станет владельцем приложения
     const isFirstUser = (await this.prisma.user.count()) === 0;

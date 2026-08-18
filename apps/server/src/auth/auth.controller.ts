@@ -76,6 +76,15 @@ export class AuthController {
     return this.registrationInvites.check(code);
   }
 
+  /* Проверка логина при наборе. Ограничение жёсткое нарочно: без него через
+     этот запрос можно перебирать, кто вообще зарегистрирован в приложении. */
+  @Public()
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @Get('username-available/:username')
+  usernameAvailable(@Param('username') username: string): Promise<{ available: boolean }> {
+    return this.authService.usernameAvailable(username);
+  }
+
   @Public()
   @Throttle({ default: { limit: 3, ttl: 60_000 } })
   @Post('register')
