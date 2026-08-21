@@ -100,7 +100,13 @@ function CallRecord({
   return (
     <div className={`call-record${missed ? ' missed' : ''}${ongoing ? ' ongoing' : ''}`}>
       <span className="call-record-icon" aria-hidden>
-        {missed ? <PhoneMissed size={15} /> : ongoing ? <PhoneCall size={15} /> : <Phone size={15} />}
+        {missed ? (
+          <PhoneMissed size={15} />
+        ) : ongoing ? (
+          <PhoneCall size={15} />
+        ) : (
+          <Phone size={15} />
+        )}
       </span>
       <span className="call-record-text">{text}</span>
       <span className="call-record-time">{formatTimestamp(createdAt)}</span>
@@ -155,9 +161,7 @@ export default function DmMessageItem({
 
   // Отметка о звонке — не сообщение: ни ответить, ни отредактировать
   if (message.kind === 'CALL' && message.call) {
-    return (
-      <CallRecord call={message.call} authorName={authorName} createdAt={message.createdAt} />
-    );
+    return <CallRecord call={message.call} authorName={authorName} createdAt={message.createdAt} />;
   }
 
   return (

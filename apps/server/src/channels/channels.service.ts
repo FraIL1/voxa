@@ -173,11 +173,7 @@ export class ChannelsService {
     }
   }
 
-  async updateChannel(
-    actorId: string,
-    id: string,
-    input: UpdateChannelInput,
-  ): Promise<ChannelDto> {
+  async updateChannel(actorId: string, id: string, input: UpdateChannelInput): Promise<ChannelDto> {
     await this.assertVisible(actorId, id);
     const existing = await this.prisma.channel.findUnique({
       where: { id },

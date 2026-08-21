@@ -275,10 +275,7 @@ export default function CallPanel({ conversationId }: { conversationId: string }
     );
   }, [sharing, screenSharers]);
 
-  const others = useMemo(
-    () => participants.filter((p) => p.id !== me?.id),
-    [participants, me?.id],
-  );
+  const others = useMemo(() => participants.filter((p) => p.id !== me?.id), [participants, me?.id]);
   // Состав держим хуком — он же доигрывает уход вышедших
   const roster = useCallRoster(others);
   const [collapsed, setCollapsed] = useState(false);

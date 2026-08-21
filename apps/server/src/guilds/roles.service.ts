@@ -170,11 +170,7 @@ export class RolesService {
       this.assertGrantable(actor, input.permissions);
     }
     if (input.position !== undefined) {
-      this.assertBelowActor(
-        actor,
-        input.position,
-        'Нельзя поднять роль до своего уровня или выше',
-      );
+      this.assertBelowActor(actor, input.position, 'Нельзя поднять роль до своего уровня или выше');
     }
 
     if (input.name && input.name !== role.name) {

@@ -126,7 +126,10 @@ export default function VoiceView({ channel }: { channel: ChannelDto }) {
     setFocused((current) => (current === key ? null : key));
 
   const goFullscreen = (userId: string): void => {
-    void tiles.current.get(userId)?.requestFullscreen?.().catch(() => undefined);
+    void tiles.current
+      .get(userId)
+      ?.requestFullscreen?.()
+      .catch(() => undefined);
   };
 
   return (
@@ -229,7 +232,6 @@ export default function VoiceView({ channel }: { channel: ChannelDto }) {
                   </button>
                 </div>
               )}
-
             </div>
           );
         })}
