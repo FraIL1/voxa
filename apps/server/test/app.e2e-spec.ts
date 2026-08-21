@@ -1736,13 +1736,21 @@ describe('Voxa: критический поток (e2e)', () => {
     /* Закрытая вкладка вместо кнопки «завершить»: разговор вдвоём без
        одного из двоих не имеет смысла, поэтому он гаснет для всех. */
     memberSocket.disconnect();
-    await new Promise((resolve) => setTimeout(resolve, 1200));
 
-    const after = await request(httpServer)
-      .get(`/api/dm/conversations/${conversationId}/call`)
-      .set('Authorization', `Bearer ${ownerAccess}`)
-      .expect(200);
-    expect((after.body.participants as UserPublicDto[]).length).toBe(0);
+    /* Ждём условие, а не время. Цепочка «разрыв → присутствие → выход из
+       разговора» идёт через Redis, и на медленной машине не укладывалась
+       в фиксированную паузу: локально тест был зелёным, а на CI падал. */
+    let left: UserPublicDto[] = [];
+    for (let attempt = 0; attempt < 50; attempt++) {
+      const state = await request(httpServer)
+        .get(`/api/dm/conversations/${conversationId}/call`)
+        .set('Authorization', `Bearer ${ownerAccess}`)
+        .expect(200);
+      left = state.body.participants as UserPublicDto[];
+      if (left.length === 0) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    expect(left).toHaveLength(0);
   });
 
   it('звонок 1-на-1: входящий вызов по WS, принятие и завершение', async () => {
