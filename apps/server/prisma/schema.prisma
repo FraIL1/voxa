@@ -491,6 +491,12 @@ model DmParticipant {
   @@map("dm_participants")
 }
 
+/// Что за запись в переписке: обычное сообщение или отметка о звонке
+enum DmMessageKind {
+  TEXT
+  CALL
+}
+
 model DmMessage {
   id             String         @id @default(uuid(7))
   conversationId String         @map("conversation_id")
@@ -498,6 +504,11 @@ model DmMessage {
   authorId       String?        @map("author_id")
   author         User?          @relation(fields: [authorId], references: [id], onDelete: SetNull)
   content        String
+  kind           DmMessageKind  @default(TEXT)
+  /// Звонок: когда взяли трубку; null — так и не взяли (пропущенный)
+  callStartedAt  DateTime?      @map("call_started_at")
+  /// Звонок: когда завершился; null — идёт прямо сейчас
+  callEndedAt    DateTime?      @map("call_ended_at")
   replyToId      String?        @map("reply_to_id")
   replyTo        DmMessage?     @relation("DmReplies", fields: [replyToId], references: [id], onDelete: SetNull)
   replies        DmMessage[]    @relation("DmReplies")

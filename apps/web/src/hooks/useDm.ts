@@ -68,6 +68,8 @@ export function useSendDm(conversationId: string) {
       const temp: DmChatMessage = {
         id: `temp-${crypto.randomUUID()}`,
         conversationId,
+        kind: 'TEXT',
+        call: null,
         author: user
           ? {
               id: user.id,

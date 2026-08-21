@@ -164,6 +164,23 @@ export class DmService {
     return (async () => ({
       id: message.id,
       conversationId: message.conversationId,
+      kind: message.kind,
+      call:
+        message.kind === 'CALL'
+          ? {
+              startedAt: message.callStartedAt?.toISOString() ?? null,
+              endedAt: message.callEndedAt?.toISOString() ?? null,
+              durationSec:
+                message.callStartedAt && message.callEndedAt
+                  ? Math.max(
+                      0,
+                      Math.round(
+                        (message.callEndedAt.getTime() - message.callStartedAt.getTime()) / 1000,
+                      ),
+                    )
+                  : null,
+            }
+          : null,
       author: message.author
         ? {
             id: message.author.id,
@@ -434,6 +451,9 @@ export class DmService {
       where: {
         conversationId,
         deletedAt: null,
+        // Отметка о звонке — не сообщение: читать в ней нечего, и счётчик
+        // непрочитанных она поднимать не должна
+        kind: 'TEXT',
         authorId: { not: userId },
         ...(lastReadMessageId ? { id: { gt: lastReadMessageId } } : {}),
       },
@@ -480,7 +500,16 @@ export class DmService {
     if (!conversation.participants.some((p) => p.user.id === meId)) {
       throw new ForbiddenException('Нет доступа к этому диалогу');
     }
-    return this.toConversationDto(meId, conversation);
+
+    /* Заглушение лежит в DmParticipant, а не в readStates, и сюда не
+       попадало: каждое обновление диалога — в том числе отметка
+       «прочитано» при открытии — присылало mutedUntil: null и снимало
+       заглушку у клиента. */
+    const mine = await this.prisma.dmParticipant.findUnique({
+      where: { conversationId_userId: { conversationId, userId: meId } },
+      select: { mutedUntil: true },
+    });
+    return this.toConversationDto(meId, conversation, mine?.mutedUntil);
   }
 
   async history(
@@ -565,6 +594,8 @@ export class DmService {
     if (!message) throw new NotFoundException('Сообщение не найдено');
     if (message.authorId !== meId)
       throw new ForbiddenException('Редактировать можно только свои сообщения');
+    // Отметку о звонке ведёт сервер: чужой текст ей не подсунуть
+    if (message.kind !== 'TEXT') throw new BadRequestException('Эту запись нельзя изменить');
 
     await this.prisma.dmMessage.update({
       where: { id: messageId },
@@ -587,6 +618,9 @@ export class DmService {
     if (!message) throw new NotFoundException('Сообщение не найдено');
     if (message.authorId !== meId)
       throw new ForbiddenException('Удалять можно только свои сообщения');
+    /* Звонок был — значит, был. Позвонивший не должен уметь стирать след
+       разговора из чужой переписки. */
+    if (message.kind !== 'TEXT') throw new BadRequestException('Эту запись нельзя удалить');
 
     await this.prisma.dmMessage.update({
       where: { id: messageId },
@@ -713,7 +747,8 @@ export class DmService {
     pinned: boolean,
   ): Promise<DmMessageDto> {
     const { participantIds } = await this.assertParticipant(conversationId, meId);
-    await this.findAliveOrThrow(conversationId, messageId);
+    const target = await this.findAliveOrThrow(conversationId, messageId);
+    if (target.kind !== 'TEXT') throw new BadRequestException('Эту запись нельзя закрепить');
 
     if (pinned) {
       const count = await this.prisma.dmMessage.count({
@@ -771,6 +806,67 @@ export class DmService {
     const dto = await this.conversationDto(meId, conversationId);
     this.ws.emitToUsers([meId], WsEvents.DmConversationUpdated, dto);
     return dto;
+  }
+
+  // ---------- Отметки о звонках ----------
+
+  /**
+   * Запись о начатом звонке — такая же строка в переписке, как в Discord:
+   * сперва «начал звонок», а по завершении она сама превращается в
+   * «звонок, 5 минут» или в пропущенный. Отдельного сообщения при этом не
+   * появляется: строка одна и та же, она просто обновляется.
+   */
+  async openCallRecord(conversationId: string, starterId: string): Promise<string> {
+    const created = await this.prisma.dmMessage.create({
+      data: { conversationId, authorId: starterId, content: '', kind: 'CALL' },
+      select: { id: true },
+    });
+    await this.prisma.dmConversation.update({
+      where: { id: conversationId },
+      data: { lastMessageAt: new Date() },
+    });
+    // Звонок, как и сообщение, возвращает диалог тем, кто его закрыл
+    await this.prisma.dmParticipant.updateMany({
+      where: { conversationId, hiddenAt: { not: null } },
+      data: { hiddenAt: null },
+    });
+    await this.emitCallRecord(created.id, true);
+    return created.id;
+  }
+
+  /** Трубку взяли — с этого момента идёт отсчёт длительности */
+  async markCallAnswered(messageId: string): Promise<void> {
+    const { count } = await this.prisma.dmMessage.updateMany({
+      where: { id: messageId, callStartedAt: null },
+      data: { callStartedAt: new Date() },
+    });
+    if (count > 0) await this.emitCallRecord(messageId, false);
+  }
+
+  /** Разговор кончился: строка обновляется у всех, кто её уже видит */
+  async closeCallRecord(messageId: string): Promise<void> {
+    const { count } = await this.prisma.dmMessage.updateMany({
+      where: { id: messageId, callEndedAt: null },
+      data: { callEndedAt: new Date() },
+    });
+    if (count > 0) await this.emitCallRecord(messageId, false);
+  }
+
+  private async emitCallRecord(messageId: string, isNew: boolean): Promise<void> {
+    const full = await this.prisma.dmMessage.findUnique({
+      where: { id: messageId },
+      include: DM_INCLUDE,
+    });
+    if (!full) return;
+
+    const dto = await this.toMessageDto(full);
+    const participantIds = await this.participantIdsOf(full.conversationId);
+    this.ws.emitToUsers(
+      participantIds,
+      isNew ? WsEvents.DmMessageNew : WsEvents.DmMessageEdited,
+      dto,
+    );
+    await this.notifyAll(participantIds, full.conversationId);
   }
 
   /** Поиск по переписке: совпадения по тексту, свежие сверху */

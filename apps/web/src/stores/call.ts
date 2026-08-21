@@ -38,6 +38,7 @@ import {
   startDialTone,
 } from '../lib/sounds';
 import { useVoiceStore } from './voice';
+import { applyStoredVolumes, registerVolumeRoom } from './volumes';
 
 /** Комната звонка живёт вне стора: LiveKit-объекты не для рендера */
 /**
@@ -69,6 +70,8 @@ function cameraOptions(): { deviceId: string } | undefined {
 }
 
 let room: Room | null = null;
+/* Громкости общие с голосовыми каналами — отдаём и эту комнату */
+registerVolumeRoom(() => room);
 let localVideo: LocalVideoTrack | null = null;
 /** Видео участников по их id — в беседе их может быть несколько */
 const remoteVideos = new Map<string, RemoteVideoTrack>();
@@ -440,9 +443,11 @@ export const useCallStore = create<CallState>()((set, get) => ({
 
   onState: (conversationId, participants) => {
     set((s) => {
-      const ongoing = { ...s.ongoing };
-      if (participants.length === 0) delete ongoing[conversationId];
-      else ongoing[conversationId] = participants;
+      /* Пустой список именно записываем, а не удаляем ключ. Плашка «здесь
+         идёт разговор» берёт состав из стора, а при его отсутствии — из
+         кэша запроса; удаление ключа возвращало её к старому ответу, и
+         после конца звонка плашка висела с прежними людьми до перезагрузки. */
+      const ongoing = { ...s.ongoing, [conversationId]: participants };
 
       // Список для экрана обновляем только для своего разговора
       return s.conversationId === conversationId ? { ongoing, participants } : { ongoing };
@@ -501,6 +506,8 @@ async function connect(
     if (track.kind === Track.Kind.Audio) {
       attachAudio(track, participant.identity);
       applyDeafen(get().deafened);
+      // Личные громкости общие с голосовыми каналами
+      applyStoredVolumes(room, participant.identity);
       return;
     }
     if (track.source === Track.Source.Camera) {

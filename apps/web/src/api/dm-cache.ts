@@ -31,9 +31,14 @@ export function addDmMessage(queryClient: QueryClient, message: DmChatMessage): 
 
     // Своё сообщение по WS может опередить ответ на отправку — заменяем
     // оптимистичную копию, а не добавляем вторую такую же
-    const pendingTwin = (data.pages.flatMap((p) => p.items) as DmChatMessage[]).find(
-      (m) => m.pending && m.author?.id === message.author?.id && m.content === message.content,
-    );
+    // Отметка о звонке приходит с пустым текстом — она не «двойник» ничему
+    const pendingTwin =
+      message.kind === 'CALL'
+        ? undefined
+        : (data.pages.flatMap((p) => p.items) as DmChatMessage[]).find(
+            (m) =>
+              m.pending && m.author?.id === message.author?.id && m.content === message.content,
+          );
     if (pendingTwin) {
       return mapPages(data, (items) =>
         items.map((m) => (m.id === pendingTwin.id ? message : m)),

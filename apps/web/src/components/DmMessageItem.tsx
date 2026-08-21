@@ -1,4 +1,15 @@
-import { CornerUpLeft, Pencil, Pin, PinOff, SmilePlus, Trash2 } from 'lucide-react';
+import type { TFunction } from 'i18next';
+import {
+  CornerUpLeft,
+  Pencil,
+  Phone,
+  PhoneCall,
+  PhoneMissed,
+  Pin,
+  PinOff,
+  SmilePlus,
+  Trash2,
+} from 'lucide-react';
 import { useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import Markdown from 'react-markdown';
@@ -48,6 +59,55 @@ function formatTimestamp(iso: string): string {
   return isToday ? timeFormat.format(date) : dateTimeFormat.format(date);
 }
 
+/**
+ * Длительность словами: «45 секунд», «3 минуты», «1 час 5 минут».
+ * Склонение руками — Intl.RelativeTimeFormat сюда не подходит, он про
+ * «через/назад», а нам нужно «сколько длился».
+ */
+function humanDuration(totalSec: number, t: TFunction): string {
+  if (totalSec < 60) return t('call.durSeconds', { count: totalSec });
+  const minutes = Math.floor(totalSec / 60);
+  if (minutes < 60) return t('call.durMinutes', { count: minutes });
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  const head = t('call.durHours', { count: hours });
+  return rest > 0 ? `${head} ${t('call.durMinutes', { count: rest })}` : head;
+}
+
+/** Строка о звонке в переписке: идёт / длился столько-то / пропущен */
+function CallRecord({
+  call,
+  authorName,
+  createdAt,
+}: {
+  call: NonNullable<DmChatMessage['call']>;
+  authorName: string;
+  createdAt: string;
+}) {
+  const { t } = useTranslation();
+  const ongoing = call.endedAt === null;
+  const missed = !ongoing && call.startedAt === null;
+
+  const text = ongoing
+    ? t('call.recordOngoing', { name: authorName })
+    : missed
+      ? t('call.recordMissed', { name: authorName })
+      : t('call.recordEnded', {
+          name: authorName,
+          duration: humanDuration(call.durationSec ?? 0, t),
+        });
+
+  return (
+    <div className={`call-record${missed ? ' missed' : ''}${ongoing ? ' ongoing' : ''}`}>
+      <span className="call-record-icon" aria-hidden>
+        {missed ? <PhoneMissed size={15} /> : ongoing ? <PhoneCall size={15} /> : <Phone size={15} />}
+      </span>
+      <span className="call-record-text">{text}</span>
+      <span className="call-record-time">{formatTimestamp(createdAt)}</span>
+    </div>
+  );
+}
+
 export default function DmMessageItem({
   message,
   onReply,
@@ -92,6 +152,13 @@ export default function DmMessageItem({
     }
     if (e.key === 'Escape') setEditing(false);
   };
+
+  // Отметка о звонке — не сообщение: ни ответить, ни отредактировать
+  if (message.kind === 'CALL' && message.call) {
+    return (
+      <CallRecord call={message.call} authorName={authorName} createdAt={message.createdAt} />
+    );
+  }
 
   return (
     <div className={`message${message.pending ? ' pending' : ''}`}>

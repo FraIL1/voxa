@@ -269,6 +269,12 @@ export interface VoiceParticipantDto {
 
 export interface VoiceChannelStateDto {
   channelId: string;
+  /**
+   * Сервер канала — чтобы из списка друзей можно было сразу перейти в этот
+   * голосовой. null бывает только у канала, который уже опустел: там и
+   * переходить не к кому.
+   */
+  guildId: string | null;
   participants: VoiceParticipantDto[];
 }
 
@@ -307,21 +313,27 @@ export interface AuditPageDto {
   hasMore: boolean;
 }
 
-export interface AdminOverviewDto {
-  usersTotal: number;
-  onlineNow: number;
-  activeSessions: number;
-  /** Суммарный размер загруженных файлов, МБ */
-  filesTotalMb: number;
-  serverVersion: string;
-  uptimeSeconds: number;
-}
-
 // ---------- Личные сообщения (раздел 5.6 PRD) ----------
+
+/** Обычное сообщение или отметка о звонке */
+export type DmMessageKind = 'TEXT' | 'CALL';
+
+/** Отметка о звонке в переписке: как в Discord — одна строка на разговор */
+export interface DmCallInfoDto {
+  /** Когда взяли трубку; null — так и не взяли (пропущенный) */
+  startedAt: string | null;
+  /** Когда завершился; null — разговор идёт прямо сейчас */
+  endedAt: string | null;
+  /** Сколько длился разговор, секунды; null — не состоялся или ещё идёт */
+  durationSec: number | null;
+}
 
 export interface DmMessageDto {
   id: string;
   conversationId: string;
+  kind: DmMessageKind;
+  /** Заполнено только у kind === 'CALL' */
+  call: DmCallInfoDto | null;
   reactions: ReactionDto[];
   /** Закреплено в диалоге (видно обоим) */
   pinnedAt: string | null;
