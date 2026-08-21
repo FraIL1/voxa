@@ -5,18 +5,18 @@ test.describe('Приветственная страница', () => {
   test('гость видит рассказ о проекте и обе кнопки', async ({ page }) => {
     await page.goto('/');
 
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('Голос');
+    await expect(page.getByRole('heading', { level: 1 })).toContainText(/голос/i);
     // Кнопка скачивания — ссылка, если адрес сборки задан, иначе обычная кнопка
     await expect(page.getByText('Скачать для Windows').first()).toBeVisible();
-    await expect(page.locator('#features')).toBeAttached();
-    await expect(page.locator('#voice')).toBeAttached();
-    await expect(page.locator('#steps')).toBeAttached();
-    await expect(page.locator('#faq')).toBeAttached();
+    await expect(page.locator('#zashita')).toBeAttached();
+    await expect(page.locator('#vnutri')).toBeAttached();
+    await expect(page.locator('#kak-nachat')).toBeAttached();
+    await expect(page.locator('#voprosy')).toBeAttached();
   });
 
   test('в подвале указаны права и нет ссылок на исходники', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('.lp-footer')).toContainText('Все права защищены');
+    await expect(page.locator('.lp-foot')).toContainText('Все права защищены');
 
     // Проект закрытый: ссылок на репозитории на витрине быть не должно
     const links = await page
@@ -27,14 +27,14 @@ test.describe('Приветственная страница', () => {
 
   test('логотипы сверху и снизу ведут на главную и стоят на одной вертикали', async ({ page }) => {
     await page.goto('/');
-    const header = await page.locator('.lp-header .lp-logo').boundingBox();
-    await page.locator('.lp-footer').scrollIntoViewIfNeeded();
-    const footer = await page.locator('.lp-footer .lp-logo').boundingBox();
+    const header = await page.locator('.lp-hdr .lp-logo').boundingBox();
+    await page.locator('.lp-foot').scrollIntoViewIfNeeded();
+    const footer = await page.locator('.lp-foot .lp-logo').boundingBox();
     expect(Math.abs(header!.x - footer!.x)).toBeLessThanOrEqual(1);
 
     // Со страницы входа можно вернуться на главную
     await page.goto('/login');
-    await page.locator('.auth-home').click();
+    await page.locator('.auth-brand').click();
     await page.waitForURL((url) => url.pathname === '/');
   });
 
@@ -50,14 +50,16 @@ test.describe('Приветственная страница', () => {
 
   test('блоки проявляются при прокрутке, вопросы раскрываются', async ({ page }) => {
     await page.goto('/');
-    const features = page.locator('#features .reveal').first();
+    const features = page.locator('#vnutri .lp-rv').first();
     await features.scrollIntoViewIfNeeded();
-    await expect(features).toHaveClass(/shown/);
+    await expect(features).toHaveClass(/\bin\b/);
 
-    const faq = page.locator('.lp-faq').first();
-    await faq.scrollIntoViewIfNeeded();
-    await faq.getByRole('button').click();
-    await expect(faq).toHaveClass(/open/);
+    // Первый вопрос раскрыт сразу, чтобы было видно, что раздел разворачивается,
+    // — проверяем на втором
+    const question = page.locator('.lp-q').nth(1);
+    await question.scrollIntoViewIfNeeded();
+    await question.getByRole('button').click();
+    await expect(question).toHaveClass(/open/);
   });
 });
 

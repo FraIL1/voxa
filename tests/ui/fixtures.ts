@@ -15,8 +15,8 @@ async function signedInPage(
   const context = await browser.newContext();
   const page = await context.newPage();
   await page.goto('/login');
-  await page.getByLabel('Имя пользователя').fill(user.username);
-  await page.getByLabel('Пароль').fill(user.password);
+  await page.getByLabel('Логин').fill(user.username);
+  await page.getByLabel('Пароль', { exact: true }).fill(user.password);
   await page.getByRole('button', { name: 'Войти' }).click();
   await page.waitForURL(/\/(home|guilds)/, { timeout: 20_000 });
   return page;

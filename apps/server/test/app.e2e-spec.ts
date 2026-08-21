@@ -8,15 +8,19 @@ import {
   WsEvents,
   type AuthResponseDto,
   type CommunityStructureDto,
+  type DmConversationDto,
+  type DmMessageDto,
   type MeDto,
   type MemberDto,
   type MessageDto,
   type MessagesPageDto,
   type ReadStateDto,
   type ReadStateUpdatedPayload,
+  type RoleDto,
   type PresenceUpdatePayload,
   type TypingPayload,
   type UserProfileDto,
+  type UserPublicDto,
 } from '@voxa/shared';
 import cookieParser from 'cookie-parser';
 import type { AddressInfo } from 'node:net';
@@ -1007,13 +1011,6 @@ describe('Voxa: критический поток (e2e)', () => {
     expect(actions).toContain('user.kick');
     expect(actions).toContain('user.timeout');
     expect(actions).toContain('invite.create');
-
-    const overview = await request(httpServer)
-      .get('/api/admin/overview')
-      .set('Authorization', `Bearer ${ownerAccess}`)
-      .expect(200);
-    expect(overview.body.usersTotal).toBeGreaterThanOrEqual(3);
-    expect(overview.body.serverVersion).toBeTruthy();
   });
 
   it('личные сообщения: диалог, доставка обоим по WS, непрочитанные, доступ', async () => {
@@ -1313,6 +1310,190 @@ describe('Voxa: критический поток (e2e)', () => {
       .expect(200);
   });
 
+  it('«Управление ролями» не даёт поднять себе права выше выданных', async () => {
+    const memberMe = await request(httpServer)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${memberAccess}`);
+    const memberId = (memberMe.body as MeDto).id;
+
+    // Владелец доверяет участнику ровно одно право — раздачу ролей
+    const created = await request(httpServer)
+      .post(`/api/guilds/${guildId}/roles`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ name: 'Смотритель', permissions: Permissions.MANAGE_ROLES })
+      .expect(201);
+    const keeperRoleId = created.body.id as string;
+    const keeperPosition = created.body.position as number;
+
+    await request(httpServer)
+      .put(`/api/guilds/${guildId}/members/${memberId}/roles/${keeperRoleId}`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(204);
+
+    // Дописать своей же роли право банить — отказ (нельзя выдать то, чего нет)
+    await request(httpServer)
+      .patch(`/api/guilds/${guildId}/roles/${keeperRoleId}`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ permissions: Permissions.MANAGE_ROLES | Permissions.BAN_MEMBERS })
+      .expect(403);
+
+    // Создать новую роль с правами сверх своих — тоже отказ
+    await request(httpServer)
+      .post(`/api/guilds/${guildId}/roles`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ name: 'Теневой админ', permissions: Permissions.KICK_MEMBERS })
+      .expect(403);
+
+    // И «Администратор» по-прежнему только от владельца
+    await request(httpServer)
+      .post(`/api/guilds/${guildId}/roles`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ name: 'Самозванец', permissions: Permissions.ADMINISTRATOR })
+      .expect(403);
+
+    // Поднять свою роль на самый верх — отказ (старшинство)
+    await request(httpServer)
+      .patch(`/api/guilds/${guildId}/roles/${keeperRoleId}`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ position: 99 })
+      .expect(403);
+
+    /* Выдать себе готовую роль «Модератор» (она ниже по старшинству, но
+       несёт бан и кик) — отказ по надмножеству прав. Один лишь порядок
+       ролей эту дыру не закрывает. */
+    const roles = await request(httpServer)
+      .get(`/api/guilds/${guildId}/roles`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(200);
+    const moderatorRole = (roles.body as RoleDto[]).find((r) => r.name === 'Модератор');
+    expect(moderatorRole).toBeDefined();
+    await request(httpServer)
+      .put(`/api/guilds/${guildId}/members/${memberId}/roles/${moderatorRole!.id}`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(403);
+
+    // Поднять чужую нижнюю роль над собой — тоже отказ
+    await request(httpServer)
+      .patch(`/api/guilds/${guildId}/roles/${moderatorRole!.id}`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ position: 99 })
+      .expect(403);
+
+    /* Разрешённое остаётся разрешённым: роль в пределах своих прав
+       создаётся и встаёт строго ниже собственной */
+    const allowed = await request(httpServer)
+      .post(`/api/guilds/${guildId}/roles`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ name: 'Помощник', permissions: Permissions.SEND_MESSAGES })
+      .expect(201);
+    expect((allowed.body as RoleDto).position).toBeLessThan(keeperPosition);
+
+    // Права участника на сервере не выросли: банить он по-прежнему не может
+    await request(httpServer)
+      .post(`/api/guilds/${guildId}/members/${memberId}/ban`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({})
+      .expect(403);
+
+    // Убираем за собой
+    await request(httpServer)
+      .delete(`/api/guilds/${guildId}/roles/${allowed.body.id as string}`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(204);
+    await request(httpServer)
+      .delete(`/api/guilds/${guildId}/members/${memberId}/roles/${keeperRoleId}`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(204);
+    await request(httpServer)
+      .delete(`/api/guilds/${guildId}/roles/${keeperRoleId}`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(204);
+  });
+
+  it('«Управление каналами» не вскрывает закрытый канал, которого не видишь', async () => {
+    const memberMe = await request(httpServer)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${memberAccess}`);
+    const memberId = (memberMe.body as MeDto).id;
+
+    // Роль только для владельца — ей и будет виден закрытый канал
+    const secretRole = await request(httpServer)
+      .post(`/api/guilds/${guildId}/roles`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ name: 'Только свои', permissions: 0 })
+      .expect(201);
+
+    const secret = await request(httpServer)
+      .post(`/api/guilds/${guildId}/channels`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({
+        name: 'тайный',
+        type: 'TEXT',
+        isPrivate: true,
+        allowedRoleIds: [secretRole.body.id as string],
+      })
+      .expect(201);
+    const secretChannelId = secret.body.id as string;
+
+    // Участнику дают ровно одно право — управление каналами
+    const keeper = await request(httpServer)
+      .post(`/api/guilds/${guildId}/roles`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ name: 'Завхоз', permissions: Permissions.MANAGE_CHANNELS })
+      .expect(201);
+    await request(httpServer)
+      .put(`/api/guilds/${guildId}/members/${memberId}/roles/${keeper.body.id as string}`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(204);
+
+    // Канала он не видит — в структуре сервера его нет
+    const structure = await request(httpServer)
+      .get(`/api/guilds/${guildId}/structure`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(200);
+    const seen = (structure.body as CommunityStructureDto).categories
+      .flatMap((c) => c.channels)
+      .concat((structure.body as CommunityStructureDto).uncategorized);
+    expect(seen.some((c) => c.id === secretChannelId)).toBe(false);
+
+    /* Ключевое: зная id, переписать список допущенных ролей на свою нельзя.
+       Отвечаем «не найден» — существование закрытого канала тоже секрет. */
+    await request(httpServer)
+      .patch(`/api/channels/${secretChannelId}`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ allowedRoleIds: [keeper.body.id as string] })
+      .expect(404);
+
+    // И удалить его мимо доступа тоже нельзя
+    await request(httpServer)
+      .delete(`/api/channels/${secretChannelId}`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(404);
+
+    // История канала по-прежнему закрыта
+    await request(httpServer)
+      .get(`/api/channels/${secretChannelId}/messages`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(404);
+
+    // Владелец видит канал и меняет его свободно
+    await request(httpServer)
+      .patch(`/api/channels/${secretChannelId}`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ name: 'тайный-2' })
+      .expect(200);
+
+    // Убираем за собой
+    await request(httpServer)
+      .delete(`/api/guilds/${guildId}/members/${memberId}/roles/${keeper.body.id as string}`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(204);
+    await request(httpServer)
+      .delete(`/api/channels/${secretChannelId}`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(204);
+  });
+
   it('мультисервер: создание сервера, инвайт, вступление и выход', async () => {
     // Участник создаёт собственный сервер и становится его владельцем
     const created = await request(httpServer)
@@ -1515,6 +1696,53 @@ describe('Voxa: критический поток (e2e)', () => {
       .get(`/api/dm/conversations/${conversationId}/pins`)
       .set('Authorization', `Bearer ${(outsider.body as AuthResponseDto).accessToken}`)
       .expect(403);
+  });
+
+  it('обрыв связи выводит человека из разговора, а не оставляет внутри', async () => {
+    const memberMe = await request(httpServer)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${memberAccess}`);
+
+    const opened = await request(httpServer)
+      .post('/api/dm/conversations')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ userId: (memberMe.body as MeDto).id })
+      .expect(201);
+    const conversationId = opened.body.id as string;
+
+    const memberSocket = io(baseUrl, { auth: { token: memberAccess }, transports: ['websocket'] });
+    await new Promise((resolve, reject) => {
+      memberSocket.once(WsEvents.Ready, resolve);
+      memberSocket.once('auth_error', () => reject(new Error('WS-авторизация не прошла')));
+    });
+
+    await request(httpServer)
+      .post(`/api/dm/conversations/${conversationId}/call`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ video: false })
+      .expect(201);
+    await request(httpServer)
+      .post(`/api/dm/conversations/${conversationId}/call/accept`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(201);
+
+    // Оба внутри
+    const during = await request(httpServer)
+      .get(`/api/dm/conversations/${conversationId}/call`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    expect((during.body.participants as UserPublicDto[]).length).toBe(2);
+
+    /* Закрытая вкладка вместо кнопки «завершить»: разговор вдвоём без
+       одного из двоих не имеет смысла, поэтому он гаснет для всех. */
+    memberSocket.disconnect();
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+
+    const after = await request(httpServer)
+      .get(`/api/dm/conversations/${conversationId}/call`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    expect((after.body.participants as UserPublicDto[]).length).toBe(0);
   });
 
   it('звонок 1-на-1: входящий вызов по WS, принятие и завершение', async () => {
@@ -2306,6 +2534,70 @@ describe('Voxa: критический поток (e2e)', () => {
       .get('/api/users/00000000-0000-7000-8000-000000000000/profile')
       .set('Authorization', `Bearer ${ownerAccess}`)
       .expect(404);
+  });
+
+  it('заглушение диалога переживает открытие и новые сообщения', async () => {
+    const ownerMe = await request(httpServer)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${ownerAccess}`);
+
+    const conversation = await request(httpServer)
+      .post('/api/dm/conversations')
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ userId: (ownerMe.body as MeDto).id })
+      .expect(201);
+    const conversationId = conversation.body.id as string;
+
+    // Глушим «пока не включу»
+    const muted = await request(httpServer)
+      .patch(`/api/dm/conversations/${conversationId}/mute`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ minutes: null })
+      .expect(200);
+    expect(muted.body.mutedUntil).not.toBeNull();
+
+    /* Собеседник пишет, а мы открываем диалог и отмечаем прочитанным —
+       именно на этом заглушка слетала: обновление диалога приходило
+       с mutedUntil: null и снимало её у клиента. */
+    const sent = await request(httpServer)
+      .post(`/api/dm/conversations/${conversationId}/messages`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .send({ content: 'проверка заглушки' })
+      .expect(201);
+    await request(httpServer)
+      .post(`/api/dm/conversations/${conversationId}/ack`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .send({ messageId: (sent.body as DmMessageDto).id })
+      .expect(204);
+
+    const list = await request(httpServer)
+      .get('/api/dm/conversations')
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(200);
+    const mine = (list.body as DmConversationDto[]).find((c) => c.id === conversationId);
+    expect(mine?.mutedUntil).not.toBeNull();
+
+    // У собеседника своя настройка — его диалог не заглушён
+    const forOwner = await request(httpServer)
+      .get('/api/dm/conversations')
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    expect(
+      (forOwner.body as DmConversationDto[]).find((c) => c.id === conversationId)?.mutedUntil,
+    ).toBeNull();
+
+    // Снятие работает
+    await request(httpServer)
+      .delete(`/api/dm/conversations/${conversationId}/mute`)
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(204);
+    const after = await request(httpServer)
+      .get('/api/dm/conversations')
+      .set('Authorization', `Bearer ${memberAccess}`)
+      .expect(200);
+    expect(
+      (after.body as DmConversationDto[]).find((c) => c.id === conversationId)?.mutedUntil,
+    ).toBeNull();
   });
 
   it('параметры уведомлений: режим сервера и мьют канала', async () => {

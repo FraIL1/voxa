@@ -48,9 +48,11 @@ test.describe('Карточка профиля', () => {
     const card = owner.locator('.profile-modal');
     await expect(card).toBeVisible();
     await expect(card.getByText('@uitest_friend')).toBeVisible();
-    // Дата регистрации и общий сервер — то, ради чего карточку и открывают
-    await expect(card.getByText('В Voxa с')).toBeVisible();
-    await expect(card.getByText('Общие серверы', { exact: false })).toBeVisible();
+    // Дата регистрации и общие серверы — то, ради чего карточку и открывают.
+    // Обе величины стоят плитками: крупное значение и подпись под ним.
+    await expect(card.locator('.profile-stat')).toHaveCount(2);
+    await expect(card.getByText('Общих серверов')).toBeVisible();
+    await expect(card.getByRole('button', { name: 'Общие серверы' })).toBeVisible();
     // Друзья по подготовке стенда — значит есть и метка, и кнопка удаления
     await expect(card.getByText('Друг', { exact: true })).toBeVisible();
     await expect(card.getByRole('button', { name: 'Написать' })).toBeVisible();
@@ -121,8 +123,8 @@ test.describe('Смена аккаунта', () => {
     const page = await context.newPage();
 
     const signIn = async (user: { username: string; password: string }): Promise<void> => {
-      await page.getByLabel('Имя пользователя').fill(user.username);
-      await page.getByLabel('Пароль').fill(user.password);
+      await page.getByLabel('Логин').fill(user.username);
+      await page.getByLabel('Пароль', { exact: true }).fill(user.password);
       await page.getByRole('button', { name: 'Войти' }).click();
       await page.waitForURL(/\/(home|guilds)/, { timeout: 20_000 });
     };
@@ -181,38 +183,46 @@ test.describe('Свои окна вместо системных', () => {
     await owner.getByRole('button', { name: 'Настройки сервера' }).click();
     await owner.getByRole('button', { name: 'Роли' }).click();
 
-    // Галочка: системную отрисовку заменили своей — иначе снятая была белой
-    const box = owner.locator('.role-perm input[type=checkbox]').first();
-    await expect(box).toBeVisible();
-    const boxStyle = await box.evaluate((el) => {
-      const cs = getComputedStyle(el);
-      const r = el.getBoundingClientRect();
-      // Эталон берём из того же токена: цвет панели свой у каждого облика
+    /* У владельца прав не выбирают — там стоит подпись «все права», поэтому
+       берём обычную роль. */
+    await owner.locator('.roles-item', { hasText: 'Участник' }).first().click();
+
+    /* Права — переключатели: системный флажок спрятан, а видимую дорожку
+       рисуем сами. Проверяем, что системная отрисовка действительно не
+       участвует, иначе снятый флажок был бы белым квадратом. */
+    const perm = owner.locator('.role-perm .perm-switch').first();
+    await expect(perm).toBeVisible();
+    const permStyle = await perm.evaluate((el) => {
+      const input = el.querySelector('input') as HTMLInputElement;
+      const track = el.querySelector('.owner-switch-track') as HTMLElement;
+      const trackBox = track.getBoundingClientRect();
+      // Эталон берём из того же токена: цвет свой у каждого облика
       const probe = document.createElement('div');
-      probe.style.background = 'var(--panel-raised)';
+      probe.style.background = 'var(--panel-hover)';
       document.body.appendChild(probe);
-      const panel = getComputedStyle(probe).backgroundColor;
+      const hover = getComputedStyle(probe).backgroundColor;
       probe.remove();
       return {
-        appearance: cs.appearance,
-        background: cs.backgroundColor,
-        panel,
-        size: `${Math.round(r.width)}x${Math.round(r.height)}`,
-        minHeight: cs.minHeight,
-        padding: cs.padding,
+        inputOpacity: getComputedStyle(input).opacity,
+        checked: input.checked,
+        trackBackground: getComputedStyle(track).backgroundColor,
+        hover,
+        trackSize: `${Math.round(trackBox.width)}x${Math.round(trackBox.height)}`,
       };
     });
-    expect(boxStyle.appearance).toBe('none');
-    expect(boxStyle.size).toBe('16x16');
-    expect(boxStyle.minHeight).toBe('0px');
-    expect(boxStyle.padding).toBe('0px');
-    // Снятая галочка — цвета панели, а не системного белого
-    expect(boxStyle.background).toBe(boxStyle.panel);
-    expect(boxStyle.background).not.toBe('rgb(255, 255, 255)');
+    expect(permStyle.inputOpacity).toBe('0');
+    expect(permStyle.trackSize).toBe('42x24');
+    // Снятый переключатель — цвета панели, а не системного белого
+    if (!permStyle.checked) {
+      expect(permStyle.trackBackground).toBe(permStyle.hover);
+      expect(permStyle.trackBackground).not.toBe('rgb(255, 255, 255)');
+    }
 
-    // Выбор цвета роли — без системной рамки вокруг образца
-    const color = owner.locator('.role-color-input').first();
-    await expect(color).toHaveCSS('appearance', 'none');
+    /* Цвет роли выбирают из готовой палитры своими образцами: системного
+       выбора цвета в окне нет вовсе, иначе поверх приложения открывался бы
+       диалог операционной системы. */
+    await expect(owner.locator('.role-swatch').first()).toBeVisible();
+    await expect(owner.locator('.role-editor input[type=color]')).toHaveCount(0);
 
     await owner.locator('.settings-panel').getByTitle('Закрыть').click();
   });
@@ -315,10 +325,11 @@ test.describe('Звуки', () => {
     const notes = (): Promise<number> =>
       owner.evaluate(() => (window as unknown as { __notes: number }).__notes);
 
-    // Кнопка «послушать» в настройках — самый короткий путь к звуку
+    // Кнопка «послушать» на вкладке звуков — самый короткий путь к звуку
     await owner.locator('.user-card').getByTitle('Настройки').first().click();
-    await owner.getByRole('button', { name: 'Голос и видео' }).click();
-    const preview = owner.locator('.sound-toggle').getByTitle('Послушать');
+    await owner.getByRole('button', { name: 'Звуки', exact: true }).click();
+    const master = owner.locator('.settings-form .owner-switch input').first();
+    const preview = owner.getByTitle('Послушать').first();
     await preview.click();
     await expect.poll(notes).toBeGreaterThan(0);
 
@@ -332,19 +343,20 @@ test.describe('Звуки', () => {
     });
     expect(state).toBe('running');
 
-    // Выключатель гасит звуки целиком, и выбор переживает перезагрузку
+    // Общий выключатель гасит звуки целиком, и выбор переживает перезагрузку
     const played = await notes();
-    await owner.locator('.sound-toggle .owner-switch input').setChecked(false);
+    await master.setChecked(false);
     await expect(preview).toBeDisabled();
     await owner.reload();
     await owner.locator('.user-card').waitFor({ state: 'visible', timeout: 20_000 });
     await owner.locator('.user-card').getByTitle('Настройки').first().click();
-    await owner.getByRole('button', { name: 'Голос и видео' }).click();
-    await expect(owner.locator('.sound-toggle .owner-switch input')).not.toBeChecked();
+    await owner.getByRole('button', { name: 'Звуки', exact: true }).click();
+    const masterAfter = owner.locator('.settings-form .owner-switch input').first();
+    await expect(masterAfter).not.toBeChecked();
     expect(await notes()).toBeLessThanOrEqual(played);
 
     // Возвращаем звуки, чтобы следующий сценарий начинал с обычного состояния
-    await owner.locator('.sound-toggle .owner-switch input').setChecked(true);
+    await masterAfter.setChecked(true);
     await owner.locator('.settings-panel').getByTitle('Закрыть').click();
   });
 });
@@ -359,9 +371,6 @@ test.describe('Громкость и проверка микрофона', () =>
     await expect(mic).toBeVisible();
     await expect(output).toBeVisible();
 
-    // Карточка звуков лежит строкой, а не столбиком
-    await expect(owner.locator('.sound-toggle')).toHaveCSS('flex-direction', 'row');
-
     await mic.fill('160');
     await output.fill('40');
     await expect(owner.locator('.level-value').first()).toHaveText('160%');
@@ -373,20 +382,13 @@ test.describe('Громкость и проверка микрофона', () =>
     );
     expect(saved).toMatchObject({ micGain: 1.6, output: 0.4 });
 
-    // Проверка микрофона показывает живой уровень
-    await owner.getByRole('button', { name: 'Проверить микрофон' }).click();
-    const meter = owner.locator('.mic-meter');
-    await expect(meter).toBeVisible();
+    /* Полоска уровня идёт сама: включать проверку не надо, человек сразу
+       видит, слышно ли его */
+    const bars = owner.locator('.live-check .check-bars');
+    await expect(bars).toBeVisible();
     await expect
-      .poll(() =>
-        meter.locator('.mic-meter-fill').evaluate((el) => {
-          const m = new DOMMatrix(getComputedStyle(el).transform);
-          return m.a;
-        }),
-      )
+      .poll(() => bars.evaluate((el) => Number(el.getAttribute('aria-valuenow') ?? 0)))
       .toBeGreaterThan(0);
-    await owner.getByRole('button', { name: 'Остановить проверку' }).click();
-    await expect(meter).toBeHidden();
 
     // Выбор переживает перезагрузку
     await owner.reload();
@@ -558,19 +560,24 @@ test.describe('Управление звуком и видео', () => {
     await controls.getByTitle('Завершить звонок').click();
   });
 
-  test('проверка микрофона умеет возвращать звук в наушники', async ({ owner }) => {
+  test('живая проверка себя: полоска уровня и запись с прослушиванием', async ({ owner }) => {
     await owner.locator('.user-card').getByTitle('Настройки').first().click();
     await owner.getByRole('button', { name: 'Голос и видео' }).click();
-    await owner.getByRole('button', { name: 'Проверить микрофон' }).click();
 
-    const monitor = owner.locator('.sound-toggle', { hasText: 'Слышать себя' });
-    await expect(monitor).toBeVisible();
-    await monitor.locator('input').check();
-    await expect(monitor.locator('input')).toBeChecked();
+    // Полоска уровня идёт сама, без нажатий: человек должен сразу видеть,
+    // слышно ли его
+    const check = owner.locator('.live-check');
+    await expect(check).toBeVisible();
+    await expect(check.locator('.check-bars')).toBeVisible();
 
-    // Выключение проверки гасит и возврат звука
-    await owner.getByRole('button', { name: 'Остановить проверку' }).click();
-    await expect(monitor).toBeHidden();
+    // Запись и прослушивание — вместо прежнего возврата звука в наушники
+    const record = owner.getByRole('button', { name: 'Записать и прослушать себя' });
+    await expect(record).toBeVisible();
+    await record.click();
+    await expect(owner.getByRole('button', { name: 'Записываю… говори' })).toBeVisible();
+
+    // Ждём, пока проверка отыграет и кнопка вернётся в исходное состояние
+    await expect(record).toBeVisible({ timeout: 20_000 });
     await owner.locator('.settings-panel').getByTitle('Закрыть').click();
   });
 });
@@ -689,9 +696,10 @@ test.describe('Эфир', () => {
     });
 
     await expect(row.locator('.live-badge')).toHaveText('В эфире');
+    // В строке участника перед подписью стоит значок, поэтому сверяем вхождение
     await expect(
       friend.locator('.member', { hasText: 'uitest_owner' }).locator('.member-status-text.sharing'),
-    ).toHaveText('Демонстрирует экран');
+    ).toContainText('демонстрирует экран');
 
     await owner.evaluate(() => {
       const w = window as unknown as {
@@ -799,8 +807,9 @@ test.describe('Панель владельца', () => {
     await expect(panel.locator('.admin-tile.accent')).toHaveCount(1);
     await expect(panel.locator('.admin-tile-icon').first()).toBeVisible();
 
-    // Кнопки разделов оформлены, а не серые системные
-    const tab = panel.getByRole('button', { name: 'Пользователи' });
+    /* Кнопки разделов оформлены, а не серые системные. Ищем строго в столбце
+       разделов: на обзоре есть ещё ссылка «Пользователи» из панели новичков. */
+    const tab = panel.locator('.settings-nav').getByRole('button', { name: 'Пользователи' });
     const tabBg = await tab.evaluate((el) => getComputedStyle(el).backgroundColor);
     expect(tabBg).toBe('rgba(0, 0, 0, 0)');
 
@@ -808,10 +817,10 @@ test.describe('Панель владельца', () => {
     await expect(panel.getByPlaceholder('Поиск по логину или имени')).toBeVisible();
     await expect(panel.getByText('uitest_friend').first()).toBeVisible();
 
-    await panel.getByRole('button', { name: 'Серверы' }).click();
+    await panel.locator('.settings-nav').getByRole('button', { name: 'Серверы' }).click();
     await expect(panel.getByRole('heading', { name: 'Серверы' })).toBeVisible();
 
-    await panel.getByRole('button', { name: 'Хранилище' }).click();
+    await panel.locator('.settings-nav').getByRole('button', { name: 'Хранилище' }).click();
     await expect(panel.locator('.admin-tile')).toHaveCount(3);
 
     await panel.getByTitle('Закрыть').click();
