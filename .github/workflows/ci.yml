@@ -46,7 +46,7 @@ jobs:
           echo "MinIO не поднялся:"; docker logs minio; exit 1
 
       # Версия pnpm берётся из поля packageManager в package.json
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
       - uses: actions/setup-node@v4
         with:
