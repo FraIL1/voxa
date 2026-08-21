@@ -30,7 +30,7 @@ jobs:
           --health-timeout 3s
           --health-retries 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # services не поддерживают команду запуска, поэтому MinIO — обычным
       # docker run с тем же зафиксированным образом, что и в docker-compose
