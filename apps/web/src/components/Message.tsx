@@ -182,9 +182,11 @@ export default function Message({ message }: { message: ChatMessage }) {
                 <div className="lp-desc">{message.linkPreview.description}</div>
               )}
             </div>
-            {message.linkPreview.imageUrl && (
-              <img className="lp-image" src={message.linkPreview.imageUrl} alt="" loading="lazy" />
-            )}
+            {/* Картинку с чужого сайта не тянем. Браузер сходил бы за ней сам,
+                и владелец той страницы узнал бы адрес и браузер каждого, кто
+                просто открыл переписку. Прод-CSP такой запрос и так запрещает
+                (img-src не пускает произвольные домены) — здесь мы приводим
+                разработку в соответствие с ним. */}
           </a>
         )}
 

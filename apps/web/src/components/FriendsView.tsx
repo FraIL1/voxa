@@ -1,13 +1,14 @@
-import type { FriendDto } from '@voxa/shared';
+import type { FriendDto, PresenceStatus } from '@voxa/shared';
 import {
   Ban,
   Check,
   Circle,
+  Handshake,
   Inbox,
   MessageSquare,
   UserMinus,
   UserPlus,
-  Users,
+  Volume2,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -16,6 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 
 import { useOpenDm } from '../hooks/useDm';
+import { useVoiceStates, voiceLocationOf } from '../hooks/useVoiceStates';
 import { openProfile } from '../stores/profileView';
 import Avatar from './Avatar';
 import ConfirmModal from './ConfirmModal';
@@ -33,6 +35,32 @@ import {
 } from '../hooks/useFriends';
 
 type Tab = 'online' | 'all' | 'requests' | 'blocked' | 'add';
+
+/**
+ * Присутствие друга в строке списка. Если он сидит в голосовом канале, куда
+ * нам тоже можно, вместо «в сети» показываем это и уводим прямо в канал —
+ * не надо обходить общие серверы и искать, где он.
+ */
+function FriendPresence({ userId, status }: { userId: string; status: PresenceStatus }) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const { data: voiceStates } = useVoiceStates();
+  const voice = voiceLocationOf(voiceStates, userId);
+
+  if (!voice) return <span className="friend-status">{t(`presence.${status}`)}</span>;
+
+  return (
+    <button
+      type="button"
+      className="friend-status friend-in-voice"
+      title={t('dm.joinVoiceHint')}
+      onClick={() => void navigate(`/guilds/${voice.guildId}/channels/${voice.channelId}`)}
+    >
+      <Volume2 size={13} />
+      {t('dm.inVoice')}
+    </button>
+  );
+}
 
 /**
  * Строка человека. Клик по ней открывает профиль — кроме клика по кнопкам
@@ -90,7 +118,7 @@ function FriendRows({ online }: { online: boolean }) {
       </div>
       {shown.length === 0 && (
         <EmptyBlock
-          icon={<Users size={26} />}
+          icon={<Handshake size={26} />}
           title={t('friends.emptyTitle')}
           hint={t('friends.empty')}
         />
@@ -104,7 +132,7 @@ function FriendRows({ online }: { online: boolean }) {
             className="friend-avatar"
           />
           <span className="friend-name">{friend.displayName}</span>
-          <span className="friend-status">{t(`presence.${friend.status}`)}</span>
+          <FriendPresence userId={friend.id} status={friend.status} />
           <button className="icon-button" title={t('dm.write')} onClick={() => write(friend.id)}>
             <MessageSquare size={18} />
           </button>
@@ -309,7 +337,7 @@ export default function FriendsView() {
 
   const tabs: { key: Tab; label: string; icon: LucideIcon; badge?: number }[] = [
     { key: 'online', label: t('friends.online'), icon: Circle },
-    { key: 'all', label: t('friends.all'), icon: Users },
+    { key: 'all', label: t('friends.all'), icon: Handshake },
     { key: 'requests', label: t('friends.requests'), icon: Inbox, badge: incomingCount },
     { key: 'blocked', label: t('friends.blocked'), icon: Ban },
   ];
@@ -318,7 +346,7 @@ export default function FriendsView() {
     <div className="friends-view">
       <header className="friends-header">
         <span className="friends-title">
-          <Users size={18} /> {t('nav.friends')}
+          <Handshake size={18} /> {t('nav.friends')}
         </span>
         <div className="friends-tabs">
           {tabs.map(({ key, label, icon: Icon, badge }) => (

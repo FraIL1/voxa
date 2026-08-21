@@ -1,11 +1,5 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type {
-  AdminOverviewDto,
-  AuditPageDto,
-  BanDto,
-  CreateInviteInput,
-  InviteDto,
-} from '@voxa/shared';
+import type { AuditPageDto, BanDto, CreateInviteInput, InviteDto } from '@voxa/shared';
 
 import { api } from '../api/client';
 
@@ -55,15 +49,6 @@ export function useUnban(guildId: string | undefined) {
       // Флаг banned в списке участников тоже должен обновиться
       void queryClient.invalidateQueries({ queryKey: ['members'] });
     },
-  });
-}
-
-export function useAdminOverview(enabled: boolean) {
-  return useQuery({
-    queryKey: ['adminOverview'],
-    queryFn: () => api<AdminOverviewDto>('/admin/overview'),
-    enabled,
-    refetchInterval: 30_000,
   });
 }
 

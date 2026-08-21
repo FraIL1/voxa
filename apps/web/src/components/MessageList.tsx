@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef } from 'react';
+import { Fragment, useLayoutEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MessageSquare } from 'lucide-react';
 
@@ -6,6 +6,7 @@ import { EmptyBlock, MessagesSkeleton } from './Skeletons';
 
 import { useMessages } from '../hooks/useMessages';
 import { useAutoAck } from '../hooks/useReadStates';
+import DaySeparator, { startsNewDay } from './DaySeparator';
 import Message from './Message';
 
 export default function MessageList({ channelId }: { channelId: string }) {
@@ -70,8 +71,13 @@ export default function MessageList({ channelId }: { channelId: string }) {
           {isFetchingNextPage ? t('app.loading') : t('chat.loadMore')}
         </button>
       )}
-      {messages.map((message) => (
-        <Message key={message.id} message={message} />
+      {messages.map((message, i) => (
+        <Fragment key={message.id}>
+          {startsNewDay(messages[i - 1]?.createdAt, message.createdAt) && (
+            <DaySeparator iso={message.createdAt} />
+          )}
+          <Message message={message} />
+        </Fragment>
       ))}
     </div>
   );

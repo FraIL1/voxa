@@ -2,9 +2,11 @@ import type { ChannelDto } from '@voxa/shared';
 import {
   Headphones,
   HeadphoneOff,
+  Maximize,
+  Maximize2,
   Mic,
   MicOff,
-  Maximize2,
+  Minimize2,
   MonitorUp,
   PhoneOff,
   Video,
@@ -27,21 +29,15 @@ import {
 import Avatar from './Avatar';
 import LiveVideo from './LiveVideo';
 import ShareOptionsModal from './ShareOptionsModal';
+import VolumeMenu, { type VolumeMenuState } from './VolumeMenu';
 
-/**
- * Плитка участника. Когда камера включена, вместо аватарки идёт видео —
- * трек живёт вне стора, поэтому привязываем его вручную.
- */
-function VoiceTile({
+/** Камера участника: трек живёт вне стора, привязываем вручную */
+function CameraVideo({
   userId,
-  name,
-  withVideo,
   self,
   version,
 }: {
   userId: string;
-  name: string;
-  withVideo: boolean;
   self: boolean;
   /** Меняется при появлении и пропаже треков — повод перепривязаться */
   version: number;
@@ -51,16 +47,45 @@ function VoiceTile({
   useEffect(() => {
     const element = ref.current;
     const track = cameraTrackOf(self ? SELF_CAMERA : userId);
-    if (!element || !track || !withVideo) return;
+    if (!element || !track) return;
     track.attach(element);
     return () => {
       track.detach(element);
     };
-  }, [userId, self, withVideo, version]);
+  }, [userId, self, version]);
 
-  if (!withVideo) return <Avatar name={name} className="voice-avatar" />;
-  // Своё видео зеркалим и глушим: слышать себя не нужно
   return <LiveVideo ref={ref} className="voice-video" />;
+}
+
+/**
+ * Демонстрация экрана внутри плитки того, кто показывает.
+ *
+ * Раньше показ жил отдельной чёрной областью с вкладками, и человек,
+ * начавший демонстрацию, видел надпись «выбери, чей экран смотреть» вместо
+ * собственной картинки. Теперь экран просто занимает его плитку.
+ */
+function ScreenVideo({
+  owner,
+  version,
+  muted,
+}: {
+  owner: string;
+  version: number;
+  muted: boolean;
+}) {
+  const ref = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const element = ref.current;
+    const track = screenVideoTrackOf(owner);
+    if (!element || !track) return;
+    track.attach(element);
+    return () => {
+      track.detach(element);
+    };
+  }, [owner, version]);
+
+  return <LiveVideo ref={ref} className="voice-screen-video" muted={muted} />;
 }
 
 export default function VoiceView({ channel }: { channel: ChannelDto }) {
@@ -69,28 +94,40 @@ export default function VoiceView({ channel }: { channel: ChannelDto }) {
   const voice = useVoiceStore();
   const [shareOpen, setShareOpen] = useState(false);
   const myId = useAuthStore((s) => s.user?.id);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const stageRef = useRef<HTMLDivElement>(null);
   const [shareSound, setShareSound] = useState(true);
+  /** Чей показ развёрнут на всю ширину; null — все плитки равны */
+  const [focused, setFocused] = useState<string | null>(null);
+  const [volumeMenu, setVolumeMenu] = useState<VolumeMenuState | null>(null);
+  const tiles = useRef(new Map<string, HTMLDivElement>());
 
   const participants = participantsOf(voiceStates, channel.id);
   const isHere = voice.channelId === channel.id;
-  const nameOf = (userId: string): string =>
-    participants.find((p) => p.userId === userId)?.username ?? '…';
 
-  // Подключение выбранного видеопотока к <video>
-  const watchingTrackReady = voice.watching && screenVideoTrackOf(voice.watching);
+  /** Ключ дорожки показа для участника; null — экран не показывает */
+  const screenKeyOf = (userId: string): string | null => {
+    if (userId === myId) return voice.sharing ? SELF_SCREEN : null;
+    return voice.screenSharers.includes(userId) ? userId : null;
+  };
+
+  const liveScreens = participants.flatMap((p) => {
+    const key = screenKeyOf(p.userId);
+    return key ? [key] : [];
+  });
+  const liveKey = liveScreens.join(',');
+
+  /* Появившийся показ разворачиваем сам: искать его вручную незачем, а
+     свернуть можно щелчком. Ушедший — отпускаем. */
   useEffect(() => {
-    const element = videoRef.current;
-    const track = voice.watching ? screenVideoTrackOf(voice.watching) : undefined;
-    if (!element || !track) return;
-    track.attach(element);
-    return () => {
-      track.detach(element);
-    };
-  }, [voice.watching, watchingTrackReady]);
+    const keys = liveKey ? liveKey.split(',') : [];
+    setFocused((current) => (current && keys.includes(current) ? current : (keys[0] ?? null)));
+  }, [liveKey]);
 
-  const showScreenArea = isHere && (voice.screenSharers.length > 0 || voice.sharing);
+  const toggleFocus = (key: string): void =>
+    setFocused((current) => (current === key ? null : key));
+
+  const goFullscreen = (userId: string): void => {
+    void tiles.current.get(userId)?.requestFullscreen?.().catch(() => undefined);
+  };
 
   return (
     <div className="channel-view">
@@ -100,119 +137,105 @@ export default function VoiceView({ channel }: { channel: ChannelDto }) {
         {channel.topic && <span className="topic">— {channel.topic}</span>}
       </header>
 
-      {showScreenArea && (
-        <div className="screen-area">
-          <div className="screen-tabs">
-            {voice.screenSharers.map((userId) => (
-              <button
-                key={userId}
-                className={`screen-tab${voice.watching === userId ? ' active' : ''}`}
-                onClick={() => voice.watch(voice.watching === userId ? null : userId)}
-              >
-                <MonitorUp size={13} /> {nameOf(userId)}
-              </button>
-            ))}
-            {voice.sharing && (
-              <button
-                className={`screen-tab own${voice.watching === SELF_SCREEN ? ' active' : ''}`}
-                onClick={() => voice.watch(voice.watching === SELF_SCREEN ? null : SELF_SCREEN)}
-              >
-                <MonitorUp size={13} /> {t('voice.yourScreen')}
-              </button>
-            )}
-          </div>
-          {voice.watching && watchingTrackReady ? (
-            <div className="screen-stage" ref={stageRef}>
-              <LiveVideo ref={videoRef} className="screen-video" />
-
-              {/* Подпись и управление поверх картинки: под ней места нет,
-                  а знать «что это и чей» нужно всегда */}
-              <div className="screen-overlay">
-                <span className="screen-what">
-                  <MonitorUp size={13} />
-                  {t('voice.shareLabel')}
-                  <span className="screen-air">
-                    <i />
-                    {voice.watching === SELF_SCREEN
-                      ? t('voice.yourScreen')
-                      : nameOf(voice.watching)}
-                    {' · '}
-                    {t('voice.onAir')}
-                  </span>
-                </span>
-
-                <span className="screen-tools">
-                  <button
-                    className={`screen-tool${shareSound ? ' on' : ''}`}
-                    title={shareSound ? t('voice.shareSoundOn') : t('voice.shareSoundOff')}
-                    onClick={() => {
-                      const next = !shareSound;
-                      setShareSound(next);
-                      if (videoRef.current) videoRef.current.muted = !next;
-                    }}
-                  >
-                    {shareSound ? <Volume2 size={15} /> : <VolumeX size={15} />}
-                    {shareSound ? t('voice.shareSoundOn') : t('voice.shareSoundOff')}
-                  </button>
-                  <button
-                    className="screen-tool"
-                    title={t('voice.shareFull')}
-                    onClick={() => {
-                      if (document.fullscreenElement) void document.exitFullscreen();
-                      else void stageRef.current?.requestFullscreen();
-                    }}
-                  >
-                    <Maximize2 size={15} />
-                    {t('voice.shareFull')}
-                  </button>
-                </span>
-              </div>
-            </div>
-          ) : (
-            <div className="screen-placeholder">{t('voice.pickScreen')}</div>
-          )}
-        </div>
-      )}
-
-      <div className={`voice-grid${showScreenArea ? ' compact' : ''}`}>
+      <div className={`voice-grid${focused ? ' spotlight' : ''}`}>
         {participants.length === 0 && <div className="empty-state">{t('voice.empty')}</div>}
-        {participants.map((p) => (
-          <div
-            key={p.userId}
-            className={`voice-tile${voice.speaking[p.userId] ? ' speaking' : ''}`}
-          >
-            <VoiceTile
-              userId={p.userId}
-              name={p.username}
-              self={p.userId === myId}
-              withVideo={p.userId === myId ? voice.cameraOn : voice.cameraUsers.includes(p.userId)}
-              version={voice.videoVersion}
-            />
-            <span className="voice-tile-name">{p.username}</span>
-            <span className="voice-tile-icons">
-              {p.sharing && (
-                <span className="live-badge" title={t('voice.live')}>
-                  <MonitorUp size={11} /> {t('voice.live')}
-                </span>
+        {participants.map((p) => {
+          const self = p.userId === myId;
+          const screenKey = screenKeyOf(p.userId);
+          const isFocused = screenKey !== null && focused === screenKey;
+          const withCamera = self ? voice.cameraOn : voice.cameraUsers.includes(p.userId);
+
+          return (
+            <div
+              key={p.userId}
+              ref={(el) => {
+                if (el) tiles.current.set(p.userId, el);
+                else tiles.current.delete(p.userId);
+              }}
+              className={`voice-tile${voice.speaking[p.userId] ? ' speaking' : ''}${
+                screenKey ? ' screen' : ''
+              }${isFocused ? ' focused' : ''}`}
+              /* Правый клик — громкость этого человека и его демонстрации.
+                 Свою громкость крутить незачем: себя мы не слышим. */
+              onContextMenu={(e) => {
+                if (self || !isHere) return;
+                e.preventDefault();
+                setVolumeMenu({
+                  x: e.clientX,
+                  y: e.clientY,
+                  userId: p.userId,
+                  name: p.username,
+                  hasScreen: Boolean(screenKey),
+                });
+              }}
+            >
+              {screenKey ? (
+                // Свой звук глушим всегда: слышать сам себя не нужно
+                <ScreenVideo
+                  owner={screenKey}
+                  version={voice.videoVersion}
+                  muted={self || !shareSound}
+                />
+              ) : withCamera ? (
+                <CameraVideo userId={p.userId} self={self} version={voice.videoVersion} />
+              ) : (
+                <Avatar name={p.username} className="voice-avatar" />
               )}
-              {p.muted && <MicOff size={14} />}
-              {p.deafened && <HeadphoneOff size={14} />}
-            </span>
-            {isHere && p.userId !== myId && (
-              <input
-                type="range"
-                className="volume-slider"
-                title={t('voice.volume')}
-                min={0}
-                max={1}
-                step={0.05}
-                value={voice.participantVolumes[p.userId] ?? 1}
-                onChange={(e) => voice.setParticipantVolume(p.userId, Number(e.target.value))}
-              />
-            )}
-          </div>
-        ))}
+
+              {/* Щелчок по картинке разворачивает показ и сворачивает обратно */}
+              {screenKey && (
+                <button
+                  className="voice-screen-hit"
+                  title={isFocused ? t('voice.shareCollapse') : t('voice.shareExpand')}
+                  onClick={() => toggleFocus(screenKey)}
+                />
+              )}
+
+              <span className="voice-tile-name">{p.username}</span>
+              <span className="voice-tile-icons">
+                {p.sharing && (
+                  <span className="live-badge" title={t('voice.live')}>
+                    <MonitorUp size={11} /> {t('voice.live')}
+                  </span>
+                )}
+                {p.muted && <MicOff size={14} />}
+                {p.deafened && <HeadphoneOff size={14} />}
+              </span>
+
+              {screenKey && (
+                <div className="voice-screen-tools">
+                  {!self && (
+                    <button
+                      className="icon-button"
+                      title={shareSound ? t('voice.shareSoundOn') : t('voice.shareSoundOff')}
+                      onClick={() => setShareSound((v) => !v)}
+                    >
+                      {shareSound ? <Volume2 size={14} /> : <VolumeX size={14} />}
+                    </button>
+                  )}
+                  <button
+                    className="icon-button"
+                    title={isFocused ? t('voice.shareCollapse') : t('voice.shareExpand')}
+                    onClick={() => toggleFocus(screenKey)}
+                  >
+                    {isFocused ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                  </button>
+                  <button
+                    className="icon-button"
+                    title={t('voice.shareFull')}
+                    onClick={() => goFullscreen(p.userId)}
+                  >
+                    <Maximize size={14} />
+                  </button>
+                </div>
+              )}
+
+            </div>
+          );
+        })}
       </div>
+
+      {volumeMenu && <VolumeMenu menu={volumeMenu} onClose={() => setVolumeMenu(null)} />}
 
       {voice.error && (
         <p className="auth-error voice-error">

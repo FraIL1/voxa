@@ -33,10 +33,10 @@ import {
   playShareStop,
   playUndeafen,
 } from '../lib/sounds';
+import { applyStoredVolumes, registerVolumeRoom } from './volumes';
 
 const DEVICES_KEY = 'voxa-audio-devices';
 const SHARE_KEY = 'voxa-share-options';
-const VOLUMES_KEY = 'voxa-participant-volumes';
 
 interface SavedDevices {
   micId: string | null;
@@ -93,8 +93,6 @@ interface VoiceState {
   micDeviceId: string | null;
   outputDeviceId: string | null;
   cameraDeviceId: string | null;
-  /** Локальная громкость участников, userId → 0..1 (persisted) */
-  participantVolumes: Record<string, number>;
   /** Я демонстрирую экран */
   sharing: boolean;
   /** Своя камера включена */
@@ -107,8 +105,6 @@ interface VoiceState {
   videoVersion: number;
   /** Кто в канале демонстрирует экран (userId) */
   screenSharers: string[];
-  /** Чей экран смотрим */
-  watching: string | null;
 
   join: (channelId: string, channelName?: string, guildName?: string) => Promise<void>;
   /** Принудительный мут при таймауте */
@@ -118,22 +114,24 @@ interface VoiceState {
   toggleDeafen: () => Promise<void>;
   setAudioDevice: (kind: 'audioinput' | 'audiooutput', deviceId: string) => Promise<void>;
   setCameraDevice: (deviceId: string) => Promise<void>;
-  setParticipantVolume: (userId: string, volume: number) => void;
   /** Что показывать и как — спрашиваем перед запуском, выбор запоминается */
   shareOptions: ShareOptions;
   toggleScreenShare: (options?: ShareOptions) => Promise<void>;
   toggleCamera: () => Promise<void>;
   toggleNoiseSuppression: () => Promise<void>;
-  watch: (userId: string | null) => void;
 }
 
-/** Ключ самопросмотра собственной демонстрации в поле watching */
+/** Ключ дорожки собственной демонстрации (у чужих ключ — их userId) */
 export const SELF_SCREEN = 'self';
 
 /** Комната LiveKit, аудиоэлементы и видеотреки живут вне стора: они не для рендера */
 let room: Room | null = null;
 let localScreenTrack: LocalVideoTrack | null = null;
 let stopLatency: (() => void) | null = null;
+
+/* Личные громкости общие со звонками: склад один на оба режима, поэтому
+   комнату канала отдаём ему, чтобы настройка применялась сразу */
+registerVolumeRoom(() => room);
 
 /** Остальным участникам канала нужно знать, кто сейчас в эфире */
 function announceSharing(sharing: boolean): void {
@@ -164,7 +162,15 @@ export const SELF_CAMERA = 'self-camera';
 
 /** Видеотрек демонстрации экрана участника (для attach в компоненте) */
 export function screenVideoTrackOf(userId: string): RemoteVideoTrack | LocalVideoTrack | undefined {
-  if (userId === SELF_SCREEN) return localScreenTrack ?? undefined;
+  if (userId === SELF_SCREEN) {
+    /* Публикация возвращается раньше, чем в ней появляется дорожка: сразу
+       после старта показа localScreenTrack мог быть ещё пуст, и человек
+       видел чёрный прямоугольник вместо собственной картинки. Тогда берём
+       дорожку прямо из комнаты. */
+    if (localScreenTrack) return localScreenTrack;
+    const published = room?.localParticipant.getTrackPublication(Track.Source.ScreenShare);
+    return (published?.videoTrack as LocalVideoTrack | undefined) ?? undefined;
+  }
   return screenVideoTracks.get(userId);
 }
 
@@ -221,14 +227,12 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
   micDeviceId: savedDevices.micId,
   outputDeviceId: savedDevices.outputId,
   cameraDeviceId: savedDevices.cameraId,
-  participantVolumes: loadJson<Record<string, number>>(VOLUMES_KEY, {}),
   sharing: false,
   cameraOn: false,
   cameraUsers: [],
   videoVersion: 0,
   noiseOn: noiseSuppression(),
   screenSharers: [],
-  watching: null,
   shareOptions: loadJson<ShareOptions>(SHARE_KEY, DEFAULT_SHARE),
 
   join: async (channelId, channelName, guildName) => {
@@ -269,16 +273,15 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
         (track: RemoteTrack, _pub, participant: RemoteParticipant) => {
           if (track.kind === Track.Kind.Audio) {
             attachAudioTrack(track, get().deafened);
-            const volume = get().participantVolumes[participant.identity];
-            if (volume !== undefined) participant.setVolume(volume);
+            // Приглушённый раньше остаётся приглушённым и после перезахода
+            applyStoredVolumes(room, participant.identity);
             return;
           }
           if (track.source === Track.Source.ScreenShare) {
             screenVideoTracks.set(participant.identity, track as RemoteVideoTrack);
             set((s) => ({
               screenSharers: [...new Set([...s.screenSharers, participant.identity])],
-              // первый появившийся экран открываем автоматически
-              watching: s.watching ?? participant.identity,
+              videoVersion: s.videoVersion + 1,
             }));
           }
           if (track.source === Track.Source.Camera) {
@@ -308,13 +311,10 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
           }
           if (track.source === Track.Source.ScreenShare) {
             screenVideoTracks.delete(participant.identity);
-            set((s) => {
-              const sharers = s.screenSharers.filter((id) => id !== participant.identity);
-              return {
-                screenSharers: sharers,
-                watching: s.watching === participant.identity ? (sharers[0] ?? null) : s.watching,
-              };
-            });
+            set((s) => ({
+              screenSharers: s.screenSharers.filter((id) => id !== participant.identity),
+              videoVersion: s.videoVersion + 1,
+            }));
           }
         },
       );
@@ -338,10 +338,7 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
         if (pub.source === Track.Source.ScreenShare) {
           localScreenTrack = null;
           announceSharing(false);
-          set((s) => ({
-            sharing: false,
-            watching: s.watching === SELF_SCREEN ? (s.screenSharers[0] ?? null) : s.watching,
-          }));
+          set((s) => ({ sharing: false, videoVersion: s.videoVersion + 1 }));
         }
       });
 
@@ -356,7 +353,6 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
             speaking: {},
             sharing: false,
             screenSharers: [],
-            watching: null,
           });
           emitVoiceState({ channelId: null, muted: false, deafened: false, sharing: false });
         }
@@ -419,7 +415,6 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
       cameraOn: false,
       cameraUsers: [],
       screenSharers: [],
-      watching: null,
       /* Ошибка привязана к прошлому сеансу — без сброса она висела после возврата в канал */
       error: null,
     });
@@ -495,13 +490,6 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
     if (room) await room.switchActiveDevice('videoinput', deviceId).catch(() => undefined);
   },
 
-  setParticipantVolume: (userId, volume) => {
-    const volumes = { ...get().participantVolumes, [userId]: volume };
-    saveJson(VOLUMES_KEY, volumes);
-    set({ participantVolumes: volumes });
-    room?.remoteParticipants.get(userId)?.setVolume(volume);
-  },
-
   /** Подавление шума меняется на лету: дорожка пересоздаётся с новой настройкой */
   toggleNoiseSuppression: async () => {
     const next = !noiseSuppression();
@@ -556,27 +544,23 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
         localScreenTrack = null;
         playShareStop();
         announceSharing(false);
-        set((s) => ({
-          sharing: false,
-          watching: s.watching === SELF_SCREEN ? (s.screenSharers[0] ?? null) : s.watching,
-        }));
+        // Счётчик версии — повод плиткам заново привязать дорожки
+        set((s) => ({ sharing: false, videoVersion: s.videoVersion + 1 }));
       } else {
         localScreenTrack = (publication?.videoTrack as LocalVideoTrack | undefined) ?? null;
         // Звучит только если человек действительно выбрал экран, а не закрыл диалог
         if (publication) playShareStart();
         announceSharing(Boolean(publication));
-        // самопросмотр открываем сразу — видно, что именно стримишь
-        set({
+        set((s) => ({
           sharing: Boolean(publication),
-          watching: publication ? SELF_SCREEN : get().watching,
-        });
+          videoVersion: s.videoVersion + 1,
+        }));
       }
     } catch {
       // пользователь закрыл диалог выбора экрана — не ошибка
     }
   },
 
-  watch: (userId) => set({ watching: userId }),
 }));
 
 /** Текущее голосовое состояние для повторной отправки после реконнекта WS */

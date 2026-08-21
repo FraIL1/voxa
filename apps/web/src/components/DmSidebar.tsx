@@ -1,12 +1,21 @@
 import type { DmConversationDto, PresenceStatus } from '@voxa/shared';
-import { BellOff, Pin, PinOff, Users, UsersRound } from 'lucide-react';
+import {
+  BellOff,
+  Handshake,
+  MessageSquarePlus,
+  Pin,
+  PinOff,
+  UsersRound,
+  Volume2,
+} from 'lucide-react';
 import { useState, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { NavLink } from 'react-router';
+import { NavLink, useNavigate } from 'react-router';
 
 import { dmTitle } from '../api/dm-cache';
 import { useDmConversations, useToggleConversationPin } from '../hooks/useDm';
 import { useFriends } from '../hooks/useFriends';
+import { useVoiceStates, voiceLocationOf } from '../hooks/useVoiceStates';
 import Avatar from './Avatar';
 import CreateGroupModal from './CreateGroupModal';
 import DmContextMenu, { type DmMenuState } from './DmContextMenu';
@@ -23,8 +32,13 @@ function DmLink({
   onContextMenu: (e: MouseEvent<HTMLElement>, conversation: DmConversationDto) => void;
 }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const togglePin = useToggleConversationPin();
+  const { data: voiceStates } = useVoiceStates();
   const muted = Boolean(conversation.mutedUntil && new Date(conversation.mutedUntil) > new Date());
+
+  // Сидит ли собеседник в голосовом, куда мне тоже можно
+  const voice = conversation.isGroup ? null : voiceLocationOf(voiceStates, conversation.peer?.id);
 
   /* Под именем — присутствие собеседника, а не последнее сообщение:
      в списке важнее «на месте ли он», чем «о чём говорили». */
@@ -63,7 +77,26 @@ function DmLink({
           <span className="channel-name">{dmTitle(conversation)}</span>
           {muted && <BellOff size={13} className="dm-muted-mark" />}
         </span>
-        <span className="dm-preview">{secondLine(conversation)}</span>
+        {/* Человек в голосовом — вместо «в сети» показываем это и уводим
+            прямо в канал: искать его по серверам не нужно. Внутри ссылки
+            вложенная ссылка недопустима, поэтому переходим кнопкой. */}
+        {voice ? (
+          <button
+            type="button"
+            className="dm-preview dm-in-voice"
+            title={t('dm.joinVoiceHint')}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              void navigate(`/guilds/${voice.guildId}/channels/${voice.channelId}`);
+            }}
+          >
+            <Volume2 size={12} />
+            {t('dm.inVoice')}
+          </button>
+        ) : (
+          <span className="dm-preview">{secondLine(conversation)}</span>
+        )}
       </span>
       {conversation.unreadCount > 0 && (
         <span className="mention-badge">{conversation.unreadCount}</span>
@@ -113,7 +146,7 @@ export default function DmSidebar() {
           title={t('dm.createGroup')}
           onClick={() => setGroupOpen(true)}
         >
-          <UsersRound size={16} />
+          <MessageSquarePlus size={16} />
         </button>
       </div>
 
@@ -123,7 +156,7 @@ export default function DmSidebar() {
           end
           className={({ isActive }) => `channel-link home-link${isActive ? ' active' : ''}`}
         >
-          <Users size={18} />
+          <Handshake size={18} />
           <span className="channel-name">{t('nav.friends')}</span>
         </NavLink>
 

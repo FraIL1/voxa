@@ -19,3 +19,24 @@ export function participantsOf(
 ): VoiceParticipantDto[] {
   return states?.find((s) => s.channelId === channelId)?.participants ?? [];
 }
+
+/**
+ * В каком голосовом канале сидит человек — или null, если ни в каком.
+ *
+ * Сервер отдаёт только те каналы, которые нам вправе показывать, поэтому
+ * достаточно поискать по этому списку: чужой сервер сюда не попадёт, и
+ * «в голосовом» не покажется там, где перейти всё равно некуда.
+ */
+export function voiceLocationOf(
+  states: VoiceChannelStateDto[] | undefined,
+  userId: string | undefined,
+): { channelId: string; guildId: string } | null {
+  if (!userId) return null;
+  for (const state of states ?? []) {
+    if (!state.guildId) continue;
+    if (state.participants.some((p) => p.userId === userId)) {
+      return { channelId: state.channelId, guildId: state.guildId };
+    }
+  }
+  return null;
+}

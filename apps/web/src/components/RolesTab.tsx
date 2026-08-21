@@ -1,9 +1,12 @@
 import { Permissions, hasPermission, type PermissionKey, type RoleDto } from '@voxa/shared';
-import { Check, GripVertical, Plus, RotateCcw, Trash2 } from 'lucide-react';
+import { Check, GripVertical, Lock, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useCreateRole, useDeleteRole, useGuildRoles, useUpdateRole } from '../hooks/useGuildAdmin';
+import { useGuild, useMyGuildPermissions } from '../hooks/useGuilds';
+import { useMembers } from '../hooks/useMembers';
+import { useAuthStore } from '../stores/auth';
 
 /** Права, доступные для настройки роли (ADMINISTRATOR — только у владельца, отдельно) */
 /* Права собраны по смыслу: десять строк подряд не дают понять, что
@@ -32,7 +35,19 @@ function RoleEditor({ guildId, role }: { guildId: string; role: RoleDto }) {
   const { t } = useTranslation();
   const updateRole = useUpdateRole(guildId);
   const deleteRole = useDeleteRole(guildId);
-  const locked = role.isOwnerRole;
+
+  /* Что человеку доступно, видно сразу, а не после отказа сервера: выдать
+     можно только своё право, и трогать — только роль ниже своей. Те же два
+     правила проверяются на сервере. */
+  const myMask = useMyGuildPermissions(guildId);
+  const guild = useGuild(guildId);
+  const myId = useAuthStore((s) => s.user?.id);
+  const { data: members } = useMembers(guildId);
+  const isOwner = Boolean(myId) && guild?.ownerId === myId;
+  // Роли приходят по убыванию старшинства, поэтому верхняя — первая
+  const myTop = members?.find((m) => m.id === myId)?.roles[0]?.position ?? -1;
+  const outranked = !isOwner && role.position >= myTop;
+  const locked = role.isOwnerRole || outranked;
   // Локальный цвет для живого превью; на сервер шлём только по завершении выбора
   const [color, setColor] = useState(role.color ?? '#99aab5');
 
@@ -101,7 +116,9 @@ function RoleEditor({ guildId, role }: { guildId: string; role: RoleDto }) {
       </div>
 
       {locked ? (
-        <p className="settings-hint">{t('roles.ownerAll')}</p>
+        <p className="settings-hint">
+          {role.isOwnerRole ? t('roles.ownerAll') : t('roles.outranked')}
+        </p>
       ) : (
         <>
           {PERM_GROUPS.map((group) => (
@@ -111,11 +128,20 @@ function RoleEditor({ guildId, role }: { guildId: string; role: RoleDto }) {
                 {group.keys.map((key) => {
                   const on = hasPermission(draft, Permissions[key]);
                   const danger = DANGEROUS.includes(key);
+                  /* Права, которых нет у самого, показываем запертыми, а не
+                     прячем: иначе непонятно, существует такое право вообще
+                     или его просто некуда включить. */
+                  const canGrant = hasPermission(myMask, Permissions[key]);
                   return (
-                    <label key={key} className="role-perm">
+                    <label key={key} className={`role-perm${canGrant ? '' : ' locked'}`}>
                       <span className="role-perm-text">
-                        <span className="role-perm-name">{t(`perm.${key}`)}</span>
-                        <span className="role-perm-hint">{t(`permHint.${key}`, '')}</span>
+                        <span className="role-perm-name">
+                          {t(`perm.${key}`)}
+                          {!canGrant && <Lock size={12} className="role-perm-lock" />}
+                        </span>
+                        <span className="role-perm-hint">
+                          {canGrant ? t(`permHint.${key}`, '') : t('roles.cantGrant')}
+                        </span>
                       </span>
                       <span
                         className={`owner-switch perm-switch${danger ? ' danger' : ''}${
@@ -125,6 +151,7 @@ function RoleEditor({ guildId, role }: { guildId: string; role: RoleDto }) {
                         <input
                           type="checkbox"
                           checked={on}
+                          disabled={!canGrant}
                           onChange={() => toggle(Permissions[key])}
                         />
                         <span className="owner-switch-track" />

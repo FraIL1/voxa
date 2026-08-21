@@ -1,5 +1,15 @@
 import type { DmConversationDto, DmMessageDto } from '@voxa/shared';
-import { LogOut, Search, UserPlus, UserMinus, X } from 'lucide-react';
+import {
+  Crown,
+  LogOut,
+  Pencil,
+  Search,
+  UserCog,
+  UserPlus,
+  UserMinus,
+  UsersRound,
+  X,
+} from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
@@ -131,8 +141,12 @@ export function PeerProfileAside({
   );
 }
 
-/** Панель управления группой: участники, добавление, переименование, выход */
-export function GroupPanel({
+/**
+ * Управление беседой колонкой справа: состав, добавление, переименование,
+ * выход. Полосой во всю ширину список участников не читался — строки
+ * растягивались через весь экран, а кнопки внизу обрезались.
+ */
+export function GroupAside({
   conversation,
   onClose,
 }: {
@@ -156,76 +170,110 @@ export function GroupPanel({
   const candidates = (friends ?? []).filter((f) => !memberIds.has(f.id));
 
   return (
-    <div className="dm-panel">
-      <div className="dm-panel-head">
-        <span>{t('dm.groupSettings')}</span>
+    <aside className="dm-profile-aside group-aside">
+      <div className="group-aside-head">
+        <span className="group-aside-head-title">
+          <UserCog size={15} />
+          {t('dm.groupSettings')}
+        </span>
         <button className="icon-button" onClick={onClose} title={t('settings.close')}>
           <X size={16} />
         </button>
       </div>
 
-      <button className="btn-secondary" onClick={() => setRenaming(true)}>
-        {t('dm.groupRename')}
-      </button>
-
-      <div className="friends-count">
-        {t('dm.groupMembers').toUpperCase()} — {conversation.members.length}
+      {/* Кто это: имя беседы и её размер — чтобы колонка сама себя объясняла */}
+      <div className="group-aside-hero">
+        <div className="group-aside-avatar" aria-hidden>
+          <UsersRound size={26} />
+        </div>
+        <div className="group-aside-name">{conversation.name}</div>
+        <div className="group-aside-sub">
+          {t('dm.groupMembers')}: {conversation.members.length}
+        </div>
+        <button className="btn-secondary" onClick={() => setRenaming(true)}>
+          <Pencil size={15} /> {t('dm.groupRename')}
+        </button>
       </div>
-      {conversation.members.map((m) => (
-        <div
-          key={m.id}
-          className="friend-row clickable"
-          role="button"
-          tabIndex={0}
-          onClick={(e) => {
-            if (!(e.target as HTMLElement).closest('button')) openProfile(m.id, e);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              openProfile(m.id);
-            }
-          }}
+
+      <div className="group-aside-section">
+        <span className="group-aside-section-title">
+          <UsersRound size={13} />
+          {t('dm.groupMembers')}
+        </span>
+        <span className="group-aside-section-count">{conversation.members.length}</span>
+      </div>
+
+      <div className="group-member-list">
+        {conversation.members.map((m) => (
+          <div
+            key={m.id}
+            className="group-member-row"
+            role="button"
+            tabIndex={0}
+            title={t('dm.profileTitle')}
+            onClick={(e) => {
+              if (!(e.target as HTMLElement).closest('button')) openProfile(m.id, e);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                openProfile(m.id);
+              }
+            }}
+          >
+            <Avatar name={m.displayName} url={m.avatarUrl} className="friend-avatar" />
+            <span className="group-member-lines">
+              <span className="group-member-name">
+                {m.displayName}
+                {conversation.ownerId === m.id && (
+                  <span className="group-owner-badge" title={t('dm.groupOwner')}>
+                    <Crown size={12} />
+                    {t('dm.groupOwner')}
+                  </span>
+                )}
+              </span>
+              <span className="group-member-login">@{m.username}</span>
+            </span>
+            {isOwner && m.id !== myId && (
+              <button
+                className="icon-button danger group-member-kick"
+                title={t('dm.groupKick')}
+                onClick={() => removeMember.mutate(m.id)}
+              >
+                <UserMinus size={16} />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="group-aside-actions">
+        <button
+          className={`btn-secondary${adding ? ' engaged' : ''}`}
+          onClick={() => setAdding((v) => !v)}
         >
-          <Avatar name={m.displayName} url={m.avatarUrl} className="friend-avatar" />
-          <span className="friend-name">{m.displayName}</span>
-          {conversation.ownerId === m.id && (
-            <span className="friend-status">{t('dm.groupOwner')}</span>
-          )}
-          {isOwner && m.id !== myId && (
-            <button
-              className="icon-button danger"
-              title={t('dm.groupKick')}
-              onClick={() => removeMember.mutate(m.id)}
-            >
-              <UserMinus size={16} />
-            </button>
-          )}
-        </div>
-      ))}
+          <UserPlus size={15} /> {t('dm.groupAdd')}
+        </button>
+        {adding && (
+          <div className="group-pick-list">
+            {candidates.length === 0 && <p className="settings-hint">{t('dm.groupNoFriends')}</p>}
+            {candidates.map((f) => (
+              <button
+                key={f.id}
+                className="group-pick-row"
+                onClick={() => addMembers.mutate([f.id], { onSuccess: () => setAdding(false) })}
+              >
+                <Avatar name={f.displayName} url={f.avatarUrl} className="friend-avatar" />
+                <span className="friend-name">{f.displayName}</span>
+              </button>
+            ))}
+          </div>
+        )}
 
-      <button className="btn-secondary" onClick={() => setAdding((v) => !v)}>
-        <UserPlus size={15} /> {t('dm.groupAdd')}
-      </button>
-      {adding && (
-        <div className="group-pick-list">
-          {candidates.length === 0 && <p className="settings-hint">{t('dm.groupNoFriends')}</p>}
-          {candidates.map((f) => (
-            <button
-              key={f.id}
-              className="group-pick-row"
-              onClick={() => addMembers.mutate([f.id], { onSuccess: () => setAdding(false) })}
-            >
-              <Avatar name={f.displayName} url={f.avatarUrl} className="friend-avatar" />
-              <span className="friend-name">{f.displayName}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      <button className="btn-secondary danger-text" onClick={() => setLeaving(true)}>
-        <LogOut size={15} /> {t('dm.groupLeave')}
-      </button>
+        <button className="btn-secondary danger-text" onClick={() => setLeaving(true)}>
+          <LogOut size={15} /> {t('dm.groupLeave')}
+        </button>
+      </div>
 
       {renaming && (
         <PromptModal
@@ -251,6 +299,6 @@ export function GroupPanel({
           onClose={() => setLeaving(false)}
         />
       )}
-    </div>
+    </aside>
   );
 }

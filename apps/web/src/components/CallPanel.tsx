@@ -2,8 +2,10 @@ import type { UserPublicDto } from '@voxa/shared';
 import {
   Headphones,
   HeadphoneOff,
+  Maximize,
   Maximize2,
   Mic,
+  MonitorPlay,
   MonitorUp,
   MicOff,
   Minimize2,
@@ -11,7 +13,7 @@ import {
   Video,
   VideoOff,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useAuthStore } from '../stores/auth';
@@ -26,25 +28,9 @@ import { useVoiceStore } from '../stores/voice';
 import Avatar from './Avatar';
 import LiveVideo from './LiveVideo';
 import ShareOptionsModal from './ShareOptionsModal';
+import VolumeMenu, { type VolumeMenuState } from './VolumeMenu';
 
-/** Экран участника в звонке: трек живёт вне стора, привязываем вручную */
-function CallScreen({ owner, version }: { owner: string; version: number }) {
-  const ref = useRef<HTMLVideoElement>(null);
-
-  useEffect(() => {
-    const element = ref.current;
-    const track = screenTrackOf(owner);
-    if (!element || !track) return;
-    track.attach(element);
-    return () => {
-      track.detach(element);
-    };
-  }, [owner, version]);
-
-  return <LiveVideo ref={ref} className="call-screen" />;
-}
-
-/** Плитка участника: видео, если камера включена, иначе аватар */
+/** Плитка участника: экран, если показывает; иначе видео или аватар */
 function CallTile({
   userId,
   speaking = false,
@@ -52,6 +38,12 @@ function CallTile({
   avatarUrl,
   self,
   withVideo,
+  version,
+  leaving = false,
+  screenOwner = null,
+  focused = false,
+  onToggleFocus,
+  onVolumeMenu,
 }: {
   userId: string;
   /** Говорит прямо сейчас — плитка подсвечивается */
@@ -60,8 +52,22 @@ function CallTile({
   avatarUrl?: string | null;
   self?: boolean;
   withVideo: boolean;
+  /** Смена дорожек: заново привязываем видео, не пересоздавая плитку */
+  version: number;
+  /** Человек вышел — плитка доигрывает уход и только потом пропадает */
+  leaving?: boolean;
+  /** Ключ дорожки демонстрации; null — человек экран не показывает */
+  screenOwner?: string | null;
+  /** Плитка развёрнута на всю ширину сцены */
+  focused?: boolean;
+  onToggleFocus?: () => void;
+  /** Правый клик по чужой плитке — настройка его громкости */
+  onVolumeMenu?: (e: React.MouseEvent) => void;
 }) {
+  const { t } = useTranslation();
   const ref = useRef<HTMLVideoElement>(null);
+  const screenRef = useRef<HTMLVideoElement>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const element = ref.current;
@@ -71,22 +77,143 @@ function CallTile({
     return () => {
       track.detach(element);
     };
-  }, [userId, self, withVideo]);
+  }, [userId, self, withVideo, version]);
+
+  /* Демонстрация живёт в плитке того, кто показывает: раньше она уезжала
+     отдельным блоком под звонок, и было непонятно, чей это экран. */
+  useEffect(() => {
+    const element = screenRef.current;
+    const track = screenOwner ? screenTrackOf(screenOwner) : null;
+    if (!element || !track) return;
+    track.attach(element);
+    return () => {
+      track.detach(element);
+    };
+  }, [screenOwner, version]);
+
+  const goFullscreen = (): void => {
+    void boxRef.current?.requestFullscreen?.().catch(() => undefined);
+  };
+
+  /* Ушедшего снимаем с потока в его последней позиции: соседи сразу
+     смыкаются, а плитка гаснет там, где сидела. Иначе на её месте на всё
+     время анимации оставалась дыра. */
+  useLayoutEffect(() => {
+    const el = boxRef.current;
+    if (!el || !leaving) return;
+    const { offsetLeft, offsetTop, offsetWidth, offsetHeight } = el;
+    el.style.left = `${offsetLeft}px`;
+    el.style.top = `${offsetTop}px`;
+    el.style.width = `${offsetWidth}px`;
+    el.style.height = `${offsetHeight}px`;
+    el.style.position = 'absolute';
+  }, [leaving]);
 
   return (
     <div
-      className={`call-tile${self ? ' self' : ''}${withVideo ? ' video' : ''}${
+      ref={boxRef}
+      className={`call-tile${self ? ' self' : ''}${withVideo || screenOwner ? ' video' : ''}${
         speaking ? ' speaking' : ''
-      }`}
+      }${leaving ? ' leaving' : ''}${screenOwner ? ' screen' : ''}${focused ? ' focused' : ''}`}
+      onContextMenu={onVolumeMenu}
     >
-      {withVideo ? (
+      {screenOwner ? (
+        <LiveVideo ref={screenRef} className="call-video call-video-screen" muted />
+      ) : withVideo ? (
         <LiveVideo ref={ref} className="call-video" muted={self} />
       ) : (
         <Avatar name={name} url={avatarUrl} className="call-tile-avatar" />
       )}
-      <span className="call-tile-label">{name}</span>
+
+      {/* По экрану можно щёлкнуть, чтобы развернуть его на всю сцену */}
+      {screenOwner && (
+        <button
+          className="call-screen-hit"
+          title={focused ? t('call.screenCollapse') : t('call.screenExpand')}
+          onClick={onToggleFocus}
+        />
+      )}
+
+      <span className="call-tile-label">
+        {screenOwner && <MonitorPlay size={12} />}
+        {screenOwner ? t('call.screenOf', { name }) : name}
+      </span>
+
+      {screenOwner && (
+        <div className="call-screen-tools">
+          <button
+            className="icon-button"
+            title={focused ? t('call.screenCollapse') : t('call.screenExpand')}
+            onClick={onToggleFocus}
+          >
+            {focused ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+          </button>
+          <button className="icon-button" title={t('call.screenFullscreen')} onClick={goFullscreen}>
+            <Maximize size={14} />
+          </button>
+        </div>
+      )}
     </div>
   );
+}
+
+/** Сколько плитка доигрывает уход, прежде чем пропасть */
+const LEAVE_ANIM_MS = 320;
+
+interface RosterEntry {
+  user: UserPublicDto;
+  leaving: boolean;
+}
+
+/**
+ * Состав разговора с задержкой на уход: тот, кто вышел, остаётся в списке
+ * ещё на время анимации. Без этого плитки появлялись и исчезали рывком, и
+ * по экрану нельзя было понять, что кто-то присоединился или ушёл.
+ */
+function useCallRoster(present: UserPublicDto[]): RosterEntry[] {
+  const key = present.map((p) => p.id).join(',');
+  const [roster, setRoster] = useState<RosterEntry[]>([]);
+  const timers = useRef(new Map<string, number>());
+
+  useEffect(() => {
+    setRoster((prev) => {
+      const next: RosterEntry[] = [];
+
+      // Кто в разговоре сейчас; вернувшемуся снимаем метку ухода
+      for (const user of present) {
+        const timer = timers.current.get(user.id);
+        if (timer !== undefined) {
+          window.clearTimeout(timer);
+          timers.current.delete(user.id);
+        }
+        next.push({ user, leaving: false });
+      }
+
+      // Кого уже нет — держим, пока доиграет анимация
+      for (const entry of prev) {
+        if (present.some((p) => p.id === entry.user.id)) continue;
+        next.push({ user: entry.user, leaving: true });
+        if (timers.current.has(entry.user.id)) continue;
+        const id = window.setTimeout(() => {
+          timers.current.delete(entry.user.id);
+          setRoster((cur) => cur.filter((e) => !(e.user.id === entry.user.id && e.leaving)));
+        }, LEAVE_ANIM_MS);
+        timers.current.set(entry.user.id, id);
+      }
+      return next;
+    });
+    // present меняется каждый рендер по ссылке — следим за составом, не за массивом
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  useEffect(() => {
+    const pending = timers.current;
+    return () => {
+      for (const id of pending.values()) window.clearTimeout(id);
+    };
+  }, []);
+
+  return roster;
 }
 
 /** Длительность разговора в формате мм:сс (часы добавляются после часа) */
@@ -134,11 +261,26 @@ export default function CallPanel({ conversationId }: { conversationId: string }
   const sharing = useCallStore((s) => s.sharing);
   const screenSharers = useCallStore((s) => s.screenSharers);
   const [shareOpen, setShareOpen] = useState(false);
+  const [volumeMenu, setVolumeMenu] = useState<VolumeMenuState | null>(null);
   const shareOptions = useVoiceStore((s) => s.shareOptions);
 
-  // Показываем один экран: свой, если показываешь сам, иначе первый чужой
-  const screenOwner = sharing ? SELF_SCREEN_CALL : (screenSharers[0] ?? null);
+  /* Кто показывает экран: свой ключ отдельный, чужие — по id участника.
+     Демонстрация уходит в плитку человека, а не в блок под звонком. */
+  const [focusedScreen, setFocusedScreen] = useState<string | null>(null);
+  useEffect(() => {
+    const owners = [...(sharing ? [SELF_SCREEN_CALL] : []), ...screenSharers];
+    // Появившийся экран разворачиваем сам — как в голосовом канале
+    setFocusedScreen((current) =>
+      current && owners.includes(current) ? current : (owners[0] ?? null),
+    );
+  }, [sharing, screenSharers]);
 
+  const others = useMemo(
+    () => participants.filter((p) => p.id !== me?.id),
+    [participants, me?.id],
+  );
+  // Состав держим хуком — он же доигрывает уход вышедших
+  const roster = useCallRoster(others);
   const [collapsed, setCollapsed] = useState(false);
   const duration = useDuration(startedAt);
 
@@ -146,10 +288,11 @@ export default function CallPanel({ conversationId }: { conversationId: string }
     return null;
   }
 
-  const others: UserPublicDto[] = participants.filter((p) => p.id !== me?.id);
-  const anyVideo = cameraOn || videoUserIds.length > 0;
-  // Сетка нужна, когда собеседников больше одного или кто-то с камерой
-  const asGrid = anyVideo || others.length > 1;
+  /* Пока идёт дозвон — крупная карточка того, кому звоним. Как только
+     разговор пошёл, показываем плитками всех, включая себя: раньше вдвоём
+     была видна только аватарка собеседника, и было непонятно, кто уже здесь. */
+  const ringing = status === 'outgoing';
+  const asGrid = !ringing;
 
   const statusText =
     status === 'outgoing'
@@ -171,24 +314,52 @@ export default function CallPanel({ conversationId }: { conversationId: string }
       </button>
 
       {asGrid ? (
-        <div className="call-tiles" key={videoVersion}>
-          {others.map((p) => (
-            <CallTile
-              key={p.id}
-              userId={p.id}
-              name={p.displayName}
-              avatarUrl={p.avatarUrl}
-              withVideo={videoUserIds.includes(p.id)}
-              speaking={speaking[p.id] ?? false}
-            />
-          ))}
+        <div className={`call-tiles${focusedScreen ? ' spotlight' : ''}`}>
+          {roster.map(({ user, leaving }) => {
+            const screen = screenSharers.includes(user.id) ? user.id : null;
+            return (
+              <CallTile
+                key={user.id}
+                userId={user.id}
+                name={user.displayName}
+                avatarUrl={user.avatarUrl}
+                withVideo={videoUserIds.includes(user.id)}
+                speaking={speaking[user.id] ?? false}
+                version={videoVersion}
+                leaving={leaving}
+                screenOwner={screen}
+                focused={Boolean(screen) && focusedScreen === screen}
+                onToggleFocus={() =>
+                  setFocusedScreen((current) => (current === screen ? null : screen))
+                }
+                onVolumeMenu={(e) => {
+                  e.preventDefault();
+                  setVolumeMenu({
+                    x: e.clientX,
+                    y: e.clientY,
+                    userId: user.id,
+                    name: user.displayName,
+                    hasScreen: Boolean(screen),
+                  });
+                }}
+              />
+            );
+          })}
           <CallTile
             userId={me?.id ?? 'me'}
             name={t('call.you')}
             avatarUrl={me?.avatarUrl}
             withVideo={cameraOn}
             speaking={speaking[me?.id ?? ''] ?? false}
+            version={videoVersion}
             self
+            screenOwner={sharing ? SELF_SCREEN_CALL : null}
+            focused={sharing && focusedScreen === SELF_SCREEN_CALL}
+            onToggleFocus={() =>
+              setFocusedScreen((current) =>
+                current === SELF_SCREEN_CALL ? null : SELF_SCREEN_CALL,
+              )
+            }
           />
         </div>
       ) : (
@@ -218,8 +389,6 @@ export default function CallPanel({ conversationId }: { conversationId: string }
           </span>
         </div>
       )}
-
-      {screenOwner && <CallScreen owner={screenOwner} version={videoVersion} />}
 
       {error && <div className="call-error">{error}</div>}
 
@@ -260,6 +429,8 @@ export default function CallPanel({ conversationId }: { conversationId: string }
           <PhoneOff size={19} />
         </button>
       </div>
+
+      {volumeMenu && <VolumeMenu menu={volumeMenu} onClose={() => setVolumeMenu(null)} />}
 
       {shareOpen && (
         <ShareOptionsModal

@@ -1,23 +1,9 @@
-import { hasPermission, Permissions } from '@voxa/shared';
-import {
-  Activity,
-  Check,
-  Clock,
-  Copy,
-  HardDrive,
-  KeyRound,
-  Plus,
-  Tag,
-  Trash2,
-  Users,
-  type LucideIcon,
-} from 'lucide-react';
+import { Check, Copy, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router';
 
 import {
-  useAdminOverview,
   useAudit,
   useBans,
   useCreateInvite,
@@ -26,7 +12,6 @@ import {
   useUnban,
 } from '../hooks/useAdmin';
 import { useGuildRoles } from '../hooks/useGuildAdmin';
-import { useMyGuildPermissions } from '../hooks/useGuilds';
 import Select from './Select';
 
 const timeFormat = new Intl.DateTimeFormat('ru', {
@@ -35,35 +20,6 @@ const timeFormat = new Intl.DateTimeFormat('ru', {
   hour: '2-digit',
   minute: '2-digit',
 });
-
-export function Overview() {
-  const { t } = useTranslation();
-  const { data } = useAdminOverview(true);
-  if (!data) return null;
-
-  const tiles: [string, string | number, LucideIcon, boolean?][] = [
-    [t('community.usersTotal'), data.usersTotal, Users],
-    [t('community.onlineNow'), data.onlineNow, Activity, true],
-    [t('community.sessions'), data.activeSessions, KeyRound],
-    [t('community.filesMb'), `${data.filesTotalMb} МБ`, HardDrive],
-    [t('community.version'), data.serverVersion, Tag],
-    [t('community.uptime'), `${Math.floor(data.uptimeSeconds / 3600)} ч`, Clock],
-  ];
-
-  return (
-    <div className="admin-tiles">
-      {tiles.map(([label, value, Icon, accent]) => (
-        <div key={label} className={`admin-tile${accent ? ' accent' : ''}`}>
-          <span className="admin-tile-icon">
-            <Icon size={15} />
-          </span>
-          <div className="admin-tile-value">{value}</div>
-          <div className="admin-tile-label">{label}</div>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 export function Invites() {
   const { t } = useTranslation();
@@ -236,46 +192,6 @@ export function Audit() {
         >
           {t('chat.loadMore')}
         </button>
-      )}
-    </>
-  );
-}
-
-/** Вкладка «Сервер»: секции по правам текущего пользователя на нём */
-export default function CommunityTab() {
-  const { t } = useTranslation();
-  const { guildId } = useParams<{ guildId: string }>();
-  const mask = useMyGuildPermissions(guildId);
-
-  const isAdmin = hasPermission(mask, Permissions.ADMINISTRATOR);
-  const canInvite = hasPermission(mask, Permissions.CREATE_INVITES);
-  const canBan = hasPermission(mask, Permissions.BAN_MEMBERS);
-
-  return (
-    <>
-      {isAdmin && (
-        <>
-          <h2>{t('community.overview')}</h2>
-          <Overview />
-        </>
-      )}
-      {canInvite && (
-        <>
-          <h2>{t('community.invites')}</h2>
-          <Invites />
-        </>
-      )}
-      {canBan && (
-        <>
-          <h2>{t('community.bans')}</h2>
-          <Bans />
-        </>
-      )}
-      {isAdmin && (
-        <>
-          <h2>{t('community.audit')}</h2>
-          <Audit />
-        </>
       )}
     </>
   );

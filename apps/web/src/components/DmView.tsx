@@ -2,6 +2,7 @@ import type { AttachmentDto, DmConversationDto } from '@voxa/shared';
 import { MAX_ATTACHMENTS_PER_MESSAGE } from '@voxa/shared';
 import {
   AtSign,
+  IdCard,
   Loader2,
   MessageSquare,
   Paperclip,
@@ -9,12 +10,13 @@ import {
   Pin,
   Search,
   SendHorizontal,
-  UserRound,
+  UserCog,
   UsersRound,
   Video,
   X,
 } from 'lucide-react';
 import {
+  Fragment,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -35,7 +37,8 @@ import { openProfile } from '../stores/profileView';
 import CallPanel from './CallPanel';
 import OngoingCallBanner from './OngoingCallBanner';
 import { dmTitle } from '../api/dm-cache';
-import { GroupPanel, PeerProfileAside, PinnedPanel, SearchPanel } from './DmHeaderPanels';
+import DaySeparator, { startsNewDay } from './DaySeparator';
+import { GroupAside, PeerProfileAside, PinnedPanel, SearchPanel } from './DmHeaderPanels';
 import DmMessageItem from './DmMessageItem';
 import { EmptyBlock, MessagesSkeleton } from './Skeletons';
 
@@ -253,8 +256,13 @@ function DmMessages({ conversationId }: { conversationId: string }) {
           {isFetchingNextPage ? t('app.loading') : t('chat.loadMore')}
         </button>
       )}
-      {messages.map((m) => (
-        <DmMessageItem key={m.id} message={m} onReply={onReply} />
+      {messages.map((m, i) => (
+        <Fragment key={m.id}>
+          {startsNewDay(messages[i - 1]?.createdAt, m.createdAt) && (
+            <DaySeparator iso={m.createdAt} />
+          )}
+          <DmMessageItem message={m} onReply={onReply} />
+        </Fragment>
       ))}
     </div>
   );
@@ -351,7 +359,7 @@ export default function DmView() {
               title={t('dm.groupSettings')}
               onClick={() => setPanel((p) => (p === 'group' ? null : 'group'))}
             >
-              <UsersRound size={17} />
+              <UserCog size={17} />
             </button>
           ) : (
             <button
@@ -360,7 +368,7 @@ export default function DmView() {
               disabled={!peer}
               onClick={() => setPanel((p) => (p === 'profile' ? null : 'profile'))}
             >
-              <UserRound size={17} />
+              <IdCard size={17} />
             </button>
           )}
           <button
@@ -382,10 +390,6 @@ export default function DmView() {
       {panel === 'search' && (
         <SearchPanel conversationId={conversationId} onClose={() => setPanel(null)} />
       )}
-      {panel === 'group' && conversation && (
-        <GroupPanel conversation={conversation} onClose={() => setPanel(null)} />
-      )}
-
       <div className="dm-body">
         <div className="dm-main">
           <DmMessages conversationId={conversationId} />
@@ -393,6 +397,9 @@ export default function DmView() {
         </div>
         {panel === 'profile' && peer && (
           <PeerProfileAside peer={peer} onClose={() => setPanel(null)} />
+        )}
+        {panel === 'group' && conversation && (
+          <GroupAside conversation={conversation} onClose={() => setPanel(null)} />
         )}
       </div>
     </div>
