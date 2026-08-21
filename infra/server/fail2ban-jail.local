@@ -1,0 +1,34 @@
+# Тюрьмы fail2ban для Voxa (раздел 9.2 PRD).
+# Кладётся в /etc/fail2ban/jail.local скриптом harden.sh.
+
+[DEFAULT]
+# Свои адреса не банятся никогда
+ignoreip = 127.0.0.1/8 ::1
+backend = auto
+# Бан через ufw, чтобы правила не расходились с файрволом
+banaction = ufw
+
+[sshd]
+enabled = true
+port = ssh
+maxretry = 4
+findtime = 10m
+bantime = 1h
+# Повторные нарушители сидят дольше
+bantime.increment = true
+bantime.factor = 4
+bantime.maxtime = 7d
+
+[voxa-login]
+enabled = true
+filter = voxa-login
+port = http,https
+logpath = /opt/voxa/logs/caddy/access.log
+# Пять неверных паролей за десять минут — час бана.
+# Это поверх лимита самого приложения, а не вместо него.
+maxretry = 5
+findtime = 10m
+bantime = 1h
+bantime.increment = true
+bantime.factor = 4
+bantime.maxtime = 24h

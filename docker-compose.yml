@@ -11,6 +11,10 @@ services:
       context: .
       dockerfile: infra/caddy/Dockerfile
     restart: unless-stopped
+    # Процесс внутри контейнера не сможет получить права выше выданных,
+    # даже если найдёт файл с setuid
+    security_opt:
+      - no-new-privileges:true
     ports:
       - '80:80'
       - '443:443'
@@ -22,6 +26,8 @@ services:
       - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+      # Журнал обращений наружу: его читает fail2ban на хосте
+      - ./logs/caddy:/var/log/caddy
     depends_on:
       server:
         condition: service_healthy
@@ -31,11 +37,15 @@ services:
       context: .
       dockerfile: apps/server/Dockerfile
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     environment:
       NODE_ENV: production
       PORT: '3000'
       DATABASE_URL: postgresql://voxa:${POSTGRES_PASSWORD}@postgres:5432/voxa
-      REDIS_URL: redis://redis:6379
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       S3_ENDPOINT: http://minio:9000
       S3_ACCESS_KEY: ${MINIO_ROOT_USER}
       S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
@@ -66,6 +76,8 @@ services:
   postgres:
     image: postgres:17-alpine
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     environment:
       POSTGRES_DB: voxa
       POSTGRES_USER: voxa
@@ -81,11 +93,18 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: ['redis-server', '--appendonly', 'yes']
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # Пароль нужен не от внешнего мира (порт наружу не выведен), а на случай,
+    # если взломают любой другой контейнер: без него Redis отдал бы сессии
+    # и присутствие кому угодно во внутренней сети
+    command: ['redis-server', '--appendonly', 'yes', '--requirepass', '${REDIS_PASSWORD}']
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
+      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD}', 'ping']
       interval: 5s
       timeout: 3s
       retries: 10
@@ -94,6 +113,8 @@ services:
     # Зафиксированная версия: последний релиз MinIO с полноценной веб-консолью
     image: minio/minio:RELEASE.2025-04-22T22-12-26Z
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     command: server /data
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
@@ -109,6 +130,8 @@ services:
   livekit:
     image: livekit/livekit-server:v1.13.3
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     command: --config /etc/livekit.yaml
     ports:
       - '7881:7881' # WebRTC по TCP (фолбэк при закрытом UDP)

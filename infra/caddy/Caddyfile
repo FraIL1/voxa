@@ -5,6 +5,16 @@
 {$DOMAIN} {
 	encode zstd gzip
 
+	# Журнал обращений в JSON: по нему fail2ban ловит перебор пароля на
+	# /api/auth/login, а заодно видно, кто и куда стучится.
+	log {
+		output file /var/log/caddy/access.log {
+			roll_size 10MiB
+			roll_keep 5
+		}
+		format json
+	}
+
 	header {
 		X-Content-Type-Options nosniff
 		Referrer-Policy strict-origin-when-cross-origin
@@ -66,7 +76,21 @@ files.{$DOMAIN} {
 	header {
 		Content-Security-Policy "sandbox; default-src 'none'"
 		X-Content-Type-Options nosniff
+
+		# Файл открывается как загрузка, а не как страница. Картинкам и видео
+		# внутри приложения это не мешает — заголовок влияет только на переход
+		# по ссылке, зато присланный html или svg не выполнится в браузере.
+		Content-Disposition attachment
 		-Server
 	}
+
+	# Наружу торчит только чтение самих файлов. Всё остальное на порту 9000 —
+	# это административный API MinIO, и снаружи ему делать нечего.
+	@notFiles not path /voxa-files/*
+	respond @notFiles 404
+
+	@notRead not method GET HEAD
+	respond @notRead 405
+
 	reverse_proxy minio:9000
 }

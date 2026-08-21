@@ -1,0 +1,31 @@
+# Присмотр за сервисом (раздел 9.2 PRD). Поднимается отдельно от основного
+# стека, чтобы падение мониторинга никогда не роняло само приложение:
+#
+#   docker compose -f docker-compose.monitoring.yml up -d
+#
+# Uptime Kuma открывается только с самого сервера (127.0.0.1:3001) — наружу
+# порт не выведен намеренно. Заходить через SSH-туннель:
+#   ssh -L 3001:127.0.0.1:3001 voxa@<адрес>
+#
+# Что настроить внутри после запуска:
+#   1. Проверка https://<домен>/api/healthz — интервал 60 с.
+#   2. Проверка https://<домен>/ — что отдаётся сама страница.
+#   3. Проверка wss://livekit.<домен> — голос жив.
+#   4. Оповещение Telegram: токен бота и chat id.
+
+name: voxa-monitoring
+
+services:
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      # Только петля: снаружи не достучаться
+      - '127.0.0.1:3001:3001'
+    volumes:
+      - kuma_data:/app/data
+
+volumes:
+  kuma_data:

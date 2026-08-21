@@ -1,0 +1,57 @@
+# Обновления зависимостей (раздел 9.2 PRD).
+# Раз в неделю Dependabot открывает PR с обновлениями; CI на них прогоняется,
+# так что видно сразу, ломает обновление сборку или нет.
+version: 2
+
+updates:
+  # Пакеты npm всего монорепо: pnpm-workspace обходится одной записью
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Moscow
+    open-pull-requests-limit: 5
+    versioning-strategy: increase
+    groups:
+      # Мелкие обновления одной пачкой, чтобы не плодить PR
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+    commit-message:
+      prefix: 'chore(deps)'
+
+  # Rust-зависимости десктопного приложения
+  - package-ecosystem: cargo
+    directory: /apps/desktop/src-tauri
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Moscow
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: 'chore(deps)'
+
+  # Базовые образы в Dockerfile: node, caddy
+  - package-ecosystem: docker
+    directories:
+      - /apps/server
+      - /infra/caddy
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Moscow
+    commit-message:
+      prefix: 'chore(deps)'
+
+  # Сами действия в CI тоже стареют
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: 'chore(ci)'
