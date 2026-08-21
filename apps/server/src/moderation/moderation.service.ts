@@ -9,6 +9,7 @@ import { WsEvents, type BanDto } from '@voxa/shared';
 import { AuditService } from '../audit/audit.service';
 import { GuildsService } from '../guilds/guilds.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { UsersService } from '../users/users.service';
 import { LiveKitAdminService } from '../voice/livekit-admin.service';
 import { VoiceStateService } from '../voice/voice-state.service';
 import { WsGateway } from '../ws/ws.gateway';
@@ -20,6 +21,7 @@ export class ModerationService {
     private readonly audit: AuditService,
     private readonly ws: WsGateway,
     private readonly guilds: GuildsService,
+    private readonly users: UsersService,
     private readonly voiceStates: VoiceStateService,
     private readonly livekit: LiveKitAdminService,
   ) {}
@@ -39,7 +41,14 @@ export class ModerationService {
     await this.livekit.removeFromRoom(channelId, userId);
   }
 
-  /** Владельца сервера нельзя кикать/банить/таймаутить; себя — тоже */
+  /**
+   * Владельца сервера нельзя кикать/банить/таймаутить; себя — тоже.
+   *
+   * И действовать можно только на того, кто ниже тебя по ролям. Без этого
+   * любой с правом кика выгонял бы других модераторов и администраторов:
+   * старшинство ролей в интерфейсе есть (роли перетаскиваются), а на деле
+   * не проверялось.
+   */
   private async assertModeratable(
     guildId: string,
     actorId: string,
@@ -61,12 +70,21 @@ export class ModerationService {
       select: { id: true },
     });
     if (!target) throw new NotFoundException('Пользователь не найден');
+
+    const [actorTop, targetTop] = await Promise.all([
+      this.users.topRolePositionOf(guildId, actorId),
+      this.users.topRolePositionOf(guildId, targetId),
+    ]);
+    if (actorTop <= targetTop) {
+      throw new ForbiddenException('Нельзя применить действие к равному или старшему по ролям');
+    }
   }
 
   /** Кик: удаление с сервера (аккаунт и другие серверы не трогаем) */
   async kick(guildId: string, actorId: string, targetId: string, reason?: string): Promise<void> {
     await this.assertModeratable(guildId, actorId, targetId);
     await this.removeFromVoice(guildId, targetId);
+    // removeMember сам отписывает сокеты от комнат сервера
     await this.guilds.removeMember(guildId, targetId);
 
     this.ws.emitToGuild(guildId, WsEvents.GuildMembersChanged, { guildId });

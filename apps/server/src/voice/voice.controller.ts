@@ -22,9 +22,19 @@ export class VoiceController {
     return this.voice.issueToken(user.id, channelId);
   }
 
-  /** Начальное состояние голосовых каналов (дальше — WS voice.update) */
+  /**
+   * Начальное состояние голосовых каналов (дальше — WS voice.update).
+   *
+   * Отдаём только те каналы, которые человек вправе видеть. Без этой проверки
+   * любой участник получал состав всех голосовых каналов приложения, включая
+   * серверы, на которых он не состоит, и закрытые каналы.
+   */
   @Get('voice/states')
-  states(): VoiceChannelStateDto[] {
-    return this.voiceStates.all();
+  async states(@CurrentUser() user: RequestUser): Promise<VoiceChannelStateDto[]> {
+    const all = this.voiceStates.all();
+    const visible = await Promise.all(
+      all.map((state) => this.voice.canSeeChannel(user.id, state.channelId)),
+    );
+    return all.filter((_, i) => visible[i]);
   }
 }

@@ -15,6 +15,7 @@ import {
   WsClientEvents,
   WsEvents,
   type PresenceMode,
+  type PresenceStatus,
   type WsEventName,
   type WsServerEvents,
 } from '@voxa/shared';
@@ -24,6 +25,7 @@ import type { AccessTokenPayload } from '../common/guards/jwt-auth.guard';
 import { PresenceService } from '../presence/presence.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
+import { LiveKitAdminService } from '../voice/livekit-admin.service';
 import { VoiceStateService } from '../voice/voice-state.service';
 
 export function channelRoom(channelId: string): string {
@@ -60,11 +62,23 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private readonly logger = new Logger(WsGateway.name);
 
+  /**
+   * Кого позвать, когда человек ушёл из приложения совсем (закрыл последнее
+   * окно). Через подписку, а не прямым вызовом: иначе шлюз и служба звонков
+   * ссылались бы друг на друга.
+   */
+  private readonly offlineHandlers: ((userId: string) => void)[] = [];
+
+  onUserOffline(handler: (userId: string) => void): void {
+    this.offlineHandlers.push(handler);
+  }
+
   constructor(
     private readonly jwtService: JwtService,
     private readonly usersService: UsersService,
     private readonly presence: PresenceService,
     private readonly voiceStates: VoiceStateService,
+    private readonly livekit: LiveKitAdminService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -72,8 +86,59 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   broadcastVoiceState(channelId: string): void {
     this.emitToChannel(channelId, WsEvents.VoiceUpdate, {
       channelId,
+      guildId: this.voiceStates.guildOf(channelId),
       participants: this.voiceStates.participantsOf(channelId),
     });
+  }
+
+  /**
+   * Пересобрать подписки живых сокетов человека.
+   *
+   * Комнаты назначаются один раз при подключении. Если после этого доступ
+   * изменился — выгнали с сервера, сняли роль, канал закрыли, — сокет
+   * оставался подписан и продолжал получать новые сообщения в реальном
+   * времени, пока человек не переподключится. Вызывать всюду, где меняется
+   * состав участников или видимость каналов.
+   */
+  async refreshRooms(userId: string): Promise<void> {
+    const [guildIds, channelIds] = await Promise.all([
+      this.usersService.guildIdsOf(userId),
+      this.usersService.visibleChannelIdsOf(userId),
+    ]);
+    const visible = new Set(channelIds);
+
+    /* Потерял доступ к голосовому каналу — выселяем и с медиасервера.
+       Выданный токен живёт два часа и сам по себе доступ не отзывает:
+       без этого снятая роль ещё долго позволяла бы слушать закрытый
+       голосовой канал, даже когда из списка он уже пропал. */
+    const voiceChannelId = this.voiceStates.channelOf(userId);
+    if (voiceChannelId && !visible.has(voiceChannelId)) {
+      this.voiceStates.drop(userId);
+      this.broadcastVoiceState(voiceChannelId);
+      await this.livekit.removeFromRoom(voiceChannelId, userId).catch((error: Error) => {
+        this.logger.warn(`Не удалось выселить из голосового канала: ${error.message}`);
+      });
+    }
+
+    const sockets = await this.server.in(userRoom(userId)).fetchSockets();
+    if (sockets.length === 0) return;
+
+    const wanted = new Set([
+      userRoom(userId),
+      ...guildIds.map(guildRoom),
+      ...channelIds.map(channelRoom),
+    ]);
+
+    for (const socket of sockets) {
+      for (const room of socket.rooms) {
+        // Личная комната самого сокета (его id) — служебная, её не трогаем
+        if (room === socket.id || wanted.has(room)) continue;
+        socket.leave(room);
+      }
+      for (const room of wanted) {
+        if (!socket.rooms.has(room)) socket.join(room);
+      }
+    }
   }
 
   /** Кик/бан: адресное событие и принудительное отключение всех сокетов */
@@ -103,11 +168,20 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const voiceChannelId = this.voiceStates.rename(user.id, user.displayName);
     if (voiceChannelId) this.broadcastVoiceState(voiceChannelId);
 
-    this.emitToAll(WsEvents.UserUpdated, {
+    // Только тем, кто этого человека и так знает: логин посторонним не нужен
+    this.emitToUsers(await this.usersService.observerIdsOf(user.id), WsEvents.UserUpdated, {
       id: user.id,
       username: user.username,
       displayName: user.displayName,
       avatarUrl: user.avatarUrl,
+    });
+  }
+
+  /** Разослать новое присутствие тем, кто этого человека знает */
+  private async emitPresence(userId: string, status: PresenceStatus): Promise<void> {
+    this.emitToUsers(await this.usersService.observerIdsOf(userId), WsEvents.PresenceUpdate, {
+      userId,
+      status,
     });
   }
 
@@ -166,10 +240,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       socket.emit(WsEvents.Ready, ready);
 
       if (becameOnline) {
-        this.emitToAll(WsEvents.PresenceUpdate, {
-          userId: payload.sub,
-          status: this.presence.statusOf(payload.sub),
-        });
+        await this.emitPresence(payload.sub, this.presence.statusOf(payload.sub));
       }
     } catch {
       socket.emit('auth_error', 'Авторизация не пройдена, переподключитесь с новым токеном');
@@ -187,14 +258,17 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const wentOffline = await this.presence.disconnected(data.userId, socket.id);
     const after = this.presence.statusOf(data.userId);
     if (!wentOffline && before !== after) {
-      this.emitToAll(WsEvents.PresenceUpdate, { userId: data.userId, status: after });
+      await this.emitPresence(data.userId, after);
     }
     if (wentOffline) {
-      this.emitToAll(WsEvents.PresenceUpdate, { userId: data.userId, status: 'offline' });
+      await this.emitPresence(data.userId, 'offline');
 
       // Оборванное соединение = выход из голосового канала
       const leftChannel = this.voiceStates.drop(data.userId);
       if (leftChannel) this.broadcastVoiceState(leftChannel);
+
+      // И выход из разговора в личке: иначе он висел бы с ушедшим внутри
+      for (const handler of this.offlineHandlers) handler(data.userId);
     }
   }
 
@@ -203,7 +277,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * или вернулся. Статус «отошёл» ставим только тем, кто в обычном режиме.
    */
   @SubscribeMessage(WsClientEvents.PresenceIdle)
-  handleIdle(@ConnectedSocket() socket: Socket, @MessageBody() body: unknown): void {
+  async handleIdle(@ConnectedSocket() socket: Socket, @MessageBody() body: unknown): Promise<void> {
     const data = socket.data as SocketData;
     if (!data.userId) return;
     const idle = typeof body === 'object' && body !== null && 'idle' in body && Boolean(body.idle);
@@ -211,17 +285,14 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.presence.setIdle(data.userId, socket.id, idle);
     const after = this.presence.statusOf(data.userId);
     if (before !== after) {
-      this.emitToAll(WsEvents.PresenceUpdate, { userId: data.userId, status: after });
+      await this.emitPresence(data.userId, after);
     }
   }
 
   /** Смена режима из настроек: обновляем кэш и рассылаем новый статус */
-  broadcastPresenceMode(userId: string, mode: PresenceMode): void {
+  async broadcastPresenceMode(userId: string, mode: PresenceMode): Promise<void> {
     this.presence.setMode(userId, mode);
-    this.emitToAll(WsEvents.PresenceUpdate, {
-      userId,
-      status: this.presence.statusOf(userId),
-    });
+    await this.emitPresence(userId, this.presence.statusOf(userId));
   }
 
   /**
@@ -243,13 +314,25 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     if (channelId !== null && !socket.rooms.has(channelRoom(channelId))) return;
 
-    // Активный таймаут сервера: клиент не может объявить себя размученным
-    if (channelId !== null && !muted) {
-      const channel = await this.prisma.channel.findUnique({
-        where: { id: channelId },
-        select: { guildId: true },
-      });
-      if (channel && (await this.usersService.timeoutOf(channel.guildId, data.userId))) {
+    /* Сервер канала нужен и для таймаута, и для того, чтобы из списка друзей
+       можно было перейти прямо в этот голосовой. При переключении мьюта
+       канал тот же — берём уже известный, лишний запрос ни к чему. */
+    let guildId: string | null = null;
+    if (channelId !== null) {
+      const known = this.voiceStates.locationOf(data.userId);
+      if (known?.channelId === channelId) {
+        guildId = known.guildId;
+      } else {
+        const channel = await this.prisma.channel.findUnique({
+          where: { id: channelId },
+          select: { guildId: true },
+        });
+        guildId = channel?.guildId ?? null;
+      }
+      if (!guildId) return;
+
+      // Активный таймаут сервера: клиент не может объявить себя размученным
+      if (!muted && (await this.usersService.timeoutOf(guildId, data.userId))) {
         muted = true;
       }
     }
@@ -258,6 +341,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       data.userId,
       data.username,
       channelId,
+      guildId,
       muted,
       deafened,
       sharing,

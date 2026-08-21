@@ -72,6 +72,44 @@ export class UsersService {
     return memberships.map((m) => m.guildId);
   }
 
+  /**
+   * Кому вообще есть дело до этого человека: соседи по серверам, друзья и
+   * собеседники в личке. Плюс он сам — своё присутствие показывается в
+   * карточке внизу.
+   *
+   * По этому списку рассылаются присутствие и смена профиля. Раньше они
+   * летели всем подряд, и посторонний узнавал логин и время появления
+   * человека, с которым у него нет ни общих серверов, ни переписки.
+   */
+  async observerIdsOf(userId: string): Promise<string[]> {
+    const [guildMates, friendships, dmMates] = await Promise.all([
+      this.prisma.guildMember.findMany({
+        where: { guild: { members: { some: { userId } } } },
+        select: { userId: true },
+        distinct: ['userId'],
+      }),
+      // Только принятая дружба: иначе присутствие узнавали бы рассылкой заявок
+      this.prisma.friendship.findMany({
+        where: { status: 'ACCEPTED', OR: [{ requesterId: userId }, { addresseeId: userId }] },
+        select: { requesterId: true, addresseeId: true },
+      }),
+      this.prisma.dmParticipant.findMany({
+        where: { conversation: { participants: { some: { userId } } } },
+        select: { userId: true },
+        distinct: ['userId'],
+      }),
+    ]);
+
+    const ids = new Set<string>([userId]);
+    for (const mate of guildMates) ids.add(mate.userId);
+    for (const friendship of friendships) {
+      ids.add(friendship.requesterId);
+      ids.add(friendship.addresseeId);
+    }
+    for (const mate of dmMates) ids.add(mate.userId);
+    return [...ids];
+  }
+
   /** Итоговая маска прав пользователя на сервере (владелец — все права) */
   async permissionMaskOf(userId: string, guildId: string): Promise<number> {
     const guild = await this.prisma.guild.findUnique({
@@ -93,6 +131,28 @@ export class UsersService {
       select: { roleId: true },
     });
     return userRoles.map((ur) => ur.roleId);
+  }
+
+  /**
+   * Старшинство человека на сервере — позиция его высшей роли.
+   *
+   * Владелец выше всех всегда, даже если ролей у него нет. Без ролей — −1,
+   * то есть ниже любой роли: обычного участника может модерировать любой,
+   * у кого есть на это право.
+   */
+  async topRolePositionOf(guildId: string, userId: string): Promise<number> {
+    const guild = await this.prisma.guild.findUnique({
+      where: { id: guildId },
+      select: { ownerId: true },
+    });
+    if (guild?.ownerId === userId) return Number.POSITIVE_INFINITY;
+
+    const top = await this.prisma.role.findFirst({
+      where: { guildId, members: { some: { userId } } },
+      select: { position: true },
+      orderBy: { position: 'desc' },
+    });
+    return top?.position ?? -1;
   }
 
   /**

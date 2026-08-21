@@ -3,6 +3,9 @@ import { ConfigService } from '@nestjs/config';
 import type { LinkPreviewDto } from '@voxa/shared';
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
+// Свой undici, а не встроенный в Node fetch: только так можно задать
+// соединению проверенный адрес
+import { Agent, fetch } from 'undici';
 
 import type { Env } from '../config/env';
 
@@ -41,17 +44,54 @@ function isPrivateAddress(address: string): boolean {
   );
 }
 
-async function assertPublicHost(url: URL): Promise<void> {
+/**
+ * Проверяет адрес и возвращает тот самый IP, к которому надо идти.
+ *
+ * Возвращать IP обязательно: если проверить имя, а потом дать fetch резолвить
+ * его заново, владелец домена успеет подменить ответ DNS между двумя
+ * запросами (короткий TTL) и увести запрос во внутреннюю сеть. Поэтому
+ * дальше соединяемся строго по проверенному адресу.
+ */
+async function resolvePublicAddress(url: URL): Promise<string> {
   const host = url.hostname.replace(/^\[|\]$/g, '');
   if (isIP(host)) {
     if (isPrivateAddress(host)) throw new Error('приватный адрес');
-    return;
+    return host;
   }
   const records = await lookup(host, { all: true, verbatim: true });
   if (records.length === 0) throw new Error('DNS не разрешился');
   if (records.some((r) => isPrivateAddress(r.address))) {
     throw new Error('приватный адрес за DNS-именем');
   }
+  const first = records[0];
+  if (!first) throw new Error('DNS не разрешился');
+  return first.address;
+}
+
+/**
+ * Соединение строго по уже проверенному адресу: подменять DNS между проверкой
+ * и запросом бессмысленно, потому что второго обращения к DNS не будет.
+ * Имя хоста при этом сохраняется — TLS и заголовок Host остаются верными.
+ */
+function pinnedAgent(address: string): Agent {
+  const family = isIP(address) === 6 ? 6 : 4;
+  return new Agent({
+    connect: {
+      // Подпись как у dns.lookup: с all: true ждут массив, иначе пару
+      lookup: (
+        _hostname: string,
+        options: { all?: boolean },
+        callback: (
+          err: Error | null,
+          address: string | { address: string; family: number }[],
+          family?: number,
+        ) => void,
+      ): void => {
+        if (options.all) callback(null, [{ address, family }]);
+        else callback(null, address, family);
+      },
+    },
+  });
 }
 
 function firstMeta(html: string, property: string): string | null {
@@ -99,15 +139,16 @@ export class LinkPreviewService {
     if (!this.enabled) return null;
     try {
       let url = new URL(rawUrl);
-      let response: Response | null = null;
+      let response: Awaited<ReturnType<typeof fetch>> | null = null;
 
       for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
         if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
-        await assertPublicHost(url);
+        const address = await resolvePublicAddress(url);
 
         response = await fetch(url, {
           redirect: 'manual',
           signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+          dispatcher: pinnedAgent(address),
           headers: {
             'User-Agent': 'VoxaBot/0.1 (+link-preview)',
             Accept: 'text/html,application/xhtml+xml',

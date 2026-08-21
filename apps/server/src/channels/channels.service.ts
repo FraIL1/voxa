@@ -158,7 +158,27 @@ export class ChannelsService {
     return dto;
   }
 
-  async updateChannel(id: string, input: UpdateChannelInput): Promise<ChannelDto> {
+  /**
+   * Трогать можно только тот канал, который и так видишь.
+   *
+   * Без этой проверки право «Управление каналами» вскрывало любой закрытый
+   * канал: достаточно было знать его id (а он остаётся известен всякому, кто
+   * когда-то имел доступ) и переписать список допущенных ролей на свою.
+   * Отвечаем «не найден», а не «нельзя»: существование закрытого канала —
+   * тоже сведения не для посторонних.
+   */
+  private async assertVisible(actorId: string, channelId: string): Promise<void> {
+    if (!(await this.users.canSeeChannel(actorId, channelId))) {
+      throw new NotFoundException('Канал не найден');
+    }
+  }
+
+  async updateChannel(
+    actorId: string,
+    id: string,
+    input: UpdateChannelInput,
+  ): Promise<ChannelDto> {
+    await this.assertVisible(actorId, id);
     const existing = await this.prisma.channel.findUnique({
       where: { id },
       include: { allowedRoles: { select: { roleId: true } } },
@@ -203,7 +223,8 @@ export class ChannelsService {
     return dto;
   }
 
-  async deleteChannel(id: string): Promise<string> {
+  async deleteChannel(actorId: string, id: string): Promise<string> {
+    await this.assertVisible(actorId, id);
     const existing = await this.prisma.channel.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Канал не найден');
 

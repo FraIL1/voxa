@@ -60,7 +60,7 @@ export class UsersController {
     @Body(new ZodValidationPipe(updatePresenceSchema)) body: UpdatePresenceInput,
   ): Promise<MeDto> {
     const me = await this.usersService.updatePresence(user.id, body);
-    if (body.mode) this.ws.broadcastPresenceMode(user.id, body.mode);
+    if (body.mode) await this.ws.broadcastPresenceMode(user.id, body.mode);
     // Строчка статуса живёт в тех же карточках, что и имя
     if (body.statusText !== undefined) await this.ws.handleUserRenamed(me);
     return me;

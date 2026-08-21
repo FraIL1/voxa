@@ -18,6 +18,11 @@ export class VoiceService {
     private readonly config: ConfigService<Env, true>,
   ) {}
 
+  /** Вправе ли человек вообще знать об этом канале (членство + закрытые каналы) */
+  canSeeChannel(userId: string, channelId: string): Promise<boolean> {
+    return this.users.canSeeChannel(userId, channelId);
+  }
+
   /** Комната LiveKit = голосовой канал; имя комнаты — id канала */
   async issueToken(userId: string, channelId: string): Promise<VoiceTokenDto> {
     const me = await this.prisma.user.findUnique({

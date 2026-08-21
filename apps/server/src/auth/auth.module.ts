@@ -17,7 +17,11 @@ export const ACCESS_TOKEN_TTL = '15m';
       inject: [ConfigService],
       useFactory: (config: ConfigService<Env, true>) => ({
         secret: config.get('JWT_ACCESS_SECRET', { infer: true }),
-        signOptions: { expiresIn: ACCESS_TOKEN_TTL },
+        signOptions: { expiresIn: ACCESS_TOKEN_TTL, algorithm: 'HS256' },
+        /* Алгоритм закреплён явно: иначе проверка принимает любой, каким
+           подписан сам токен, и подпись становится предметом торга с тем,
+           кто её прислал. Наследуется всеми verifyAsync (guard и WS). */
+        verifyOptions: { algorithms: ['HS256'] },
       }),
     }),
   ],

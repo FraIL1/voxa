@@ -4,7 +4,6 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import type Redis from 'ioredis';
 
-import { AdminModule } from './admin/admin.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { ChannelsModule } from './channels/channels.module';
@@ -57,7 +56,6 @@ import { WsModule } from './ws/ws.module';
     ReadStatesModule,
     VoiceModule,
     ModerationModule,
-    AdminModule,
     DmModule,
     FriendsModule,
     GuildsModule,

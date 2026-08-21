@@ -70,7 +70,7 @@ export class ChannelsController {
     @Param('channelId', ParseUUIDPipe) channelId: string,
     @Body(new ZodValidationPipe(updateChannelSchema)) body: UpdateChannelInput,
   ): Promise<ChannelDto> {
-    const dto = await this.channelsService.updateChannel(channelId, body);
+    const dto = await this.channelsService.updateChannel(user.id, channelId, body);
     this.audit.log(
       dto.guildId,
       user.id,
@@ -88,7 +88,7 @@ export class ChannelsController {
     @CurrentUser() user: RequestUser,
     @Param('channelId', ParseUUIDPipe) channelId: string,
   ): Promise<void> {
-    const guildId = await this.channelsService.deleteChannel(channelId);
+    const guildId = await this.channelsService.deleteChannel(user.id, channelId);
     this.audit.log(guildId, user.id, 'channel.delete', { type: 'channel', id: channelId });
   }
 

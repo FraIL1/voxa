@@ -3,6 +3,7 @@ import type { VoiceChannelStateDto, VoiceParticipantDto } from '@voxa/shared';
 
 interface VoiceState {
   channelId: string;
+  guildId: string;
   participant: VoiceParticipantDto;
 }
 
@@ -18,6 +19,13 @@ export class VoiceStateService {
   private readonly states = new Map<string, VoiceState>();
 
   /**
+   * Канал → его сервер. Держим отдельно и не чистим: список голосовых каналов
+   * маленький, зато опустевший канал всё равно знает, чей он, и рассылка о
+   * нём остаётся полноценной.
+   */
+  private readonly channelGuild = new Map<string, string>();
+
+  /**
    * Обновляет состояние пользователя; channelId=null — выход из голоса.
    * Возвращает затронутые каналы (старый при переходе/выходе + новый).
    */
@@ -25,6 +33,7 @@ export class VoiceStateService {
     userId: string,
     username: string,
     channelId: string | null,
+    guildId: string | null,
     muted: boolean,
     deafened: boolean,
     sharing = false,
@@ -33,11 +42,13 @@ export class VoiceStateService {
     const previous = this.states.get(userId);
     if (previous) affected.add(previous.channelId);
 
-    if (channelId === null) {
+    if (channelId === null || guildId === null) {
       this.states.delete(userId);
     } else {
+      this.channelGuild.set(channelId, guildId);
       this.states.set(userId, {
         channelId,
+        guildId,
         participant: { userId, username, muted, deafened, sharing },
       });
       affected.add(channelId);
@@ -48,6 +59,17 @@ export class VoiceStateService {
   /** В каком голосовом канале пользователь (null — не в голосе) */
   channelOf(userId: string): string | null {
     return this.states.get(userId)?.channelId ?? null;
+  }
+
+  /** Где сидит пользователь: канал и его сервер (null — не в голосе) */
+  locationOf(userId: string): { channelId: string; guildId: string } | null {
+    const state = this.states.get(userId);
+    return state ? { channelId: state.channelId, guildId: state.guildId } : null;
+  }
+
+  /** Сервер голосового канала, если он нам уже встречался */
+  guildOf(channelId: string): string | null {
+    return this.channelGuild.get(channelId) ?? null;
   }
 
   /** Принудительный мут (таймаут); вернёт канал для рассылки или null */
@@ -92,6 +114,7 @@ export class VoiceStateService {
     }
     return [...byChannel.entries()].map(([channelId, participants]) => ({
       channelId,
+      guildId: this.guildOf(channelId),
       participants,
     }));
   }

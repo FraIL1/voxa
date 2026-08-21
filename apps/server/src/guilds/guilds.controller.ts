@@ -145,10 +145,11 @@ export class GuildsController {
   @HttpCode(204)
   @RequirePermissions(Permissions.MANAGE_ROLES)
   async deleteRole(
+    @CurrentUser() user: RequestUser,
     @Param('guildId') guildId: string,
     @Param('roleId') roleId: string,
   ): Promise<void> {
-    await this.roles.remove(guildId, roleId);
+    await this.roles.remove(guildId, user.id, roleId);
   }
 
   @Put(':guildId/members/:userId/roles/:roleId')
@@ -167,11 +168,12 @@ export class GuildsController {
   @HttpCode(204)
   @RequirePermissions(Permissions.MANAGE_ROLES)
   async unassignRole(
+    @CurrentUser() user: RequestUser,
     @Param('guildId') guildId: string,
     @Param('userId') userId: string,
     @Param('roleId') roleId: string,
   ): Promise<void> {
-    await this.roles.unassign(guildId, roleId, userId);
+    await this.roles.unassign(guildId, user.id, roleId, userId);
   }
 
   @Get(':guildId/members')
