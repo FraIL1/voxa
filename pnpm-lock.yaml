@@ -122,7 +122,7 @@ importers:
         specifier: ^4.8.3
         version: 4.8.3
       undici:
-        specifier: ^7.16.0
+        specifier: ^7.29.0
         version: 7.29.0
       zod:
         specifier: ^3.24.1

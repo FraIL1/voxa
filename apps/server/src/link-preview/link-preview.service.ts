@@ -14,8 +14,12 @@ const MAX_BODY_BYTES = 512 * 1024;
 const MAX_REDIRECTS = 3;
 const URL_RE = /https?:\/\/[^\s<>"')\]]+/u;
 
-/** Приватные/служебные диапазоны — защита от SSRF (раздел 9 PRD) */
-function isPrivateAddress(address: string): boolean {
+/**
+ * Приватные/служебные диапазоны — защита от SSRF (раздел 9 PRD).
+ * Экспортируется ради тестов: это решение о безопасности, и оно должно
+ * проверяться напрямую, а не через побочные признаки.
+ */
+export function isPrivateAddress(address: string): boolean {
   if (isIP(address) === 4) {
     const parts = address.split('.').map(Number);
     const [a = 0, b = 0] = parts;
@@ -73,7 +77,7 @@ async function resolvePublicAddress(url: URL): Promise<string> {
  * и запросом бессмысленно, потому что второго обращения к DNS не будет.
  * Имя хоста при этом сохраняется — TLS и заголовок Host остаются верными.
  */
-function pinnedAgent(address: string): Agent {
+export function pinnedAgent(address: string): Agent {
   const family = isIP(address) === 6 ? 6 : 4;
   return new Agent({
     connect: {
