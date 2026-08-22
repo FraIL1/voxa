@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---------- Сборка ----------
-FROM node:22-alpine AS build
+FROM node:24-alpine AS build
 ENV CI=true
 RUN corepack enable
 WORKDIR /app
@@ -25,7 +25,7 @@ RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
     && pnpm --filter @voxa/server exec prisma generate
 
 # ---------- Рантайм ----------
-FROM node:22-alpine AS runtime
+FROM node:24-alpine AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=build /app /app
