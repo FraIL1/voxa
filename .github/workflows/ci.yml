@@ -30,7 +30,7 @@ jobs:
           --health-timeout 3s
           --health-retries 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # services не поддерживают команду запуска, поэтому MinIO — обычным
       # docker run с тем же зафиксированным образом, что и в docker-compose
@@ -46,9 +46,9 @@ jobs:
           echo "MinIO не поднялся:"; docker logs minio; exit 1
 
       # Версия pnpm берётся из поля packageManager в package.json
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
