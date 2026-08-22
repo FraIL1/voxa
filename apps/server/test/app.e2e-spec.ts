@@ -1702,19 +1702,43 @@ describe('Voxa: критический поток (e2e)', () => {
     const memberMe = await request(httpServer)
       .get('/api/auth/me')
       .set('Authorization', `Bearer ${memberAccess}`);
+    const memberId = (memberMe.body as MeDto).id;
 
     const opened = await request(httpServer)
       .post('/api/dm/conversations')
       .set('Authorization', `Bearer ${ownerAccess}`)
-      .send({ userId: (memberMe.body as MeDto).id })
+      .send({ userId: memberId })
       .expect(201);
     const conversationId = opened.body.id as string;
 
-    const memberSocket = io(baseUrl, { auth: { token: memberAccess }, transports: ['websocket'] });
-    await new Promise((resolve, reject) => {
-      memberSocket.once(WsEvents.Ready, resolve);
-      memberSocket.once('auth_error', () => reject(new Error('WS-авторизация не прошла')));
-    });
+    /* Сокеты прошлых сценариев закрываются без ожидания: disconnect() на
+       клиенте не ждёт, пока сервер это обработает. Из разговора же выводит
+       только закрытие ПОСЛЕДНЕГО окна, поэтому сперва дожидаемся полного
+       ухода участника. Без этого тест зелёный на быстрой машине и красный
+       на медленной — ровно так он и падал на CI. */
+    for (let attempt = 0; ; attempt++) {
+      const members = await request(httpServer)
+        .get(`/api/guilds/${guildId}/members`)
+        .set('Authorization', `Bearer ${ownerAccess}`)
+        .expect(200);
+      const found = (members.body as MemberDto[]).find((m) => m.id === memberId);
+      if (!found || found.status === 'offline') break;
+      if (attempt >= 100) throw new Error('участник так и не ушёл в офлайн');
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+
+    /* Два окна: разговор привязан к человеку, а не к вкладке. Закрытие
+       одного окна выводить из разговора не должно. */
+    const openSocket = async (): Promise<Socket> => {
+      const next = io(baseUrl, { auth: { token: memberAccess }, transports: ['websocket'] });
+      await new Promise((resolve, reject) => {
+        next.once(WsEvents.Ready, resolve);
+        next.once('auth_error', () => reject(new Error('WS-авторизация не прошла')));
+      });
+      return next;
+    };
+    const memberSocket = await openSocket();
+    const secondWindow = await openSocket();
 
     await request(httpServer)
       .post(`/api/dm/conversations/${conversationId}/call`)
@@ -1733,8 +1757,19 @@ describe('Voxa: критический поток (e2e)', () => {
       .expect(200);
     expect((during.body.participants as UserPublicDto[]).length).toBe(2);
 
-    /* Закрытая вкладка вместо кнопки «завершить»: разговор вдвоём без
-       одного из двоих не имеет смысла, поэтому он гаснет для всех. */
+    /* Закрыли одно окно из двух — человек остаётся в разговоре. Проверка
+       безопасная: если сервер ещё не обработал разрыв, участников всё
+       равно двое, а вот ошибочный выход она поймает. */
+    secondWindow.disconnect();
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    const stillThere = await request(httpServer)
+      .get(`/api/dm/conversations/${conversationId}/call`)
+      .set('Authorization', `Bearer ${ownerAccess}`)
+      .expect(200);
+    expect((stillThere.body.participants as UserPublicDto[]).length).toBe(2);
+
+    /* А закрытая последняя вкладка вместо кнопки «завершить» — уже выход:
+       разговор вдвоём без одного из двоих не имеет смысла. */
     memberSocket.disconnect();
 
     /* Ждём условие, а не время. Цепочка «разрыв → присутствие → выход из
