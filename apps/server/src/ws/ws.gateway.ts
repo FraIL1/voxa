@@ -252,23 +252,34 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const data = socket.data as SocketData;
     if (!data.userId) return;
 
-    // Закрытие активного окна может сделать человека отошедшим: остальные
-    // его окна свёрнуты — тогда статус меняется и без ухода в офлайн
-    const before = this.presence.statusOf(data.userId);
-    const wentOffline = await this.presence.disconnected(data.userId, socket.id);
-    const after = this.presence.statusOf(data.userId);
-    if (!wentOffline && before !== after) {
-      await this.emitPresence(data.userId, after);
-    }
-    if (wentOffline) {
-      await this.emitPresence(data.userId, 'offline');
+    /*
+     * Разрыв обрабатываем «мягко»: при остановке приложения все сокеты
+     * рвутся разом, и обработчик успевает пойти в базу уже после того,
+     * как Prisma закрылась. Ронять из-за этого процесс нельзя — уход в
+     * офлайн никого не спасает, а необработанный отказ валил весь прогон
+     * тестов при полностью зелёных тестах.
+     */
+    try {
+      // Закрытие активного окна может сделать человека отошедшим: остальные
+      // его окна свёрнуты — тогда статус меняется и без ухода в офлайн
+      const before = this.presence.statusOf(data.userId);
+      const wentOffline = await this.presence.disconnected(data.userId, socket.id);
+      const after = this.presence.statusOf(data.userId);
+      if (!wentOffline && before !== after) {
+        await this.emitPresence(data.userId, after);
+      }
+      if (wentOffline) {
+        await this.emitPresence(data.userId, 'offline');
 
-      // Оборванное соединение = выход из голосового канала
-      const leftChannel = this.voiceStates.drop(data.userId);
-      if (leftChannel) this.broadcastVoiceState(leftChannel);
+        // Оборванное соединение = выход из голосового канала
+        const leftChannel = this.voiceStates.drop(data.userId);
+        if (leftChannel) this.broadcastVoiceState(leftChannel);
 
-      // И выход из разговора в личке: иначе он висел бы с ушедшим внутри
-      for (const handler of this.offlineHandlers) handler(data.userId);
+        // И выход из разговора в личке: иначе он висел бы с ушедшим внутри
+        for (const handler of this.offlineHandlers) handler(data.userId);
+      }
+    } catch (error) {
+      this.logger.debug(`Разрыв соединения не доработан до конца: ${(error as Error).message}`);
     }
   }
 
